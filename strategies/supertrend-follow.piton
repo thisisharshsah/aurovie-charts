@@ -1,0 +1,19 @@
+// Supertrend
+//
+// An ATR-width band that RATCHETS: it may only tighten while price stays on its side, and
+// flips when price closes through. Follow the flip.
+//
+// The ratchet is the whole indicator — a plain band at mid ± ATR would whipsaw on every
+// bar. `dir` is +1 in an uptrend and -1 in a downtrend, and reads 0 during ATR warmup,
+// which is why the entries test the flip rather than the sign.
+strategy("Supertrend", overlay = true)
+
+[line, dir] = supertrend(10, 3)
+
+plot(line, title = "Supertrend", color = color.accent)
+
+if dir == 1 and dir[1] == -1
+    strategy.entry("trend", strategy.long)
+
+if dir == -1 and dir[1] == 1
+    strategy.close("trend")

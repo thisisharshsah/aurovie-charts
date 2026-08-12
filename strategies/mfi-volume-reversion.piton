@@ -1,0 +1,21 @@
+// Money Flow Reversion
+//
+// The money flow index is RSI weighted by volume: it asks not just whether price rose, but
+// whether volume came with it. Below 20 is exhaustion with the sellers spent.
+//
+// It is the only reversion rule here that can see volume, which is exactly why it belongs
+// beside RSI — compare the two on the same instrument and the difference IS the information
+// volume adds, measured rather than asserted.
+strategy("Money Flow Reversion", overlay = false)
+
+m = mfi(14)
+
+plot(m,  title = "MFI", color = color.accent)
+plot(20, title = "Oversold",   color = color.mute, style = style.step)
+plot(80, title = "Overbought", color = color.mute, style = style.step)
+
+if crossover(m, 20)
+    strategy.entry("mfi", strategy.long)
+
+if crossunder(m, 55)
+    strategy.close("mfi")

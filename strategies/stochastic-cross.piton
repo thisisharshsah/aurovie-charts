@@ -1,0 +1,20 @@
+// Stochastic Cross
+//
+// George Lane's oscillator: where the close sits in the recent high/low range. Buy when
+// %K crosses above %D while both are still low — momentum turning inside a pullback.
+//
+// The oversold condition matters. A bare %K/%D cross fires constantly in a trend and means
+// almost nothing; requiring the cross to happen below 30 is what makes it a signal.
+strategy("Stochastic Cross", overlay = false)
+
+[k, d] = stoch(14, 3)
+
+plot(k,  title = "%K", color = color.accent)
+plot(d,  title = "%D", color = color.s2)
+plot(20, title = "Oversold", color = color.mute, style = style.step)
+
+if crossover(k, d) and k < 30
+    strategy.entry("stoch", strategy.long)
+
+if crossunder(k, d) and k > 70
+    strategy.close("stoch")

@@ -1,0 +1,24 @@
+// ADX-Filtered Trend
+//
+// A moving-average crossover that only trades when Wilder's ADX says a trend actually
+// exists. Below 20, ADX is telling you the market is ranging and a crossover means little.
+//
+// The point of including it is comparative: run it beside "MA Crossover" and the filter's
+// value shows up as fewer trades, not as a better win rate. Whether that is worth it is an
+// expectancy question, which is what the scorecard answers.
+strategy("ADX-Filtered Trend", overlay = true)
+
+fast = ema(close, 20)
+slow = ema(close, 50)
+[adxv, plusDi, minusDi] = adx(14)
+
+trending = adxv > 20
+
+plot(fast, title = "Fast", color = color.accent)
+plot(slow, title = "Slow", color = color.mute)
+
+if crossover(fast, slow) and trending
+    strategy.entry("filtered", strategy.long)
+
+if crossunder(fast, slow)
+    strategy.close("filtered")

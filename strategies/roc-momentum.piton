@@ -1,0 +1,28 @@
+// Rate-of-Change Momentum
+//
+// The oldest momentum measurement there is: price now against price N bars ago. Long while
+// the change is positive and turning up.
+//
+// It is included as a CONTROL. Momentum this plain is the null hypothesis every more
+// elaborate trend strategy in this library should have to beat out of sample — and often
+// does not.
+//
+// NOTE, because it cost this file a rewrite: "rising" is `r > r[1]`, NOT `r > sma(r, 5)`.
+// `sma` reproduces the chart's running sum exactly, including that a single `na` poisons it
+// permanently — and `roc` is `na` for its first 20 bars. `sma(roc(close, 20), 5)` is
+// therefore `na` for the WHOLE run, every comparison against it is false, and the strategy
+// silently never trades. Feed an averager only a series that is already warm, or use `nz`
+// and accept the zeros it substitutes.
+strategy("ROC Momentum", overlay = false)
+
+r = roc(close, 20)
+rising = r > r[1]
+
+plot(r, title = "ROC", color = color.accent)
+plot(0, title = "Zero", color = color.mute, style = style.step)
+
+if crossover(r, 0) and rising
+    strategy.entry("roc", strategy.long)
+
+if crossunder(r, 0)
+    strategy.close("roc")

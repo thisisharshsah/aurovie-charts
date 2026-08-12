@@ -23,6 +23,19 @@ export interface ScriptPreset {
   overlay?: boolean;
 }
 
+/**
+ * One of the user's OWN saved strategies — the editable layer above the read-only preset library.
+ * The host persists these; this component only lists, loads, saves and deletes them through the
+ * callbacks below. `badge` is a short host-formatted profitability line (e.g. "+18% · Sharpe 0.7")
+ * so the editor need not understand a scorecard to show one.
+ */
+export interface SavedStrategy {
+  id: string | number;
+  title: string;
+  source: string;
+  badge?: string;
+}
+
 /** One half of a scored record, as the host returns it. */
 export interface ScriptMetrics {
   bars: number;
@@ -138,6 +151,21 @@ export interface ScriptEditorProps {
   onSweep?: () => void;
   sweep?: ScriptSweep | null;
   sweeping?: boolean;
+  /**
+   * The user's saved strategies (the editable layer). Absent/empty simply hides the "Yours"
+   * section, so a host without persistence is unaffected. The host owns the store.
+   */
+  savedLibrary?: SavedStrategy[];
+  /** Save the current source over the loaded strategy. The host decides create-vs-update. */
+  onSave?: () => void;
+  /** Save the current source as a NEW strategy under the given title. */
+  onSaveAs?: (title: string) => void;
+  /** Load a saved strategy into the editor. Falls back to onChange(source) when absent. */
+  onSelectSaved?: (s: SavedStrategy) => void;
+  /** Delete a saved strategy by id. */
+  onDeleteSaved?: (id: string | number) => void;
+  /** True when the editor has unsaved edits vs the loaded strategy — marks the Save button. */
+  dirty?: boolean;
 }
 
 const EXAMPLE = `indicator("Squeeze", overlay = false)
@@ -171,6 +199,12 @@ export function ScriptEditor({
   onSweep,
   sweep,
   sweeping,
+  savedLibrary,
+  onSave,
+  onSaveAs,
+  onSelectSaved,
+  onDeleteSaved,
+  dirty,
 }: ScriptEditorProps) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const gutterRef = useRef<HTMLDivElement>(null);
@@ -192,7 +226,17 @@ export function ScriptEditor({
 
   const [browsing, setBrowsing] = useState(false);
   const [showRows, setShowRows] = useState(false); // the sweep's per-instrument breakdown
+  const [savingAs, setSavingAs] = useState(false);
+  const [saveAsTitle, setSaveAsTitle] = useState("");
   const presets = library ?? [];
+  const saved = savedLibrary ?? [];
+  const commitSaveAs = () => {
+    const t = saveAsTitle.trim();
+    if (!t) return;
+    onSaveAs?.(t);
+    setSavingAs(false);
+    setSaveAsTitle("");
+  };
   // Only the first line of the preset's prose — enough to choose by, in a list this size.
   const gist = (d: string) => (d.split("\n").find((l) => l.trim().length > 0) ?? "").trim();
 
@@ -211,6 +255,16 @@ export function ScriptEditor({
     background: primary ? soft(th.line, 18) : "transparent",
     color: primary ? th.line : th.text,
   });
+
+  const sectionLabel: CSSProperties = {
+    padding: "8px 12px 2px",
+    fontFamily: th.font,
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    color: soft(th.text, 70),
+  };
 
   return (
     <div
@@ -237,13 +291,13 @@ export function ScriptEditor({
         <span style={{ fontFamily: th.font, fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: th.text }}>
           Script
         </span>
-        {presets.length > 0 && (
+        {(presets.length > 0 || saved.length > 0) && (
           <button
             style={{ ...btn(browsing), height: 22, padding: "0 9px", fontSize: 11 }}
             title="Load a strategy from the library"
             onClick={() => setBrowsing((b) => !b)}
           >
-            {browsing ? "Close library" : `Library · ${presets.length}`}
+            {browsing ? "Close library" : `Library · ${presets.length + saved.length}`}
           </button>
         )}
         <span style={{ flex: 1 }} />
@@ -270,11 +324,76 @@ export function ScriptEditor({
             {backtesting ? "Scoring…" : "Score"}
           </button>
         )}
+        {onSaveAs && (
+          <button
+            style={btn()}
+            onClick={() => {
+              setSavingAs(true);
+              setSaveAsTitle("");
+            }}
+            title="Save the current script as a new strategy"
+          >
+            Save as
+          </button>
+        )}
+        {onSave && (
+          <button
+            style={btn()}
+            onClick={onSave}
+            disabled={dirty === false}
+            title="Save changes to this strategy"
+          >
+            {dirty ? "Save •" : "Save"}
+          </button>
+        )}
         <button style={btn(true)} onClick={onRun} disabled={running} title="Run (Ctrl/Cmd + Enter)">
           {running ? "Running…" : "▶ Run"}
         </button>
         <button style={btn()} onClick={onClose} aria-label="Close editor">✕</button>
       </div>
+
+      {savingAs && (
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            alignItems: "center",
+            padding: "6px 10px",
+            borderBottom: `1px solid ${th.border}`,
+            background: th.background,
+          }}
+        >
+          <input
+            autoFocus
+            value={saveAsTitle}
+            onChange={(e) => setSaveAsTitle(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === "Enter") commitSaveAs();
+              if (e.key === "Escape") setSavingAs(false);
+            }}
+            placeholder="Name this strategy…"
+            style={{
+              flex: 1,
+              height: 24,
+              border: `1px solid ${th.border}`,
+              borderRadius: 6,
+              background: th.paneBackground,
+              color: th.textStrong,
+              fontFamily: th.font,
+              fontSize: 12,
+              padding: "0 8px",
+              outline: "none",
+            }}
+          />
+          <button style={btn(true)} disabled={!saveAsTitle.trim()} onClick={commitSaveAs}>
+            Save
+          </button>
+          <button style={btn()} onClick={() => setSavingAs(false)}>
+            Cancel
+          </button>
+        </div>
+      )}
 
       {browsing && (
         <div
@@ -299,6 +418,9 @@ export function ScriptEditor({
             Independent implementations of published techniques — a starting point to read and edit,
             not a product. Loading one replaces the editor's contents.
           </div>
+          {presets.length > 0 && saved.length > 0 && (
+            <div style={sectionLabel}>Built-in · read-only</div>
+          )}
           {presets.map((p) => (
             <button
               key={p.id}
@@ -326,6 +448,53 @@ export function ScriptEditor({
               </div>
             </button>
           ))}
+          {saved.length > 0 && (
+            <>
+              <div style={sectionLabel}>Yours · editable</div>
+              {saved.map((sv) => (
+                <div
+                  key={String(sv.id)}
+                  style={{ display: "flex", alignItems: "center", borderTop: `1px solid ${soft(th.border, 60)}` }}
+                >
+                  <button
+                    onClick={() => {
+                      if (onSelectSaved) onSelectSaved(sv);
+                      else onChange(sv.source);
+                      setBrowsing(false);
+                      taRef.current?.focus();
+                    }}
+                    title={`Load ${sv.title}`}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      textAlign: "left",
+                      padding: "8px 12px",
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
+                      fontFamily: th.font,
+                    }}
+                  >
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: th.textStrong }}>{sv.title}</div>
+                    {sv.badge && (
+                      <div style={{ fontSize: 11, lineHeight: 1.45, color: soft(th.text, 85), marginTop: 2, fontFamily: mono }}>
+                        {sv.badge}
+                      </div>
+                    )}
+                  </button>
+                  {onDeleteSaved && (
+                    <button
+                      onClick={() => onDeleteSaved(sv.id)}
+                      title={`Delete ${sv.title}`}
+                      style={{ ...btn(), height: 22, marginRight: 8, color: th.down }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
 

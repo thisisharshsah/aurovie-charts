@@ -1,0 +1,20 @@
+// Williams %R Reversion
+//
+// Larry Williams' oscillator — the mirror of the stochastic, on a -100..0 scale. Below -80
+// is "oversold": the close is near the bottom of its recent range.
+//
+// Like every reversion rule here it wins often and loses rarely but largely. Read the
+// expectancy and the max drawdown, not the win rate.
+strategy("Williams %R Reversion", overlay = false)
+
+w = willr(14)
+
+plot(w,   title = "%R", color = color.accent)
+plot(-80, title = "Oversold",   color = color.mute, style = style.step)
+plot(-20, title = "Overbought", color = color.mute, style = style.step)
+
+if crossover(w, -80)
+    strategy.entry("wr", strategy.long)
+
+if crossunder(w, -30)
+    strategy.close("wr")

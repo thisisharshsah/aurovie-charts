@@ -1,0 +1,20 @@
+// Turtle System 2 (55/20)
+//
+// The Turtles' slower channel: enter on a 55-bar breakout, leave on a 20-bar reversal.
+// Longer than the 20/10 variant, so it holds trends further and gives back more at the end.
+//
+// Both Turtle systems are in the library on purpose — run them side by side and the
+// difference between them is a lesson about holding period that no single backtest teaches.
+strategy("Turtle 55/20", overlay = true)
+
+[hi, mid, lo]    = donchian(55)
+[xHi, xMid, xLo] = donchian(20)
+
+plot(hi, title = "55 high", color = color.mute)
+plot(xLo, title = "20 low", color = color.s2)
+
+if close > hi[1]
+    strategy.entry("turtle", strategy.long)
+
+if close < xLo[1]
+    strategy.close("turtle")

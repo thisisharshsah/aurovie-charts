@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Chart, type Tool } from "../src/chart";
 import { Icon } from "./icons";
-import { ScriptEditor, type ScriptError, type ScriptPreset, type ScriptScorecard, type ScriptSweep } from "./ScriptEditor";
+import { ScriptEditor, type ScriptError, type ScriptPreset, type ScriptScorecard, type ScriptSweep, type SavedStrategy } from "./ScriptEditor";
 import { parseScriptDraw, type ScriptRender } from "../src/script";
 import { DARK, LIGHT, THEMES, THEME_NAMES, SERIES_PALETTE as IND_PALETTE, SWATCHES, CMP_COLORS, CHIP_INK } from "../src/util";
 import type { Drawing } from "../src/drawings";
@@ -99,10 +99,25 @@ export interface TradingChartProps {
    * without touching alerts, and so a host that has neither still gets alerts.
    */
   levels?: PriceLine[];
-  /** Score the current strategy. Host-supplied, like `onRunScript` — the chart never fetches. */
-  onBacktestScript?: (source: string) => Promise<ScriptScorecard | null>;
+  /**
+   * Score the current strategy. Host-supplied, like `onRunScript` — the chart never fetches. When
+   * a saved strategy is loaded, its id is passed too, so the host can cache the score against it.
+   */
+  onBacktestScript?: (source: string, savedId?: string | number) => Promise<ScriptScorecard | null>;
   /** Score across every instrument with stored history. Host-supplied, like the others. */
   onSweepScript?: (source: string) => Promise<ScriptSweep | null>;
+  /**
+   * The user's saved strategies — the editable layer above `scriptLibrary`. Host-persisted; the
+   * chart only lists, loads, saves and deletes them through the callbacks below. Absent → the
+   * editor simply shows no "Yours" section, so a host without persistence is unaffected.
+   */
+  savedLibrary?: SavedStrategy[];
+  /** Persist edits to the loaded saved strategy. Receives the current source and that strategy's id. */
+  onSaveScript?: (source: string, id: string | number) => Promise<void>;
+  /** Create a NEW saved strategy from the current source under `title`; return it so the editor tracks it. */
+  onSaveAsScript?: (source: string, title: string) => Promise<SavedStrategy | null>;
+  /** Delete a saved strategy by id. */
+  onDeleteSavedScript?: (id: string | number) => Promise<void>;
   /**
    * Mirror of the crosshair readout the widget already renders in its own legend, so a host can
    * drive chrome OUTSIDE the chart from the hovered bar (a price header that follows the scrub,
@@ -384,6 +399,10 @@ export function TradingChart({
   levels,
   onBacktestScript,
   onSweepScript,
+  savedLibrary,
+  onSaveScript,
+  onSaveAsScript,
+  onDeleteSavedScript,
   onCrosshair,
   scripts: hostScripts,
   lockedIndicators,
@@ -453,6 +472,7 @@ export function TradingChart({
   const [shortcuts, setShortcuts] = useState(false); // keyboard help overlay
   const [scriptOpen, setScriptOpen] = useState(false);
   const [scriptSrc, setScriptSrc] = useState("");
+  const [loadedSaved, setLoadedSaved] = useState<SavedStrategy | null>(null); // which saved strategy the editor is editing, if any
   const [scriptErr, setScriptErr] = useState<ScriptError | null>(null);
   const [scriptStatus, setScriptStatus] = useState<string | null>(null);
   const [scriptRunning, setScriptRunning] = useState(false);
@@ -1854,7 +1874,7 @@ export function TradingChart({
                   ? async () => {
                       setBacktesting(true);
                       try {
-                        setScorecard(await onBacktestScript(scriptSrc));
+                        setScorecard(await onBacktestScript(scriptSrc, loadedSaved?.id));
                       } catch {
                         // the host toasts the reason; the panel simply stays empty rather than
                         // showing a stale scorecard for a script that is no longer the one on screen
@@ -1883,6 +1903,40 @@ export function TradingChart({
               }
               sweep={sweep}
               sweeping={sweeping}
+              savedLibrary={savedLibrary}
+              onSelectSaved={(sv) => {
+                setScriptSrc(sv.source);
+                setLoadedSaved(sv);
+                setScorecard(null);
+                setSweep(null);
+                setScriptErr(null);
+              }}
+              onSave={
+                loadedSaved && onSaveScript
+                  ? async () => {
+                      await onSaveScript(scriptSrc, loadedSaved.id);
+                      // Clear "dirty" by remembering the source we just persisted.
+                      setLoadedSaved((prev) => (prev ? { ...prev, source: scriptSrc } : prev));
+                    }
+                  : undefined
+              }
+              onSaveAs={
+                onSaveAsScript
+                  ? async (title) => {
+                      const sv = await onSaveAsScript(scriptSrc, title);
+                      if (sv) setLoadedSaved(sv); // now editing the newly-saved strategy
+                    }
+                  : undefined
+              }
+              onDeleteSaved={
+                onDeleteSavedScript
+                  ? async (id) => {
+                      await onDeleteSavedScript(id);
+                      setLoadedSaved((prev) => (prev && prev.id === id ? null : prev));
+                    }
+                  : undefined
+              }
+              dirty={loadedSaved ? scriptSrc !== loadedSaved.source : undefined}
             />
           )}
           {/* Keyboard shortcuts — the chart's own keys, live while the pointer is over the plot */}

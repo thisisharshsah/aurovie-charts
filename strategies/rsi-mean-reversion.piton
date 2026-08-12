@@ -1,0 +1,21 @@
+// RSI Mean Reversion
+//
+// Welles Wilder's relative strength index, traded the way he described: buy exhaustion
+// below 30, leave on the return to the middle.
+//
+// Read its numbers carefully. Mean reversion wins often and loses rarely but LARGELY —
+// negative skew — which is exactly the return shape a naive Sharpe flatters. The deflated
+// figure exists for strategies like this one.
+strategy("RSI Mean Reversion", overlay = false)
+
+r = rsi(close, 14)
+
+plot(r,  title = "RSI",        color = color.accent)
+plot(30, title = "Oversold",   color = color.mute, style = style.step)
+plot(70, title = "Overbought", color = color.mute, style = style.step)
+
+if crossover(r, 30)
+    strategy.entry("reversion", strategy.long)
+
+if crossunder(r, 55)
+    strategy.close("reversion")

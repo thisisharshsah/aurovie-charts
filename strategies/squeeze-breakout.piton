@@ -1,0 +1,24 @@
+// Squeeze Breakout
+//
+// Volatility coils, then releases. When the Bollinger bands sit INSIDE the Keltner
+// channels, range is unusually tight; the trade is the direction price leaves in.
+//
+// This is the classic squeeze construction (Bollinger bands inside Keltner channels,
+// popularised by John Carter's TTM Squeeze), implemented from that public description.
+strategy("Squeeze Breakout", overlay = true)
+
+[bbUp, bbMid, bbLo] = bb(close, 20, 2)
+[kcUp, kcMid, kcLo] = keltner(20, 1.5, 20)
+
+squeezed = bbUp < kcUp and bbLo > kcLo
+
+plot(kcUp, title = "Keltner upper", color = color.mute)
+plot(kcLo, title = "Keltner lower", color = color.mute)
+plot(squeezed ? kcMid : na, title = "Squeeze", color = color.s3, style = style.circles, width = 2)
+
+// Enter on the bar that LEAVES a squeeze upward: coiled last bar, breaking the band now.
+if squeezed[1] and close > bbUp
+    strategy.entry("release", strategy.long)
+
+if close < kcMid
+    strategy.close("release")

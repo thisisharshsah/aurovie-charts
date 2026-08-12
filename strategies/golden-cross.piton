@@ -1,0 +1,21 @@
+// Golden Cross
+//
+// The 50/200-day crossover the financial press names. Slow enough that it trades a
+// handful of times a decade, which is the point: it is a REGIME filter wearing a
+// strategy's clothes, and its value is measured in drawdown avoided, not trades won.
+//
+// Expect very few out-of-sample trades on any normal window. That is honest evidence of
+// nothing rather than evidence of failure — the scorecard says so explicitly.
+strategy("Golden Cross", overlay = true)
+
+fast = sma(close, 50)
+slow = sma(close, 200)
+
+plot(fast, title = "SMA 50", color = color.accent)
+plot(slow, title = "SMA 200", color = color.mute)
+
+if crossover(fast, slow)
+    strategy.entry("golden", strategy.long)
+
+if crossunder(fast, slow)
+    strategy.close("golden")

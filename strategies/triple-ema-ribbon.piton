@@ -1,0 +1,24 @@
+// Triple EMA Ribbon
+//
+// Hold only while three exponential averages are stacked in order — 8 above 21 above 55.
+// The stack is the filter: any two averages cross constantly, three agreeing is rarer and
+// says the whole term structure of the trend points one way.
+//
+// Its weakness is the exit. By the time the stack breaks, a good part of the move is gone.
+strategy("Triple EMA Ribbon", overlay = true)
+
+f = ema(close, 8)
+m = ema(close, 21)
+s = ema(close, 55)
+
+plot(f, title = "EMA 8",  color = color.accent)
+plot(m, title = "EMA 21", color = color.s2)
+plot(s, title = "EMA 55", color = color.mute)
+
+stacked = f > m and m > s
+
+if stacked and not stacked[1]
+    strategy.entry("ribbon", strategy.long)
+
+if not stacked
+    strategy.close("ribbon")

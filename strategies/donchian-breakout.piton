@@ -1,0 +1,25 @@
+// Donchian Breakout
+//
+// Buy when price closes above the highest high of the last N bars; leave when it closes
+// below the lowest low of a shorter window. Richard Donchian's channel, and the core of
+// the Turtle Traders' published rules — a technique documented for decades, implemented
+// here from its description.
+//
+// It is a TREND system: it loses small and often, and pays for that with rare large wins.
+// Judged on win rate it looks terrible. Judged on expectancy it is the reason trend
+// following survived fifty years.
+strategy("Donchian Breakout", overlay = true)
+
+[upper, mid, lower] = donchian(20)
+[xUp, xMid, xLow]   = donchian(10)
+
+plot(upper, title = "Upper", color = color.mute)
+plot(lower, title = "Lower", color = color.mute)
+
+// `upper[1]` is the channel BEFORE this bar — comparing against `upper` would compare the
+// high to a channel that already contains it, and nothing would ever break out.
+if close > upper[1]
+    strategy.entry("breakout", strategy.long)
+
+if close < xLow[1]
+    strategy.close("breakout")

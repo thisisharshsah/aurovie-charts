@@ -1,0 +1,21 @@
+// CCI Reversal
+//
+// Donald Lambert's commodity channel index measures how far price sits from its own mean
+// in units of mean deviation. Lambert traded the ±100 band as a trend signal; the reversal
+// reading below is the other common published use.
+//
+// Note the asymmetry: entry needs -100 crossed from below (exhaustion ending), exit takes
+// the return to zero rather than waiting for +100, because the far band arrives rarely.
+strategy("CCI Reversal", overlay = false)
+
+c = cci(20)
+
+plot(c,    title = "CCI", color = color.accent)
+plot(100,  title = "+100", color = color.mute, style = style.step)
+plot(-100, title = "-100", color = color.mute, style = style.step)
+
+if crossover(c, -100)
+    strategy.entry("cci", strategy.long)
+
+if crossover(c, 0)
+    strategy.close("cci")

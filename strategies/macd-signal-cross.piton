@@ -1,0 +1,20 @@
+// MACD Signal Cross
+//
+// Gerald Appel's moving-average convergence/divergence: the distance between a fast and a
+// slow EMA, and an EMA of that distance. Long while the line is above its signal.
+//
+// The histogram is the difference between them, so it crosses zero at exactly the same
+// bars — it is plotted because it reads more clearly, not because it says anything more.
+strategy("MACD Signal Cross", overlay = false)
+
+[line, signal, hist] = macd(close, 12, 26, 9)
+
+plot(hist,   title = "Histogram", color = color.mute, style = style.histogram)
+plot(line,   title = "MACD",      color = color.accent)
+plot(signal, title = "Signal",    color = color.s2)
+
+if crossover(line, signal)
+    strategy.entry("macd", strategy.long)
+
+if crossunder(line, signal)
+    strategy.close("macd")

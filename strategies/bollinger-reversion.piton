@@ -1,0 +1,21 @@
+// Bollinger Band Reversion
+//
+// John Bollinger's bands: a moving average with rails at two standard deviations. Traded
+// as reversion — buy the lower rail, leave at the middle.
+//
+// Bollinger himself warned against exactly this reading: a touch of the lower band in a
+// downtrend is not a bargain, it is a downtrend. It is here because it is the most common
+// published use, and because seeing it fail out of sample teaches more than being told.
+strategy("Bollinger Reversion", overlay = true)
+
+[upper, mid, lower] = bb(close, 20, 2)
+
+plot(upper, title = "Upper",  color = color.mute)
+plot(mid,   title = "Middle", color = color.accent)
+plot(lower, title = "Lower",  color = color.mute)
+
+if crossunder(close, lower)
+    strategy.entry("reversion", strategy.long)
+
+if crossover(close, mid)
+    strategy.close("reversion")

@@ -1,0 +1,33 @@
+// ATR trailing stop — ride the trend, exit mechanically
+//
+// Enter long when price closes above its 50-bar average, then protect the position with a stop set
+// a multiple of ATR below the close and RE-ARMED every bar. The stop only ever tightens in a rising
+// market because it trails the close; it never widens on the way down, because the exit is taken
+// the moment the level is touched.
+//
+// This is the asymmetry the Covenant is built around (BLUEPRINT Part V): small mechanical losses,
+// occasional large riding wins. Humans invert it reliably — they take profits like thieves and hold
+// losses like heirlooms. The machine does not hope.
+//
+// WHAT THE BACKTEST WILL AND WILL NOT TELL YOU. Stops fill intra-bar here, which is honest, but two
+// costs are modelled deliberately pessimistically because the alternative flatters: a bar that GAPS
+// through the stop fills at the open, not at the stop; and when a bar touches both the stop and a
+// target, the stop is taken, because which came first is unknowable without tick data.
+//@version=1
+strategy("ATR trailing stop")
+
+trend = sma(close, 50)
+atr14 = atr(14)
+
+if close > trend and strategy.position_size == 0
+    strategy.entry("L", strategy.long)
+
+// Re-armed every bar: this is what makes it TRAIL. A stop set once at entry is a fixed stop.
+strategy.exit("L", close - 3 * atr14, na)
+
+// Stand down when the trend breaks, rather than waiting to be stopped out of a position the regime
+// no longer supports. Cash is a position (Covenant 4).
+if close < trend
+    strategy.close("L")
+
+plot(trend)

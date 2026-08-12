@@ -1,0 +1,20 @@
+// Moving Average Crossover
+//
+// Long while the fast average is above the slow one. The oldest published trend rule
+// there is; the 50/200 pairing is the one the financial press calls a "golden cross".
+//
+// Included because it is the honest baseline: any strategy that cannot beat this, after
+// costs and out of sample, is not earning its complexity.
+strategy("MA Crossover", overlay = true)
+
+fast = ema(close, 20)
+slow = ema(close, 50)
+
+plot(fast, title = "Fast", color = color.accent)
+plot(slow, title = "Slow", color = color.mute)
+
+if crossover(fast, slow)
+    strategy.entry("trend", strategy.long)
+
+if crossunder(fast, slow)
+    strategy.close("trend")
