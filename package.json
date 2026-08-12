@@ -1,9 +1,9 @@
 {
   "name": "aurovie-charts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Framework-agnostic canvas charting engine — a TradingView-class financial chart (candles/volume, indicators, drawings, crosshair, pan/zoom) with a datafeed abstraction. React-free core; optional ./react binding.",
   "license": "MIT",
-  "author": "",
+  "author": "Harsh Kumar Sah",
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.js",
@@ -17,11 +17,12 @@
     "./react": {
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.js"
-    }
+    },
+    "./standalone": "./dist/aurovie-charts.standalone.global.js"
   },
   "files": ["dist", "README.md", "LICENSE", "CHANGELOG.md"],
   "scripts": {
-    "build": "tsup && node scripts/preserve-use-client.mjs",
+    "build": "node scripts/clean-dist.mjs && tsup && node scripts/preserve-use-client.mjs",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
@@ -42,9 +43,9 @@
     "typescript": "^5.4.0"
   },
   "engines": { "node": ">=18" },
-  "repository": { "type": "git", "url": "git+https://github.com/OWNER/aurovie-charts.git" },
-  "homepage": "https://github.com/OWNER/aurovie-charts#readme",
-  "bugs": { "url": "https://github.com/OWNER/aurovie-charts/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/thisisharshsah/aurovie-charts.git" },
+  "homepage": "https://github.com/thisisharshsah/aurovie-charts#readme",
+  "bugs": { "url": "https://github.com/thisisharshsah/aurovie-charts/issues" },
   "keywords": [
     "charting",
     "candlestick",

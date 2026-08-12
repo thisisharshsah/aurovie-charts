@@ -112,6 +112,43 @@ ma50 · ma200 · ema21 · vwap · boll · donch · rsi · macd · atr · stoch �
 - `TradingChart` — the full self-contained widget (toolbar + drawing rail + legend) wired to a `DataFeed`
 - Types: `TradingChartProps`, `TimeframeOption`
 
+### Driving host chrome from the widget
+
+The widget owns its toolbar and legend, but a host usually has chrome of its own to keep in sync.
+Three props open that up without giving up the batteries-included widget:
+
+```tsx
+<TradingChart
+  datafeed={feed}
+  symbol="DEMO"
+  // mirror the crosshair into your own price header
+  onCrosshair={(bar) => setScrubbed(bar)}
+  // draw series YOU computed (a model forecast, an equity curve)
+  scripts={forecast ? [forecast] : []}
+  // gate indicators behind a plan; locked entries stay listed, with a lock
+  lockedIndicators={plan === "free" ? ["rsi", "macd", "boll"] : []}
+  onLockedIndicator={(id) => openUpgrade(id)}
+/>
+```
+
+`scripts` takes the same `ScriptRender` shape the script editor produces (`parseScriptDraw` builds
+one). Host series are the host's to invalidate — the widget clears the *editor's* scripts when the
+symbol or interval changes, but never yours, since only you know whether you have recomputed.
+
+## Standalone build (no ES modules)
+
+For hosts that cannot import an ES module — a React Native WebView, a `<script>` tag, a page that
+inlines its whole bundle — `aurovie-charts/standalone` is the React-free core as one self-contained
+IIFE that defines `window.AurovieCharts`:
+
+```html
+<script src="node_modules/aurovie-charts/dist/aurovie-charts.standalone.global.js"></script>
+<script>
+  const chart = new AurovieCharts.Chart(document.getElementById("chart"), { theme: AurovieCharts.DARK });
+  chart.setData(bars);
+</script>
+```
+
 ## Examples
 
 See [`examples/`](./examples) — a zero-framework `vanilla` example and a `react` example.

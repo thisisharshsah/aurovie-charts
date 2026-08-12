@@ -103,6 +103,32 @@ export interface TradingChartProps {
   onBacktestScript?: (source: string) => Promise<ScriptScorecard | null>;
   /** Score across every instrument with stored history. Host-supplied, like the others. */
   onSweepScript?: (source: string) => Promise<ScriptSweep | null>;
+  /**
+   * Mirror of the crosshair readout the widget already renders in its own legend, so a host can
+   * drive chrome OUTSIDE the chart from the hovered bar (a price header that follows the scrub,
+   * say). Null bar = the pointer left the plot.
+   *
+   * Purely an observer: the widget's legend is unaffected by whether anyone listens.
+   */
+  onCrosshair?: (bar: Bar | null, values: LegendValue[]) => void;
+  /**
+   * Host-computed series drawn with the same machinery as a user script — a model forecast, a
+   * backtest equity curve, anything the host calculates rather than the engine.
+   *
+   * Kept separate from the script editor's output: these are the HOST's, so the widget never
+   * clears them on a symbol/interval change (it cannot know whether the host has already
+   * recomputed). Bar-alignment is therefore the host's responsibility — a stale series here
+   * draws misaligned, exactly as a lying chart would.
+   */
+  scripts?: ScriptRender[];
+  /**
+   * Indicator ids the host does not permit (a subscription tier, a data entitlement). They stay
+   * VISIBLE and listed — a lock the user can see is an upsell; a hidden feature is just absence —
+   * but selecting one fires `onLockedIndicator` instead of activating it.
+   */
+  lockedIndicators?: string[];
+  /** Fired when the user picks a locked indicator, so the host can prompt (e.g. an upgrade sheet). */
+  onLockedIndicator?: (id: string) => void;
 }
 
 const DEFAULT_TF: TimeframeOption[] = [
@@ -291,6 +317,10 @@ export function TradingChart({
   levels,
   onBacktestScript,
   onSweepScript,
+  onCrosshair,
+  scripts: hostScripts,
+  lockedIndicators,
+  onLockedIndicator,
 }: TradingChartProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -351,6 +381,8 @@ export function TradingChart({
   const [backtesting, setBacktesting] = useState(false);
   const [sweep, setSweep] = useState<ScriptSweep | null>(null);
   const [sweeping, setSweeping] = useState(false);
+  // The script EDITOR's output. Host-supplied `scripts` are merged in at render (see `allScripts`)
+  // and deliberately kept out of this state: the two have different lifetimes.
   const [scripts, setScripts] = useState<ScriptRender[]>([]);
   const [loading, setLoading] = useState(true);
   // one write per change, so the chart comes back exactly as the user left it
@@ -487,9 +519,11 @@ export function TradingChart({
   // The engine is created once, so route the (possibly-changing) price-line callbacks through refs.
   const axisClickRef = useRef(onAxisClickPrice);
   const removeLineRef = useRef(onPriceLineRemove);
+  const crosshairRef = useRef(onCrosshair);
   useEffect(() => {
     axisClickRef.current = onAxisClickPrice;
     removeLineRef.current = onPriceLineRemove;
+    crosshairRef.current = onCrosshair;
   });
 
   // "Auto" follows the host app (theme prop + design-token override, so it stays on-brand); a
@@ -504,7 +538,10 @@ export function TradingChart({
     if (!hostRef.current) return;
     const chart = new Chart(hostRef.current, {
       theme: th,
-      onCrosshair: (bar, values) => setLegend({ bar, values }),
+      onCrosshair: (bar, values) => {
+        setLegend({ bar, values });
+        crosshairRef.current?.(bar, values);
+      },
       onViewChange: (v) => setView(v),
       onAxisClickPrice: (p) => axisClickRef.current?.(p),
       onPriceLineRemove: (id) => removeLineRef.current?.(id),
@@ -680,10 +717,15 @@ export function TradingChart({
   );
   useEffect(() => chartRef.current?.setMagnet(magnet), [magnet]);
   useEffect(() => chartRef.current?.setVolumeProfileVisible(vpvr), [vpvr]);
-  useEffect(() => chartRef.current?.setScripts(scripts), [scripts]);
+  // Host series first, so a script the user wrote draws over them rather than under.
+  const allScripts = useMemo(() => [...(hostScripts ?? []), ...scripts], [hostScripts, scripts]);
+  useEffect(() => chartRef.current?.setScripts(allScripts), [allScripts]);
   // A script's plots are bar-aligned to the data they ran on, so a symbol or interval change
   // invalidates them. Dropping them is the honest move — redrawing stale series against new bars
   // would be a chart that lies.
+  //
+  // Only the EDITOR's scripts are dropped: host-supplied ones are the host's to invalidate, and it
+  // is the only side that knows whether it has already recomputed for the new symbol.
   useEffect(() => {
     setScripts([]);
     setScriptStatus(null);
@@ -754,16 +796,20 @@ export function TradingChart({
   }, [active]);
   // The active indicators resolved with their (possibly overridden) periods, stable colour, hidden
   // flag, and a display label — drives both the engine and the on-chart legend chips.
+  //
+  // Locked ids are filtered here rather than only at the toggle, so an entitlement that lapses (or
+  // a host that seeds a locked id via `indicators`) stops DRAWING immediately instead of leaving a
+  // paid study on the chart until the user happens to toggle it.
   const activeInds = useMemo(
     () =>
-      INDS.filter((d) => active.includes(d.id)).map((d) => {
+      INDS.filter((d) => active.includes(d.id) && !lockedIndicators?.includes(d.id)).map((d) => {
         const inputs = indInputs[d.id] ?? d.inputs;
         const period = inputs[0];
         const adjustable = SINGLE_PERIOD.has(d.kind) && period != null;
         const label = !adjustable ? d.label : /\d/.test(d.label) ? d.label.replace(/\d+/, String(period)) : `${d.label} ${period}`;
         return { id: d.id, kind: d.kind, pane: d.pane, inputs, color: indColors[d.id] ?? IND_PALETTE[0], label, adjustable, period, hidden: indHidden.includes(d.id) };
       }),
-    [active, indInputs, indColors, indHidden],
+    [active, indInputs, indColors, indHidden, lockedIndicators],
   );
   useEffect(() => {
     // hidden indicators are simply not sent to the engine (chips still list them, dimmed)
@@ -816,7 +862,18 @@ export function TradingChart({
     setTool(t);
     chartRef.current?.setTool(t);
   };
-  const toggleInd = (id: string) => setActive((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]));
+  // Turning an indicator OFF is never gated — only turning one on. A user whose entitlement lapses
+  // while an indicator is active must still be able to clear it.
+  const isLocked = (id: string) => !!lockedIndicators?.includes(id);
+  const toggleInd = (id: string) =>
+    setActive((a) => {
+      if (a.includes(id)) return a.filter((x) => x !== id);
+      if (isLocked(id)) {
+        onLockedIndicator?.(id);
+        return a;
+      }
+      return [...a, id];
+    });
   const stepPeriod = (id: string, cur: number, dir: number) => {
     const next = Math.max(1, Math.min(500, cur + dir));
     setIndInputs((m) => ({ ...m, [id]: [next] }));
@@ -1779,14 +1836,17 @@ export function TradingChart({
                         <div key={g.label}>
                           <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text, padding: "8px 10px 4px" }}>{g.label}</div>
                           {items.map((d) => {
-                            const on = active.includes(d.id);
+                            const locked = isLocked(d.id);
+                            const on = active.includes(d.id) && !locked;
                             return (
                               <button
                                 key={d.id}
                                 onClick={() => toggleInd(d.id)}
-                                style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "8px 10px", border: "none", borderRadius: 7, cursor: "pointer", textAlign: "left", fontFamily: th.font, fontSize: 13, color: th.textStrong, background: on ? `color-mix(in srgb, ${th.line} 12%, transparent)` : "transparent" }}
+                                aria-disabled={locked}
+                                title={locked ? `${d.label} — not included in your plan` : undefined}
+                                style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "8px 10px", border: "none", borderRadius: 7, cursor: "pointer", textAlign: "left", fontFamily: th.font, fontSize: 13, color: locked ? th.text : th.textStrong, background: on ? `color-mix(in srgb, ${th.line} 12%, transparent)` : "transparent" }}
                               >
-                                <span style={{ width: 14, textAlign: "center", color: on ? th.line : th.text }}>{on ? "✓" : "＋"}</span>
+                                <span style={{ width: 14, textAlign: "center", color: on ? th.line : th.text }}>{locked ? "🔒" : on ? "✓" : "＋"}</span>
                                 {d.label}
                               </button>
                             );
