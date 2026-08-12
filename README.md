@@ -135,6 +135,31 @@ Three props open that up without giving up the batteries-included widget:
 one). Host series are the host's to invalidate — the widget clears the *editor's* scripts when the
 symbol or interval changes, but never yours, since only you know whether you have recomputed.
 
+### Instrument header, ranges, and sessions
+
+```tsx
+<TradingChart
+  datafeed={feed}
+  symbol="GMFBS"
+  header={{
+    name: "Ganapati Laghubitta Bittiya Sanstha Limited",
+    sector: "Microfinance",
+    stats: [{ label: "52W", value: "1,130.5-1,688.0" }, { label: "Vol", value: "24" }],
+    price: { value: "1,160.00", change: "▲ 27.00 (2.38%)", direction: "up" },
+  }}
+  ranges={[{ label: "6M", days: 180 }, { label: "1Y", days: 365 }, { label: "All", days: null }]}
+  session={{ openMin: 11 * 60, closeMin: 15 * 60, days: [0, 1, 2, 3, 4], utc: true }}
+/>
+```
+
+Every `header` field is optional — a field you cannot fill is omitted, never rendered as a dash or
+a zero, which would state something false about the instrument. `priceSlot` replaces the price
+block entirely when your ticker animates.
+
+`session` drives the intraday out-of-hours shading. It defaults to `US_EQUITIES_SESSION`, so set it
+for any other venue or the shading marks the wrong bars. Use `utc: true` when your bar times are
+exchange wall-clock stamped as UTC — otherwise the shading is computed in the *reader's* timezone.
+
 ## Standalone build (no ES modules)
 
 For hosts that cannot import an ES module — a React Native WebView, a `<script>` tag, a page that

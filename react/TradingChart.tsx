@@ -9,7 +9,7 @@ import { ScriptEditor, type ScriptError, type ScriptPreset, type ScriptScorecard
 import { parseScriptDraw, type ScriptRender } from "../src/script";
 import { DARK, LIGHT, THEMES, THEME_NAMES, SERIES_PALETTE as IND_PALETTE, SWATCHES, CMP_COLORS, CHIP_INK } from "../src/util";
 import type { Drawing } from "../src/drawings";
-import type { Bar, DataFeed, IndicatorInstance, LegendValue, PriceLine, ScaleMode, SeriesType, Theme, ChartMarker } from "../src/types";
+import type { Bar, DataFeed, IndicatorInstance, LegendValue, PriceLine, ScaleMode, SeriesType, SessionSpec, Theme, ChartMarker } from "../src/types";
 
 // Drawings persist per symbol in localStorage, so they survive reloads + symbol switches.
 const drawKey = (s: string) => `aurovie-chart-drawings:${s.toUpperCase()}`;
@@ -129,7 +129,62 @@ export interface TradingChartProps {
   lockedIndicators?: string[];
   /** Fired when the user picks a locked indicator, so the host can prompt (e.g. an upgrade sheet). */
   onLockedIndicator?: (id: string) => void;
+  /**
+   * The exchange's trading session, driving the intraday out-of-hours shading (which the user
+   * toggles in chart settings). Defaults to US equities — set it for any other venue, or the
+   * shading marks the wrong bars.
+   */
+  session?: SessionSpec;
+  /**
+   * Visible-window presets ("1M · 6M · 1Y · All"), shown as a strip in the toolbar. Pass `false` to
+   * hide it, or your own list to match the history you actually serve — offering 5Y for an
+   * instrument with six months of bars is a dead button.
+   */
+  ranges?: RangePreset[] | false;
+  /**
+   * An instrument identity block above the toolbar — ticker, name, sector, and whatever reference
+   * stats the host actually has. Omitted entirely when absent, so a chart embedded in a page that
+   * already names the instrument doesn't say it twice.
+   */
+  header?: InstrumentHeader;
 }
+
+/**
+ * The identity of what is being charted. Every field is optional because instrument metadata is
+ * never uniformly available: an index has no sector, a freshly-listed name has no 52-week range.
+ * A field the host cannot fill is simply not rendered — never rendered as "—" or a zero, which
+ * would state something false about the instrument.
+ */
+export interface InstrumentHeader {
+  /** Defaults to the chart's `symbol` prop. */
+  ticker?: string;
+  name?: string;
+  sector?: string;
+  /** Reference stats: 52-week range, volume, trade count, as-of date. */
+  stats?: { label?: string; value: string }[];
+  /** The headline price. Ignored when `priceSlot` is given. */
+  price?: { value: string; change?: string; direction?: "up" | "down" | null };
+  /**
+   * Replaces the rendered price block — for hosts whose ticker animates (a rolling number, a
+   * flash-on-change). The widget owns the layout; the host owns the motion.
+   */
+  priceSlot?: ReactNode;
+}
+
+export interface RangePreset {
+  label: string;
+  /** Days back from the newest bar; `null` fits the whole history. */
+  days: number | null;
+}
+
+const DEFAULT_RANGES: RangePreset[] = [
+  { label: "1M", days: 30 },
+  { label: "3M", days: 90 },
+  { label: "6M", days: 180 },
+  { label: "1Y", days: 365 },
+  { label: "5Y", days: 1825 },
+  { label: "All", days: null },
+];
 
 const DEFAULT_TF: TimeframeOption[] = [
   { label: "1m", value: "1m" },
@@ -321,6 +376,9 @@ export function TradingChart({
   scripts: hostScripts,
   lockedIndicators,
   onLockedIndicator,
+  session,
+  ranges,
+  header,
 }: TradingChartProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -333,13 +391,19 @@ export function TradingChart({
   const [tool, setTool] = useState<Tool>("cross");
   // Seed the active indicators from a host grammar spec (e.g. AAPL C VWAP RSI); a chrome-less tile with
   // no spec still shows MA50 so it never reads as an empty study list.
-  const [active, setActive] = useState<string[]>(indicators && indicators.length ? indicators : ["ma50"]);
+  // `??`, not a truthiness check on length: a host passing [] is SAYING "start clean", and the old
+  // test treated that identically to passing nothing — so an explicit empty list still got MA50.
+  const [active, setActive] = useState<string[]>(indicators ?? ["ma50"]);
   const [indInputs, setIndInputs] = useState<Record<string, number[]>>({}); // per-indicator period overrides
   const [indHidden, setIndHidden] = useState<string[]>([]); // active-but-hidden indicators (eye toggled off)
   const [hoverInd, setHoverInd] = useState<string | null>(null); // legend chip under the cursor
   const colorAssign = useRef<Record<string, string>>({}); // stable per-indicator colour (kept across add/remove)
   const [scaleMode, setScaleMode] = useState<ScaleMode>("normal");
   const [legend, setLegend] = useState<{ bar: Bar | null; values: LegendValue[] }>({ bar: null, values: [] });
+  // The newest loaded bar, so the legend reads out the LATEST values when nothing is hovered.
+  // A chart at rest showing only a ticker symbol makes the reader move the mouse to learn the
+  // price it is already displaying.
+  const [latest, setLatest] = useState<Bar | null>(null);
   const [selection, setSelection] = useState<{ id: number; color?: string; width?: number; style?: "solid" | "dashed" | "dotted"; x: number; y: number } | null>(null);
   const [objects, setObjects] = useState<Drawing[]>([]); // the objects-panel list (mirrors the engine's drawings)
   const [objectsOpen, setObjectsOpen] = useState(false);
@@ -348,6 +412,7 @@ export function TradingChart({
   const [speed, setSpeed] = useState(1);
   const [compares, setCompares] = useState<{ symbol: string; color: string }[]>([]);
   const [cmpInput, setCmpInput] = useState("");
+  const [cmpHits, setCmpHits] = useState<{ symbol: string; description: string }[]>([]);
   const [railMenu, setRailMenu] = useState<string | null>(null); // open rail group fly-out
   const [groupTool, setGroupTool] = useState<Record<string, Tool>>(() => Object.fromEntries(RAIL_GROUPS.map((g) => [g.id, g.tools[0].t])));
   const [indModal, setIndModal] = useState(false);
@@ -625,6 +690,7 @@ export function TradingChart({
         if (!alive) return;
         setLoading(false);
         chart.setData(res.bars, res.dataVersion);
+        setLatest(res.bars[res.bars.length - 1] ?? null);
         setBoxEff(chart.getBrickSize()); // auto box depends on the freshly loaded data
         chart.setDrawings(loadDrawings(symbol)); // restore this symbol's saved drawings
       })
@@ -632,8 +698,15 @@ export function TradingChart({
         if (!alive) return;
         setLoading(false);
         chart.setData([], undefined);
+        setLatest(null);
       });
-    const unsub = datafeed.subscribe?.(symbol, resolution, (bar) => alive && chart.update(bar));
+    const unsub = datafeed.subscribe?.(symbol, resolution, (bar) => {
+      if (!alive) return;
+      chart.update(bar);
+      // A realtime tick moves the newest bar, so the at-rest legend has to follow it — otherwise
+      // the resting readout freezes at the price the chart happened to load with.
+      setLatest((cur) => (cur && bar.time < cur.time ? cur : bar));
+    });
     return () => {
       alive = false;
       unsub?.();
@@ -731,6 +804,9 @@ export function TradingChart({
     setScriptStatus(null);
   }, [symbol, resolution]);
   useEffect(() => chartRef.current?.setSessions(sessions), [sessions]);
+  useEffect(() => {
+    if (session) chartRef.current?.setSession(session);
+  }, [session]);
   useEffect(() => chartRef.current?.setCountdown(countdown), [countdown]);
   useEffect(() => chartRef.current?.setLoading(loading), [loading]);
   // The identity mark behind the plot follows whatever the chart is actually showing.
@@ -879,13 +955,46 @@ export function TradingChart({
     setIndInputs((m) => ({ ...m, [id]: [next] }));
   };
   const toggleHide = (id: string) => setIndHidden((h) => (h.includes(id) ? h.filter((x) => x !== id) : [...h, id]));
-  const addCompare = () => {
-    const s = cmpInput.trim().toUpperCase();
+  const addCompare = (sym?: string) => {
+    const s = (sym ?? cmpInput).trim().toUpperCase();
     setCmpInput("");
+    setCmpHits([]);
     if (!s || s === symbol.toUpperCase() || compares.some((c) => c.symbol === s)) return;
     setCompares((cs) => [...cs, { symbol: s, color: CMP_COLORS[cs.length % CMP_COLORS.length] }]);
   };
   const removeCompare = (s: string) => setCompares((cs) => cs.filter((c) => c.symbol !== s));
+
+  // Visible-window presets. Measured back from the newest BAR, not from today: a symbol that
+  // stopped trading a month ago would otherwise get an empty window for "1M".
+  const rangeList = ranges === false ? [] : (ranges ?? DEFAULT_RANGES);
+  const applyRange = (days: number | null) => {
+    const c = chartRef.current;
+    if (!c) return;
+    if (days == null) c.fit();
+    else c.showSince((latest?.time ?? Math.floor(Date.now() / 1000)) - days * 86400);
+  };
+
+  // Compare-box suggestions. The DATAFEED owns symbol lookup — the widget still never fetches — so a
+  // feed that implements `searchSymbols` gets a picker and one that doesn't gets a plain input where
+  // typing a ticker works exactly as before. Debounced, because this fires per keystroke.
+  useEffect(() => {
+    const q = cmpInput.trim();
+    if (menu !== "compare" || !datafeed.searchSymbols || !q) {
+      setCmpHits([]);
+      return;
+    }
+    let alive = true;
+    const t = setTimeout(() => {
+      datafeed
+        .searchSymbols!(q)
+        .then((r) => alive && setCmpHits(r.slice(0, 6)))
+        .catch(() => alive && setCmpHits([]));
+    }, 180);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [cmpInput, menu, datafeed]);
 
   // Renko/P&F/Kagi box size: ± scales the (auto or current) box by 1.5×; the middle button resets to Auto.
   const stepBox = (dir: number) => {
@@ -994,7 +1103,10 @@ export function TradingChart({
   const toggleCmdFav = (id: string) => setCmdFav((list) => (list.includes(id) ? list.filter((x) => x !== id) : [id, ...list]));
   const toggleGuidedPin = (id: string) => setGuidedPins((pins) => (pins.includes(id) ? pins.filter((x) => x !== id) : [...pins, id]));
 
-  const up = legend.bar ? legend.bar.close >= legend.bar.open : true;
+  // The bar the legend reports: the hovered one, else the newest. Falling back to `latest` is what
+  // keeps prices on screen when the pointer is elsewhere.
+  const legendBar = legend.bar ?? latest;
+  const up = legendBar ? legendBar.close >= legendBar.open : true;
   const barCol = up ? th.up : th.down;
 
   // ---- styles (theme-driven so the whole widget is self-consistent + reusable) ----
@@ -1029,6 +1141,41 @@ export function TradingChart({
 
   return (
     <div ref={rootRef} style={{ display: "flex", flexDirection: "column", height, background: th.background, border: `1px solid ${th.border}`, borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.2), 0 8px 28px rgba(0,0,0,0.16)", transition: "background 220ms ease, border-color 220ms ease" }}>
+      {header && (
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 14, padding: "11px 13px", borderBottom: `1px solid ${th.border}`, fontFamily: th.font }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.01em", color: th.textStrong }}>{header.ticker ?? symbol}</span>
+              {header.sector && <span style={{ fontSize: 11.5, color: th.line }}>{header.sector}</span>}
+            </div>
+            {header.name && (
+              <div style={{ marginTop: 2, fontSize: 12, color: th.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{header.name}</div>
+            )}
+            {header.stats && header.stats.length > 0 && (
+              <div style={{ marginTop: 3, display: "flex", flexWrap: "wrap", gap: "2px 10px", fontFamily: th.monoFont, fontSize: 10.5, color: th.text }}>
+                {header.stats.map((s, i) => (
+                  <span key={`${s.label ?? ""}${i}`}>
+                    {s.label ? `${s.label} ` : ""}
+                    {s.value}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          {(header.priceSlot ?? header.price) && (
+            <div style={{ textAlign: "right" }}>
+              {header.priceSlot ?? (
+                <>
+                  <div style={{ fontFamily: th.monoFont, fontSize: 21, fontWeight: 600, lineHeight: 1.15, color: th.textStrong }}>{header.price!.value}</div>
+                  {header.price!.change && (
+                    <div style={{ fontFamily: th.monoFont, fontSize: 12.5, color: header.price!.direction === "down" ? th.down : th.up }}>{header.price!.change}</div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
       {toolbar && (
         <div style={bar}>
           {!narrow && <span style={{ fontSize: 13, fontWeight: 700, color: th.textStrong, marginRight: 4 }}>{symbol}</span>}
@@ -1084,6 +1231,15 @@ export function TradingChart({
               </div>
             )}
           </span>
+          {rangeList.length > 0 && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 1 }} title="Visible range">
+              {rangeList.map((r) => (
+                <button key={r.label} style={{ ...btn(false), padding: "0 7px" }} onClick={() => applyRange(r.days)}>
+                  {r.label}
+                </button>
+              ))}
+            </span>
+          )}
           {RESAMPLED.includes(type) && (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 1 }} title="Box / reversal size">
               <button style={{ ...btn(false), padding: "0 7px", fontSize: 15 }} onClick={() => stepBox(-1)} aria-label="Finer box">−</button>
@@ -1124,10 +1280,26 @@ export function TradingChart({
                     autoFocus
                     style={{ flex: 1, minWidth: 0, fontFamily: th.font, fontSize: 12, padding: "4px 6px", borderRadius: 5, border: `1px solid ${th.border}`, background: th.background, color: th.textStrong }}
                   />
-                  <button onClick={addCompare} style={{ ...btn(false), background: `color-mix(in srgb, ${th.line} 18%, transparent)`, color: th.line }}>
+                  <button onClick={() => addCompare()} style={{ ...btn(false), background: `color-mix(in srgb, ${th.line} 18%, transparent)`, color: th.line }}>
                     Add
                   </button>
                 </div>
+                {cmpHits.length > 0 && (
+                  <div style={{ marginBottom: 6, borderBottom: `1px solid ${th.border}`, paddingBottom: 4 }}>
+                    {cmpHits.map((h) => (
+                      <button
+                        key={h.symbol}
+                        onClick={() => addCompare(h.symbol)}
+                        style={{ display: "flex", alignItems: "baseline", gap: 8, width: "100%", padding: "4px 6px", border: "none", borderRadius: 5, cursor: "pointer", textAlign: "left", background: "transparent", fontFamily: th.font, fontSize: 12.5, color: th.textStrong }}
+                      >
+                        <span style={{ fontWeight: 700 }}>{h.symbol}</span>
+                        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11.5, color: th.text }}>
+                          {h.description}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {compares.map((c) => (
                   <div key={c.symbol} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 2px", fontSize: 12.5, color: th.textStrong }}>
                     <span style={{ width: 10, height: 10, borderRadius: 2, background: c.color }} />
@@ -1403,18 +1575,18 @@ export function TradingChart({
             >
               <span style={{ color: th.textStrong, fontWeight: 700, fontFamily: th.font, fontSize: 12.5, letterSpacing: "0.01em" }}>{symbol}</span>
               <span style={{ fontFamily: th.font, fontSize: 10.5, fontWeight: 600, color: th.text, background: soft(th.text, 14), borderRadius: 4, padding: "1px 5px" }}>{TF_SHORT[resolution] ?? resolution}</span>
-              {legend.bar && (
+              {legendBar && (
                 <>
-                  <span>O <b style={{ color: barCol }}>{legend.bar.open.toFixed(2)}</b></span>
-                  <span>H <b style={{ color: barCol }}>{legend.bar.high.toFixed(2)}</b></span>
-                  <span>L <b style={{ color: barCol }}>{legend.bar.low.toFixed(2)}</b></span>
-                  <span>C <b style={{ color: barCol }}>{legend.bar.close.toFixed(2)}</b></span>
+                  <span>O <b style={{ color: barCol }}>{legendBar.open.toFixed(2)}</b></span>
+                  <span>H <b style={{ color: barCol }}>{legendBar.high.toFixed(2)}</b></span>
+                  <span>L <b style={{ color: barCol }}>{legendBar.low.toFixed(2)}</b></span>
+                  <span>C <b style={{ color: barCol }}>{legendBar.close.toFixed(2)}</b></span>
                   <span style={{ color: barCol, fontWeight: 700 }}>
-                    {legend.bar.close - legend.bar.open >= 0 ? "+" : ""}
-                    {(legend.bar.close - legend.bar.open).toFixed(2)}
-                    {legend.bar.open ? ` (${(((legend.bar.close - legend.bar.open) / legend.bar.open) * 100).toFixed(2)}%)` : ""}
+                    {legendBar.close - legendBar.open >= 0 ? "+" : ""}
+                    {(legendBar.close - legendBar.open).toFixed(2)}
+                    {legendBar.open ? ` (${(((legendBar.close - legendBar.open) / legendBar.open) * 100).toFixed(2)}%)` : ""}
                   </span>
-                  {legend.bar.volume ? <span>Vol {fmtVol(legend.bar.volume)}</span> : null}
+                  {legendBar.volume ? <span>Vol {fmtVol(legendBar.volume)}</span> : null}
                 </>
               )}
             </div>

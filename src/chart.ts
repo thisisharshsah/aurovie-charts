@@ -1,4 +1,4 @@
-import type { Bar, ChartMarker, ChartOptions, IndicatorInstance, LegendValue, PriceLine, ScaleMode, SeriesType, Theme } from "./types";
+import { US_EQUITIES_SESSION, type Bar, type ChartMarker, type ChartOptions, type IndicatorInstance, type LegendValue, type PriceLine, type ScaleMode, type SeriesType, type SessionSpec, type Theme } from "./types";
 import { DRAW_SPECS, type Drawing, type DrawCtx, type Point } from "./drawings";
 import { autoBox, computeRenko, computePnf, computeKagi, type PnfCol, type KagiSeg } from "./resample";
 import { scriptColor, type ScriptRender } from "./script";
@@ -172,7 +172,12 @@ export class Chart {
   // change and NEVER recomputed inside the rAF loop — a pan must not allocate per bar per frame.
   private spacingSec = 86400; // median bar spacing (drives the bar-close countdown)
   private volMa: number[] = []; // volume moving average drawn across the volume pane
-  private extHours: boolean[] = []; // per-bar "outside 09:30–16:00" flag for session shading
+  private extHours: boolean[] = []; // per-bar "outside the exchange session" flag for session shading
+  private session: SessionSpec = US_EQUITIES_SESSION;
+  // Axis gutters, zeroed by `axes: false` so a bare plot fills the host.
+  private axisW = RIGHT_AXIS_W;
+  private axisH = BOTTOM_AXIS_H;
+  private interactive = true;
 
   private barSpacing = 8;
   private offset = 0; // x of bar index 0's centre
@@ -223,6 +228,12 @@ export class Chart {
     this.theme = { ...DARK, ...(opts.theme ?? {}) };
     this.seriesType = opts.seriesType ?? "candles";
     this.showVolume = opts.showVolume ?? true;
+    this.session = opts.session ?? US_EQUITIES_SESSION;
+    if (opts.axes === false) {
+      this.axisW = 0;
+      this.axisH = 0;
+    }
+    this.interactive = opts.interactive !== false;
     host.style.position = host.style.position || "relative";
     host.style.userSelect = "none";
     host.style.touchAction = "none";
@@ -589,6 +600,27 @@ export class Chart {
     this.fitContent();
     this.requestDraw();
   }
+  /**
+   * Zoom the visible window to [fromTime, newest bar] — what a "1M / 6M / 1Y" range button does.
+   *
+   * Resolved against the bars' OWN timestamps rather than a bar count: exchanges close for
+   * holidays and thin names skip days entirely, so "six months" is never a fixed number of bars.
+   * A count-based range would show a different span for a liquid name than an illiquid one.
+   */
+  showSince(fromTime: number) {
+    const pw = this.plotW();
+    if (!this.bars.length || pw <= 0) return;
+    let first = this.bars.findIndex((b) => b.time >= fromTime);
+    if (first < 0) first = 0; // window starts before the history we hold → show all of it
+    const count = Math.max(2, this.n() - first);
+    this.barSpacing = clamp(pw / count, MIN_BAR_SPACING, MAX_BAR_SPACING);
+    this.tBarSpacing = this.barSpacing;
+    this.zoomAnchor = null;
+    this.momentum = 0;
+    this.offset = pw - this.barSpacing * 6 - (this.n() - 1) * this.barSpacing;
+    this.decimals = this.deriveDecimals();
+    this.requestDraw();
+  }
   getSeriesType() {
     return this.seriesType;
   }
@@ -716,6 +748,12 @@ export class Chart {
   }
   setSessions(on: boolean) {
     this.sessionsOn = on;
+    this.requestDraw();
+  }
+  /** Point the session shading at a different exchange (see `SessionSpec`). */
+  setSession(s: SessionSpec) {
+    this.session = s;
+    this.deriveSeriesCaches();
     this.requestDraw();
   }
   // Visible-range volume profile: volume-by-price for exactly the bars on screen, drawn against the
@@ -874,14 +912,22 @@ export class Chart {
 
   // ---- sizing -------------------------------------------------------------
   private attach() {
-    this.overlay.addEventListener("pointerdown", this.onDown);
+    // The crosshair pair (move/leave) is always live: a read-only chart still has to answer "what
+    // was the price here", which is the whole point of embedding one. Everything that MUTATES the
+    // view — drag-pan, wheel-zoom, double-click, keyboard nav — is what `interactive: false` drops.
     this.overlay.addEventListener("pointermove", this.onMove);
-    window.addEventListener("pointerup", this.onUp);
-    window.addEventListener("pointercancel", this.onUp);
     this.overlay.addEventListener("pointerleave", this.onLeave);
-    this.overlay.addEventListener("wheel", this.onWheel, { passive: false });
-    this.overlay.addEventListener("dblclick", this.onDbl);
-    window.addEventListener("keydown", this.onKey);
+    if (this.interactive) {
+      this.overlay.addEventListener("pointerdown", this.onDown);
+      window.addEventListener("pointerup", this.onUp);
+      window.addEventListener("pointercancel", this.onUp);
+      this.overlay.addEventListener("wheel", this.onWheel, { passive: false });
+      this.overlay.addEventListener("dblclick", this.onDbl);
+      window.addEventListener("keydown", this.onKey);
+    }
+    // A non-interactive chart must not swallow the page's scroll gesture: with no pan to perform,
+    // `touch-action: none` would just make the surrounding list feel dead under the finger.
+    if (!this.interactive) this.host.style.touchAction = "";
     if (typeof ResizeObserver !== "undefined") {
       this.ro = new ResizeObserver(() => this.resize());
       this.ro.observe(this.host);
@@ -900,10 +946,10 @@ export class Chart {
     this.requestDraw();
   };
   private plotW() {
-    return this.w - RIGHT_AXIS_W;
+    return this.w - this.axisW;
   }
   private plotH() {
-    return this.h - BOTTOM_AXIS_H;
+    return this.h - this.axisH;
   }
 
   // ---- scales -------------------------------------------------------------
@@ -1194,12 +1240,17 @@ export class Chart {
     this.spacingSec = medianSpacingSec(this.rawBars);
     const vols = this.bars.map((b) => b.volume ?? 0);
     this.volMa = this.bars.length >= 4 ? sma(vols, Math.min(20, Math.max(2, Math.floor(this.bars.length / 3)))) : [];
-    // US regular trading is 09:30–16:00 in the bars' own local time; anything else is extended hours.
+    // Anything outside the configured exchange session is extended hours. Read in UTC when the host
+    // says its bar times are exchange wall-clock stamped as UTC — otherwise the shading would be
+    // computed in the READER's timezone and move from one viewer to the next.
+    const s = this.session;
+    const days = s.days ?? [1, 2, 3, 4, 5];
     this.extHours = this.intraday
       ? this.bars.map((b) => {
           const d = new Date(b.time * 1000);
-          const mins = d.getHours() * 60 + d.getMinutes();
-          return mins < 9 * 60 + 30 || mins >= 16 * 60;
+          const mins = s.utc ? d.getUTCHours() * 60 + d.getUTCMinutes() : d.getHours() * 60 + d.getMinutes();
+          const day = s.utc ? d.getUTCDay() : d.getDay();
+          return !days.includes(day) || mins < s.openMin || mins >= s.closeMin;
         })
       : [];
   }
@@ -1538,7 +1589,7 @@ export class Chart {
     this.drawSessions(ctx, f, l, pw);
     // price-pane grid + right axis
     for (const p of this.panes) this.drawGridAndAxis(ctx, p, pw);
-    this.drawTimeAxis(ctx, f, l, pw);
+    if (this.axisH > 0) this.drawTimeAxis(ctx, f, l, pw);
     // the hovered bar's column, tinted across every pane — a modern chart tracks the cursor
     this.drawHoverColumn(ctx, pw);
     // series on price pane — compare mode renders % lines; otherwise the chosen series + overlays
@@ -1735,6 +1786,7 @@ export class Chart {
         ctx.lineTo(pw, crisp(y));
         ctx.stroke();
       }
+      if (this.axisW === 0) continue; // bare plot: grid only, no label gutter to write into
       ctx.fillStyle = t.text;
       ctx.textAlign = "left";
       const label =
@@ -2641,10 +2693,11 @@ export class Chart {
   // background so adjacent tags never merge, and a second line of small text when a tag carries one
   // (the bar-close countdown). This single primitive is what makes the axis look designed.
   private pill(ctx: CanvasRenderingContext2D, y: number, text: string, bg: string, fg: string, sub?: string) {
+    if (this.axisW === 0) return; // no axis gutter to hang a tag in
     const pw = this.plotW();
     const h = sub ? 30 : 19;
     const x = pw + 2;
-    const w = RIGHT_AXIS_W - 4;
+    const w = this.axisW - 4;
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,0.35)";
     ctx.shadowBlur = 6;
@@ -3124,7 +3177,7 @@ export class Chart {
       }
       // hovering the right price axis with alert-create wired → hint you can click to set an alert
       const pp = this.panes[0];
-      const overAxis = this.axisHint && !!pp && x > this.plotW() && x < this.plotW() + RIGHT_AXIS_W && y > pp.top && y < pp.top + pp.height;
+      const overAxis = this.axisHint && !!pp && this.axisW > 0 && x > this.plotW() && x < this.plotW() + this.axisW && y > pp.top && y < pp.top + pp.height;
       this.axisHoverY = overAxis ? y : null;
       this.overlay.style.cursor = overAxis ? "pointer" : this.tool === "cross" ? "crosshair" : "copy";
       this.drawOverlay();

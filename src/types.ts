@@ -84,10 +84,50 @@ export interface DataFeed {
   searchSymbols?(query: string): Promise<{ symbol: string; description: string }[]>;
 }
 
+/**
+ * An exchange's regular trading session, used to tint the bars that fall outside it.
+ *
+ * Every field is required to describe a real venue because there is no universal one: NEPSE trades
+ * 11:00–15:00 Sunday–Thursday, Frankfurt and New York agree on neither hour nor weekend. A chart
+ * that assumes one exchange's clock silently mislabels every other.
+ */
+export interface SessionSpec {
+  /** Minutes from midnight when the regular session opens (inclusive). 09:30 → 570. */
+  openMin: number;
+  /** Minutes from midnight when it closes (exclusive). 16:00 → 960. */
+  closeMin: number;
+  /** Trading days, 0 = Sunday … 6 = Saturday. Defaults to Mon–Fri. */
+  days?: number[];
+  /**
+   * Read each bar's clock in UTC instead of the viewer's local zone.
+   *
+   * Set this when bar times are exchange wall-clock stamped as UTC — a common storage convention.
+   * Without it the shading is computed against whatever timezone the READER happens to sit in, so
+   * the same chart shades differently in Kathmandu and New York. That is a chart that lies.
+   */
+  utc?: boolean;
+}
+
+/** US equities regular hours — the default only because something has to be. */
+export const US_EQUITIES_SESSION: SessionSpec = { openMin: 9 * 60 + 30, closeMin: 16 * 60, days: [1, 2, 3, 4, 5] };
+
 export interface ChartOptions {
   theme?: Partial<Theme>;
   seriesType?: SeriesType;
   showVolume?: boolean;
+  /**
+   * Draw the right price axis and the bottom time axis. `false` gives a bare plot that fills the
+   * host — an embedded sparkline, a price-header "hero" chart — with the full plot area used for
+   * the series instead of reserving gutters for labels.
+   */
+  axes?: boolean;
+  /**
+   * Respond to pan, zoom, and drawing input. `false` makes the chart read-only; the crosshair
+   * still tracks the pointer, so `onCrosshair` keeps driving a host's scrub readout.
+   */
+  interactive?: boolean;
+  /** The exchange session for intraday shading. Defaults to `US_EQUITIES_SESSION`. */
+  session?: SessionSpec;
   // Crosshair readout → the host's legend (OHLC + each open indicator's value at that bar).
   onCrosshair?: (bar: Bar | null, values: LegendValue[]) => void;
   // Fired after any pan/zoom or data change: `atRealtime` = is the newest bar parked at the right
