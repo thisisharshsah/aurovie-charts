@@ -1,6 +1,6 @@
 {
   "name": "aurovie-charts",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Framework-agnostic canvas charting engine — a TradingView-class financial chart (candles/volume, indicators, drawings, crosshair, pan/zoom) with a datafeed abstraction. React-free core; optional ./react binding.",
   "license": "MIT",
   "author": "Harsh Kumar Sah",
