@@ -72,6 +72,29 @@ export interface ChartMarker {
   label?: string;
 }
 
+/**
+ * A forward projection: values for the columns AFTER the newest bar.
+ *
+ * These are explicitly NOT bars, and the engine keeps them that way — they never enter the OHLC
+ * readout, the bar count, indicator inputs, volume, or replay. The file-header rule that the engine
+ * never invents a bar it wasn't given holds exactly because a projection is a set of columns with
+ * no open, high, low or close to report.
+ *
+ * `mid[k]` is the k-th column past the last real bar (k = 0 is the very next one). `upper`/`lower`
+ * draw an uncertainty band around it; supply both or neither. A projection is a claim about the
+ * future, so it renders dashed and fading — never as a candle a reader could mistake for history.
+ */
+export interface Projection {
+  mid: number[];
+  upper?: number[];
+  lower?: number[];
+  /** Real timestamps per column, when the host knows the exchange calendar. Without these the
+   *  crosshair says "+k" rather than inventing dates that may fall on non-trading days. */
+  times?: number[];
+  /** Shown in the crosshair readout, e.g. "ATR envelope". Say what produced it. */
+  label?: string;
+}
+
 export interface DataFeedResult {
   bars: Bar[];
   dataVersion?: string; // provenance label the host can surface (honest sourcing)
@@ -128,6 +151,16 @@ export interface ChartOptions {
   interactive?: boolean;
   /** The exchange session for intraday shading. Defaults to `US_EQUITIES_SESSION`. */
   session?: SessionSpec;
+  /**
+   * Read bar times as UTC rather than in the viewer's local zone — set this when your timestamps
+   * are exchange wall-clock stamped as UTC.
+   *
+   * Governs the time axis, the crosshair readout AND the session shading, so the whole chart keeps
+   * one clock. `SessionSpec.utc` can still override the shading alone, but setting it here is
+   * almost always what you want: an axis and a shading that disagree about which day it is mislead
+   * quietly, and only for readers in the wrong timezone.
+   */
+  utc?: boolean;
   // Crosshair readout → the host's legend (OHLC + each open indicator's value at that bar).
   onCrosshair?: (bar: Bar | null, values: LegendValue[]) => void;
   // Fired after any pan/zoom or data change: `atRealtime` = is the newest bar parked at the right

@@ -5,7 +5,7 @@ export { DARK, LIGHT, THEMES, THEME_NAMES } from "./util";
 export { parseScriptDraw, parseScriptDrawJson, scriptColor } from "./script";
 export type { ScriptDraw, ScriptPlot, ScriptRender, ScriptColor, ScriptPlotStyle } from "./script";
 export { US_EQUITIES_SESSION } from "./types";
-export type { Bar, SeriesType, Resolution, Theme, DataFeed, DataFeedResult, ChartOptions, IndicatorInstance, LegendValue, PriceLine, ChartMarker, ScaleMode, SessionSpec } from "./types";
+export type { Bar, SeriesType, Resolution, Theme, DataFeed, DataFeedResult, ChartOptions, IndicatorInstance, LegendValue, PriceLine, ChartMarker, Projection, ScaleMode, SessionSpec } from "./types";
 
 export type { Drawing } from "./drawings";
 

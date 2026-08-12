@@ -4,10 +4,61 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [0.3.1] - 2026-08-12
+## [0.5.0] - 2026-08-12
+
+### Added
+
+- **Forward projection** — `Projection`, `Chart.setProjection()` and `TradingChart`'s
+  `projection` prop draw model output in the empty margin PAST the newest bar: a
+  dashed centre line, an optional band, and a hairline marking where record stops
+  and claim begins.
+
+  Projected columns are not bars and the engine keeps it that way — they never
+  enter the OHLC readout, the bar count, indicator inputs, volume or replay, so
+  the rule that the engine never invents a bar it wasn't given still holds. The
+  crosshair now emits `onCrosshair(null, …)` over a projected column with the
+  projection's own values, instead of silently reporting the last real bar's OHLC
+  and timestamp for a cursor sitting over the forecast.
+
+  A projection is cleared automatically by `setData`: computed against one series,
+  it is meaningless against another.
 
 ### Fixed
 
+- The right margin was the literal `barSpacing * 6` at four call sites that all had
+  to agree; it is now one `rightMarginBars()`, and the pan floor is derived from it
+  so a projection can always be reached by dragging.
+- The hover-column tint clamped to the last bar, lighting up the newest candle
+  while the pointer sat past it.
+
+## [0.4.0] - 2026-08-12
+
+### Added
+
+- **Instrument header** — a `header` prop (`InstrumentHeader`) rendering ticker,
+  name, sector, reference stats and the headline price above the toolbar. Every
+  field is optional and an absent one is omitted rather than dashed, since
+  instrument metadata is never uniformly available (an index has no sector; a new
+  listing has no 52-week range). `priceSlot` hands the price block back to the
+  host for animated tickers.
+- `ChartOptions.utc` (and `TradingChart`'s `utc` prop) — read bar times as UTC
+  rather than in the viewer's local zone, for timestamps stored as exchange
+  wall-clock. It governs the time axis, the crosshair readout AND the session
+  shading together, so the chart cannot end up with two clocks.
+
+### Fixed
+
+- **The intraday time axis was unreadable.** It labelled every day boundary with a
+  clock time, so a chart of an exchange with a fixed open printed the session open
+  over and over — a real NEPSE 1H chart read `07:00 07:00 07:00 08:00 07:00`
+  across its whole width. Boundaries now carry the DATE and ticks between them
+  carry the time, and labels no longer appear only at boundaries (so a chart
+  zoomed inside one day is still labelled). Pinned by tests.
+- **Axis and crosshair times were rendered in the reader's timezone.** Same defect
+  the 0.3.0 session-shading fix addressed, in the two places it was missed: the
+  same chart labelled its bars differently in Kathmandu and New York.
+- The toolbar repeated the instrument ticker even when `header` already displayed
+  it, printing the same word three times with the on-canvas legend.
 - `exports` did not expose `./package.json`, so `require.resolve
   ("aurovie-charts/package.json")` threw `ERR_PACKAGE_PATH_NOT_EXPORTED`. Build
   tooling routinely reads a dependency's manifest to pin the version it generated
@@ -36,11 +87,6 @@ All notable changes to this project are documented here. The format follows
   1Y · 5Y · All` strip in the toolbar, configurable (or hidden) via the `ranges`
   prop. Resolved from the bars' own timestamps, so holidays and non-trading days
   don't make the same preset span different periods for different instruments.
-- **Instrument header** — a `header` prop (`InstrumentHeader`) rendering ticker,
-  name, sector, reference stats and the headline price above the toolbar. Every
-  field is optional and an absent one is omitted rather than dashed, since
-  instrument metadata is never uniformly available. `priceSlot` hands the price
-  block back to the host for animated tickers.
 
 ### Fixed
 

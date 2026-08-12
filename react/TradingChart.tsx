@@ -9,7 +9,7 @@ import { ScriptEditor, type ScriptError, type ScriptPreset, type ScriptScorecard
 import { parseScriptDraw, type ScriptRender } from "../src/script";
 import { DARK, LIGHT, THEMES, THEME_NAMES, SERIES_PALETTE as IND_PALETTE, SWATCHES, CMP_COLORS, CHIP_INK } from "../src/util";
 import type { Drawing } from "../src/drawings";
-import type { Bar, DataFeed, IndicatorInstance, LegendValue, PriceLine, ScaleMode, SeriesType, SessionSpec, Theme, ChartMarker } from "../src/types";
+import type { Bar, DataFeed, IndicatorInstance, LegendValue, PriceLine, Projection, ScaleMode, SeriesType, SessionSpec, Theme, ChartMarker } from "../src/types";
 
 // Drawings persist per symbol in localStorage, so they survive reloads + symbol switches.
 const drawKey = (s: string) => `aurovie-chart-drawings:${s.toUpperCase()}`;
@@ -135,6 +135,18 @@ export interface TradingChartProps {
    * shading marks the wrong bars.
    */
   session?: SessionSpec;
+  /**
+   * Read bar times as UTC instead of the viewer's local zone — for timestamps stored as exchange
+   * wall-clock. Governs the axis, the crosshair readout and the session shading together.
+   */
+  utc?: boolean;
+  /**
+   * A forward projection drawn past the newest bar — a model cone, a scenario band.
+   *
+   * Cleared automatically whenever the chart loads a new series, because a projection computed
+   * against one symbol/interval is meaningless against another. Pass null to remove it.
+   */
+  projection?: Projection | null;
   /**
    * Visible-window presets ("1M · 6M · 1Y · All"), shown as a strip in the toolbar. Pass `false` to
    * hide it, or your own list to match the history you actually serve — offering 5Y for an
@@ -377,6 +389,8 @@ export function TradingChart({
   lockedIndicators,
   onLockedIndicator,
   session,
+  utc,
+  projection,
   ranges,
   header,
 }: TradingChartProps) {
@@ -603,6 +617,8 @@ export function TradingChart({
     if (!hostRef.current) return;
     const chart = new Chart(hostRef.current, {
       theme: th,
+      utc,
+      session,
       onCrosshair: (bar, values) => {
         setLegend({ bar, values });
         crosshairRef.current?.(bar, values);
@@ -788,6 +804,11 @@ export function TradingChart({
     () => chartRef.current?.setMarkers([...(markers ?? []), ...backtestMarkers]),
     [markers, backtestMarkers],
   );
+  // After `symbol`/`resolution` too: setData clears any projection, so re-applying only on the
+  // prop's own identity would drop it on every interval change.
+  useEffect(() => {
+    chartRef.current?.setProjection(projection ?? null);
+  }, [projection, symbol, resolution]);
   useEffect(() => chartRef.current?.setMagnet(magnet), [magnet]);
   useEffect(() => chartRef.current?.setVolumeProfileVisible(vpvr), [vpvr]);
   // Host series first, so a script the user wrote draws over them rather than under.
@@ -1105,7 +1126,10 @@ export function TradingChart({
 
   // The bar the legend reports: the hovered one, else the newest. Falling back to `latest` is what
   // keeps prices on screen when the pointer is elsewhere.
-  const legendBar = legend.bar ?? latest;
+  // `values` with a null bar means the crosshair is over a PROJECTED column — there is genuinely no
+  // bar there, so the at-rest fallback must not step in and reprint the newest one under a forecast.
+  const overProjection = legend.bar === null && legend.values.length > 0;
+  const legendBar = legend.bar ?? (overProjection ? null : latest);
   const up = legendBar ? legendBar.close >= legendBar.open : true;
   const barCol = up ? th.up : th.down;
 
@@ -1178,7 +1202,9 @@ export function TradingChart({
       )}
       {toolbar && (
         <div style={bar}>
-          {!narrow && <span style={{ fontSize: 13, fontWeight: 700, color: th.textStrong, marginRight: 4 }}>{symbol}</span>}
+          {/* The header already names the instrument; repeating it here (and again in the
+              on-canvas legend) prints the same ticker three times in one screenful. */}
+          {!narrow && !header && <span style={{ fontSize: 13, fontWeight: 700, color: th.textStrong, marginRight: 4 }}>{symbol}</span>}
           <span style={{ display: "inline-flex", gap: 1, alignItems: "center" }}>
             {(narrow ? [resolution] : TF_ORDER.filter((v) => favTf.includes(v) || v === resolution)).map((v) => (
               <button key={v} style={btn(v === resolution)} onClick={() => pickRes(v)}>

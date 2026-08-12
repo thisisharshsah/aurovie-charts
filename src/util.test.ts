@@ -3,7 +3,7 @@
 // definitions: NaN padding, the exact formulas, and the invariants each family must hold.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag } from "./util.ts";
+import { ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange } from "./util.ts";
 import type { AxisSlot } from "./util.ts";
 import type { Bar } from "./types.ts";
 
@@ -154,4 +154,79 @@ test("placeAxisTag: gives up rather than flinging a tag off the scale", () => {
   for (let y = 0; y < 400; y += 19) placeAxisTag(y, 19, slots);
   const at = placeAxisTag(200, 19, slots, 0);
   assert.ok(Math.abs(at - 200) <= 130, `flung too far: ${at}`);
+});
+
+// ---- time axis -------------------------------------------------------------
+// The axis shipped labelling every intraday DAY BOUNDARY with a clock time, so a NEPSE 1H chart
+// read "07:00 07:00 07:00" all the way across: the session open, repeated, in the reader's
+// timezone rather than the exchange's. Both halves of that are pinned here.
+
+test("fmtAxisTime labels an intraday day-boundary with the date, not the session open", () => {
+  // 2026-08-12 11:00 UTC — the first bar of a NEPSE session, stored as exchange wall-clock.
+  const t = Date.UTC(2026, 7, 12, 11, 0) / 1000;
+  assert.equal(fmtAxisTime(t, true, true, true), "Aug 12");
+  // A tick INSIDE the day still reads as a time.
+  assert.equal(fmtAxisTime(t, true, false, true), "11:00");
+});
+
+test("fmtAxisTime in UTC mode does not shift with the reader's timezone", () => {
+  const t = Date.UTC(2026, 7, 12, 11, 0) / 1000;
+  // The local-clock reading is whatever the host TZ says; the UTC reading is fixed. Asserting the
+  // fixed one is the point — a chart must not relabel itself per reader.
+  assert.equal(fmtAxisTime(t, true, false, true), "11:00");
+  assert.equal(fmtCrosshairTime(t, true, true), "Aug 12 11:00");
+});
+
+test("isTimeBoundary splits intraday bars by exchange day, not the reader's day", () => {
+  const open1 = Date.UTC(2026, 7, 12, 11, 0) / 1000;
+  const close1 = Date.UTC(2026, 7, 12, 15, 0) / 1000;
+  const open2 = Date.UTC(2026, 7, 13, 11, 0) / 1000;
+  const bar = (time: number): Bar => ({ time, open: 1, high: 1, low: 1, close: 1 });
+  assert.equal(isTimeBoundary(bar(open1), bar(close1), true, true), false, "same session");
+  assert.equal(isTimeBoundary(bar(close1), bar(open2), true, true), true, "next session");
+  assert.equal(isTimeBoundary(undefined, bar(open1), true, true), true, "first bar always breaks");
+});
+
+// ---- forward projection geometry -------------------------------------------
+// A projection lives in the empty margin past the newest bar. The failure modes are geometric and
+// silent: a margin that does not grow hides the forecast behind the right edge, and a pan floor
+// that does not clear the margin makes it unreachable by dragging.
+
+test("rightMarginBars grows with the projection so the cone has somewhere to live", () => {
+  assert.equal(rightMarginBars(0), 6, "no projection keeps the historical 6-bar margin");
+  assert.equal(rightMarginBars(20), 26);
+  assert.equal(rightMarginBars(-3), 6, "a negative length cannot shrink the margin");
+});
+
+test("panFloorBars always clears the right margin", () => {
+  for (const k of [0, 1, 5, 14, 20, 60, 250]) {
+    assert.ok(
+      panFloorBars(k) >= rightMarginBars(k),
+      `a projection of ${k} columns must be reachable by panning (floor ${panFloorBars(k)} < margin ${rightMarginBars(k)})`,
+    );
+  }
+  assert.equal(panFloorBars(0), 20, "the old fixed ceiling is preserved when there is no projection");
+});
+
+test("projVisibleRange maps on-screen columns onto projection indices", () => {
+  const n = 100; // bars 0..99; projection column k sits at index n+k
+  // Whole projection on screen.
+  assert.deepEqual(projVisibleRange(90, 120, n, 10), [0, 9]);
+  // Scrolled so only the tail is visible.
+  assert.deepEqual(projVisibleRange(105, 120, n, 10), [5, 9]);
+  // Clipped by the projection's own length, not by the viewport.
+  assert.deepEqual(projVisibleRange(90, 130, n, 4), [0, 3]);
+});
+
+test("projVisibleRange returns an empty range rather than an inverted one", () => {
+  const n = 100;
+  // Viewport ends before the projection starts — the common case while panned into history.
+  assert.deepEqual(projVisibleRange(10, 50, n, 10), [0, -1]);
+  // No projection at all.
+  assert.deepEqual(projVisibleRange(90, 120, n, 0), [0, -1]);
+  // An empty range must be safe to loop over.
+  const [f, l] = projVisibleRange(10, 50, n, 10);
+  let iterations = 0;
+  for (let k = f; k <= l; k++) iterations++;
+  assert.equal(iterations, 0);
 });

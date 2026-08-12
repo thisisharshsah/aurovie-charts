@@ -1,4 +1,4 @@
-import { US_EQUITIES_SESSION, type Bar, type ChartMarker, type ChartOptions, type IndicatorInstance, type LegendValue, type PriceLine, type ScaleMode, type SeriesType, type SessionSpec, type Theme } from "./types";
+import { US_EQUITIES_SESSION, type Bar, type ChartMarker, type ChartOptions, type IndicatorInstance, type LegendValue, type PriceLine, type Projection, type ScaleMode, type SeriesType, type SessionSpec, type Theme } from "./types";
 import { DRAW_SPECS, type Drawing, type DrawCtx, type Point } from "./drawings";
 import { autoBox, computeRenko, computePnf, computeKagi, type PnfCol, type KagiSeg } from "./resample";
 import { scriptColor, type ScriptRender } from "./script";
@@ -15,6 +15,9 @@ import {
   fmtCrosshairTime,
   fmtCountdown,
   isTimeBoundary,
+  rightMarginBars,
+  panFloorBars,
+  projVisibleRange,
   alpha,
   mix,
   roundRectPath,
@@ -174,6 +177,8 @@ export class Chart {
   private volMa: number[] = []; // volume moving average drawn across the volume pane
   private extHours: boolean[] = []; // per-bar "outside the exchange session" flag for session shading
   private session: SessionSpec = US_EQUITIES_SESSION;
+  private utc = false; // read bar times in UTC (exchange wall-clock storage) rather than local
+  private projection: Projection | null = null; // forward columns past the newest bar (never bars)
   // Axis gutters, zeroed by `axes: false` so a bare plot fills the host.
   private axisW = RIGHT_AXIS_W;
   private axisH = BOTTOM_AXIS_H;
@@ -228,7 +233,11 @@ export class Chart {
     this.theme = { ...DARK, ...(opts.theme ?? {}) };
     this.seriesType = opts.seriesType ?? "candles";
     this.showVolume = opts.showVolume ?? true;
-    this.session = opts.session ?? US_EQUITIES_SESSION;
+    this.utc = opts.utc ?? false;
+    // One clock for the whole chart: the session inherits `utc` unless it names its own, so an axis
+    // and a shading can never disagree about which day a bar belongs to.
+    const s = opts.session ?? US_EQUITIES_SESSION;
+    this.session = s.utc === undefined ? { ...s, utc: this.utc } : s;
     if (opts.axes === false) {
       this.axisW = 0;
       this.axisH = 0;
@@ -298,6 +307,8 @@ export class Chart {
       this.replayArming = false;
       this.emitReplay();
     }
+    // A new series invalidates any projection: it was computed against the old bars.
+    this.projection = null;
     this.rebuildSeries();
     this.recompute();
     this.fitContent();
@@ -617,7 +628,7 @@ export class Chart {
     this.tBarSpacing = this.barSpacing;
     this.zoomAnchor = null;
     this.momentum = 0;
-    this.offset = pw - this.barSpacing * 6 - (this.n() - 1) * this.barSpacing;
+    this.offset = pw - this.barSpacing * this.rightMarginBars() - (this.n() - 1) * this.barSpacing;
     this.decimals = this.deriveDecimals();
     this.requestDraw();
   }
@@ -648,6 +659,33 @@ export class Chart {
   setMarkers(markers: ChartMarker[]) {
     this.markers = markers;
     this.requestDraw();
+  }
+  /**
+   * Set (or clear, with null) the forward projection drawn past the newest bar.
+   *
+   * The host owns invalidation while the projection is on screen, but a new DATA SET always clears
+   * it: bars for a different symbol or interval make any existing projection a claim about the
+   * wrong series, and silently redrawing it against them would be a chart that lies.
+   */
+  setProjection(p: Projection | null) {
+    this.projection = p && p.mid.length ? p : null;
+    this.requestDraw();
+  }
+  /**
+   * Is a projection currently drawable? Off during replay (the future is the thing being hidden),
+   * while comparing (the scale is percent-from-left-edge, so an absolute price cone is meaningless),
+   * and on the resampled types, whose columns are not time — a Renko brick is a price move, so
+   * "the next column" has no forward meaning.
+   */
+  private projActive(): boolean {
+    if (!this.projection || !this.bars.length) return false;
+    if (this.replayTo != null || this.replayArming) return false;
+    if (this.comparing) return false;
+    return this.seriesType !== "renko" && this.seriesType !== "pnf" && this.seriesType !== "kagi";
+  }
+  /** How many projected columns exist (0 when none is drawable). */
+  private projLen(): number {
+    return this.projActive() ? this.projection!.mid.length : 0;
   }
   setSR(on: boolean) {
     this.srOn = on;
@@ -795,7 +833,7 @@ export class Chart {
   // Scroll the newest bar back to its default parking spot at the right edge (keeps the zoom level).
   scrollToRealtime() {
     const pw = this.plotW();
-    this.offset = pw - this.barSpacing * 6 - (this.n() - 1) * this.barSpacing;
+    this.offset = pw - this.barSpacing * this.rightMarginBars() - (this.n() - 1) * this.barSpacing;
     this.momentum = 0;
     this.requestDraw();
     this.emitViewChange();
@@ -828,7 +866,7 @@ export class Chart {
   private emitViewChange() {
     const pw = this.plotW();
     if (pw <= 0 || !this.n()) return;
-    const realtimeOffset = pw - this.barSpacing * 6 - (this.n() - 1) * this.barSpacing;
+    const realtimeOffset = pw - this.barSpacing * this.rightMarginBars() - (this.n() - 1) * this.barSpacing;
     const at = Math.abs(this.offset - realtimeOffset) < this.barSpacing * 3;
     const auto = this.priceZoom === 1;
     // Only notify the host when a button state actually FLIPS — otherwise a pan/zoom would re-render
@@ -948,6 +986,16 @@ export class Chart {
   private plotW() {
     return this.w - this.axisW;
   }
+  /**
+   * Empty columns kept to the right of the newest bar, in bar widths.
+   *
+   * Was a bare `6` repeated at four call sites that all had to agree. A projection has to fit in
+   * this gap, so it widens the margin to hold its columns plus breathing room — otherwise "go to
+   * realtime" would park the newest bar at the edge with the forecast off-screen.
+   */
+  private rightMarginBars(): number {
+    return rightMarginBars(this.projLen());
+  }
   private plotH() {
     return this.h - this.axisH;
   }
@@ -969,6 +1017,27 @@ export class Chart {
     const c1 = Math.ceil(this.indexAt(this.plotW())) - shift;
     return [clamp(c0, 0, n - 1), clamp(c1, 0, n - 1)];
   }
+  /**
+   * Every finite projection value in a column currently on screen.
+   *
+   * Returns nothing when no projection is drawable, so autoscale is untouched in the common case
+   * (an empty result cannot widen a range).
+   */
+  private projVisibleValues(): number[] {
+    const K = this.projLen();
+    if (K === 0) return [];
+    const p = this.projection!;
+    const n = this.n();
+    const [first, last] = projVisibleRange(Math.floor(this.indexAt(0)), Math.ceil(this.indexAt(this.plotW())), n, K);
+    const out: number[] = [];
+    for (let k = first; k <= last; k++) {
+      for (const arr of [p.mid, p.upper, p.lower]) {
+        const v = arr?.[k];
+        if (v != null && isFinite(v)) out.push(v);
+      }
+    }
+    return out;
+  }
   private visible(): [number, number] {
     // Clamp BOTH ends into [0, n-1]: when the series is scrolled fully off-screen (reachable at high
     // zoom where <20 bars fit), an unclamped `first` runs past end-of-data and the out-of-loop
@@ -986,7 +1055,7 @@ export class Chart {
     this.tBarSpacing = this.barSpacing;
     this.zoomAnchor = null;
     this.momentum = 0;
-    const rightMargin = this.barSpacing * 6;
+    const rightMargin = this.barSpacing * this.rightMarginBars();
     this.offset = pw - rightMargin - (this.n() - 1) * this.barSpacing;
     this.decimals = this.deriveDecimals();
   }
@@ -1070,6 +1139,13 @@ export class Chart {
         scan(fl.b, fl.shift);
       }
       for (const sl of o.shiftLines ?? []) scan(sl.values, sl.shift);
+    }
+    // The projection lives past the newest bar, so `visible()` (clamped to n-1) never sees it. Scan
+    // exactly the columns the renderer will paint — the same discipline the shifted studies above
+    // follow — or the cone silently draws outside the price scale.
+    for (const v of this.projVisibleValues()) {
+      if (v < mn) mn = v;
+      if (v > mx) mx = v;
     }
     if (!isFinite(mn) || !isFinite(mx)) {
       mn = 0;
@@ -1610,6 +1686,8 @@ export class Chart {
           for (const sl of o.shiftLines ?? []) this.drawShiftedLine(ctx, price, sl);
           if (o.dir) this.drawDirSeries(ctx, price, o.dir, f, l);
         }
+        // Inside the price-pane clip, like everything else plotted in price units.
+        this.drawProjection(ctx, price);
       });
     }
     // volume + studies
@@ -1762,7 +1840,11 @@ export class Chart {
   // a bar rather than floating over pixels.
   private drawHoverColumn(ctx: CanvasRenderingContext2D, pw: number) {
     if (!this.cross || this.dragging) return;
-    const i = clamp(Math.round(this.indexAt(this.cross.x)), 0, this.n() - 1);
+    // Don't tint a bar the cursor is not on: past the last bar this clamped back to n-1 and lit up
+    // the newest candle while the pointer sat over the projection.
+    const rawCol = Math.round(this.indexAt(this.cross.x));
+    if (rawCol > this.n() - 1) return;
+    const i = clamp(rawCol, 0, this.n() - 1);
     const x = this.x(i);
     const w = Math.max(2, this.barSpacing * 0.92);
     if (x + w / 2 < 0 || x - w / 2 > pw) return;
@@ -1824,10 +1906,12 @@ export class Chart {
     const y = this.plotH() + BOTTOM_AXIS_H / 2;
     let lastLabelX = -Infinity;
     for (let i = f; i <= l; i++) {
-      if (!isTimeBoundary(this.bars[i - 1], this.bars[i], this.intraday)) continue;
+      const boundary = isTimeBoundary(this.bars[i - 1], this.bars[i], this.intraday, this.utc);
       const px = this.x(i);
       if (px < 0 || px > pw) continue;
-      if (this.gridOn) {
+      // Gridlines mark section breaks only, but labels also land BETWEEN them — an intraday chart
+      // zoomed inside one day would otherwise carry a single label, or none at all.
+      if (boundary && this.gridOn) {
         ctx.strokeStyle = t.grid;
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -1836,8 +1920,9 @@ export class Chart {
         ctx.stroke();
       }
       if (px - lastLabelX > 54) {
-        ctx.fillStyle = t.text;
-        ctx.fillText(fmtAxisTime(this.bars[i].time, this.intraday), px, y);
+        // The date that opens a section reads stronger than the times within it.
+        ctx.fillStyle = boundary ? t.textStrong : t.text;
+        ctx.fillText(fmtAxisTime(this.bars[i].time, this.intraday, boundary, this.utc), px, y);
         lastLabelX = px;
       }
     }
@@ -2215,6 +2300,75 @@ export class Chart {
   // Fill the region between two series, coloured by which one is on top (an Ichimoku kumo flips from
   // bullish to bearish exactly where the spans cross). Walks contiguous runs so a NaN gap breaks the
   // polygon instead of stitching across it.
+  /**
+   * The forward projection: a dashed centre line and a fading band, drawn in the empty margin past
+   * the newest bar.
+   *
+   * Deliberately NOT candle-shaped and deliberately not up/down coloured — direction colours mean a
+   * realized move on this chart, and nothing here is realized. It uses `theme.line` (the accent),
+   * fades with distance so the far end reads as less certain than the near end, and is joined to
+   * the last real close so the reader can see exactly where fact stops.
+   */
+  private drawProjection(ctx: CanvasRenderingContext2D, p: Pane) {
+    const K = this.projLen();
+    if (K === 0) return;
+    const proj = this.projection!;
+    const t = this.theme;
+    const n = this.n();
+    const lastClose = this.bars[n - 1]?.close;
+    const X = (k: number) => this.x(n + k);
+    const Y = (v: number) => this.priceToY(p, v);
+
+    // Band first, under the line.
+    if (proj.upper && proj.lower) {
+      ctx.beginPath();
+      let started = false;
+      for (let k = 0; k < K; k++) {
+        const v = proj.upper[k];
+        if (v == null || !isFinite(v)) continue;
+        if (!started && lastClose != null) ctx.moveTo(this.x(n - 1), Y(lastClose)), (started = true);
+        ctx.lineTo(X(k), Y(v));
+      }
+      for (let k = K - 1; k >= 0; k--) {
+        const v = proj.lower[k];
+        if (v == null || !isFinite(v)) continue;
+        ctx.lineTo(X(k), Y(v));
+      }
+      if (lastClose != null) ctx.lineTo(this.x(n - 1), Y(lastClose));
+      ctx.closePath();
+      ctx.fillStyle = alpha(t.line, 0.1);
+      ctx.fill();
+    }
+
+    // Centre line, dashed, anchored to the last real close.
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = alpha(t.line, 0.85);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (lastClose != null) ctx.moveTo(this.x(n - 1), Y(lastClose));
+    for (let k = 0; k < K; k++) {
+      const v = proj.mid[k];
+      if (v == null || !isFinite(v)) continue;
+      ctx.lineTo(X(k), Y(v));
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    // A hairline at the boundary: everything right of it is a claim, not a record.
+    if (lastClose != null) {
+      ctx.save();
+      ctx.setLineDash([2, 3]);
+      ctx.strokeStyle = alpha(t.text, 0.45);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(crisp(this.x(n - 1)), 0);
+      ctx.lineTo(crisp(this.x(n - 1)), this.plotH());
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   private drawBandFill(ctx: CanvasRenderingContext2D, p: Pane, fill: BandFill) {
     const shift = fill.shift ?? 0;
     const [from, to] = this.shiftedRange(shift);
@@ -2828,8 +2982,15 @@ export class Chart {
     if (!this.cross || !this.bars.length) return;
     const t = this.theme;
     const pw = this.plotW();
-    const i = clamp(Math.round(this.indexAt(this.cross.x)), 0, this.n() - 1);
-    const bx = this.x(i);
+    // The UNCLAMPED column first: past the last bar the cursor is over a PROJECTED column, and the
+    // readout must say so. Clamping first (as this did) silently reported the last real bar's OHLC
+    // and its timestamp for a cursor sitting over the forecast — the chart answering a question
+    // about the future with a fact about the past.
+    const rawCol = Math.round(this.indexAt(this.cross.x));
+    const projK = rawCol - this.n();
+    const overProj = this.projLen() > 0 && projK >= 0 && projK < this.projLen();
+    const i = clamp(rawCol, 0, this.n() - 1);
+    const bx = overProj ? this.x(rawCol) : this.x(i);
     const p = this.paneAt(this.cross.y);
     // magnet mode + an active drawing tool → the horizontal crosshair snaps to the nearest OHLC so
     // the user sees exactly where the next anchor lands.
@@ -2869,7 +3030,13 @@ export class Chart {
     ctx.fillStyle = t.crosshairLabelText;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(fmtCrosshairTime(this.bars[i].time, this.intraday), tx + tw / 2, this.plotH() + BOTTOM_AXIS_H / 2 + 1);
+    const projTime = overProj ? this.projection!.times?.[projK] : undefined;
+    const timeLabel = overProj
+      ? projTime != null
+        ? fmtCrosshairTime(projTime, this.intraday, this.utc)
+        : `+${projK + 1}` // no calendar supplied → never invent a date that may not trade
+      : fmtCrosshairTime(this.bars[i].time, this.intraday, this.utc);
+    ctx.fillText(timeLabel, tx + tw / 2, this.plotH() + BOTTOM_AXIS_H / 2 + 1);
     // legend
     const b = this.bars[i];
     const values: LegendValue[] = [];
@@ -2885,9 +3052,24 @@ export class Chart {
     }
     // tag each indicator's PRIMARY legend entry with its id, so the host matches a chip by identity
     // (not colour — two indicators can share a palette colour, or a secondary line's colour).
-    for (const o of this.overlays) { const g = o.legend(i); if (g[0]) g[0].id = o.id; values.push(...g); }
-    for (const s of this.studies) { const g = s.legend(i); if (g[0]) g[0].id = s.id; values.push(...g); }
-    this.opts.onCrosshair?.(b, values);
+    if (overProj) {
+      // No bar here, and no indicator is defined past the data — an indicator value computed at the
+      // CLAMPED index would be the last real bar's, labelled as belonging to a future column.
+      const pv: LegendValue[] = [];
+      const proj = this.projection!;
+      const add = (label: string, arr: number[] | undefined) => {
+        const v = arr?.[projK];
+        if (v != null && isFinite(v)) pv.push({ label, value: v, color: this.theme.line });
+      };
+      add(proj.label ?? "Projected", proj.mid);
+      add("Upper", proj.upper);
+      add("Lower", proj.lower);
+      this.opts.onCrosshair?.(null, pv);
+    } else {
+      for (const o of this.overlays) { const g = o.legend(i); if (g[0]) g[0].id = o.id; values.push(...g); }
+      for (const s of this.studies) { const g = s.legend(i); if (g[0]) g[0].id = s.id; values.push(...g); }
+      this.opts.onCrosshair?.(b, values);
+    }
     // in-progress drawing preview: the placed points + the cursor as the next point
     if (this.drafting && this.drafting.points.length >= 1) {
       const pr = this.panes[0];
@@ -3320,7 +3502,8 @@ export class Chart {
     const pw = this.plotW();
     const n = this.n();
     // keep at least a few bars on screen at each edge
-    const minOff = pw - (n - 1) * this.barSpacing - this.barSpacing * 20;
+    // The floor has to clear the right margin, else a long projection cannot be panned into view.
+    const minOff = pw - (n - 1) * this.barSpacing - this.barSpacing * panFloorBars(this.projLen());
     const maxOff = pw - this.barSpacing * 3;
     return clamp(off, Math.min(minOff, maxOff), maxOff);
   }

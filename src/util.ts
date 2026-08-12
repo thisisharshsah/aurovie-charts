@@ -323,23 +323,44 @@ export function medianSpacingSec(bars: Bar[]): number {
 }
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const pad = (n: number) => (n < 10 ? "0" + n : String(n));
-export function fmtAxisTime(sec: number, intraday: boolean): string {
+/**
+ * Read a bar's timestamp in the chart's clock.
+ *
+ * `utc` when bar times are exchange wall-clock stamped as UTC — a common storage convention, and
+ * the only setting under which a chart reads identically in Kathmandu and New York. Left off, every
+ * label is silently shifted by the READER's offset from UTC.
+ */
+const parts = (sec: number, utc: boolean) => {
   const d = new Date(sec * 1000);
-  return intraday ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : `${MON[d.getMonth()]} ${d.getDate()}`;
+  return utc
+    ? { y: d.getUTCFullYear(), mo: d.getUTCMonth(), day: d.getUTCDate(), h: d.getUTCHours(), mi: d.getUTCMinutes() }
+    : { y: d.getFullYear(), mo: d.getMonth(), day: d.getDate(), h: d.getHours(), mi: d.getMinutes() };
+};
+
+/**
+ * An axis label.
+ *
+ * A `boundary` bar opens a new day (intraday) or year (daily), and is labelled with the DATE.
+ * Printing a day boundary as a clock time yields the session open repeated the whole way across —
+ * "07:00 07:00 07:00" — which says nothing about where you are in the series. Ticks inside a day
+ * carry the time.
+ */
+export function fmtAxisTime(sec: number, intraday: boolean, boundary: boolean, utc = false): string {
+  const p = parts(sec, utc);
+  if (!intraday) return boundary ? `${MON[p.mo]} ${p.y}` : `${MON[p.mo]} ${p.day}`;
+  return boundary ? `${MON[p.mo]} ${p.day}` : `${pad(p.h)}:${pad(p.mi)}`;
 }
-export function fmtCrosshairTime(sec: number, intraday: boolean): string {
-  const d = new Date(sec * 1000);
-  return intraday
-    ? `${MON[d.getMonth()]} ${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-    : `${MON[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+export function fmtCrosshairTime(sec: number, intraday: boolean, utc = false): string {
+  const p = parts(sec, utc);
+  return intraday ? `${MON[p.mo]} ${p.day} ${pad(p.h)}:${pad(p.mi)}` : `${MON[p.mo]} ${p.day}, ${p.y}`;
 }
 // True when bar i begins a new "section" (day for intraday, month for daily) — where a time
 // gridline + label belongs, the way TradingView breaks its time axis.
-export function isTimeBoundary(prev: Bar | undefined, cur: Bar, intraday: boolean): boolean {
+export function isTimeBoundary(prev: Bar | undefined, cur: Bar, intraday: boolean, utc = false): boolean {
   if (!prev) return true;
-  const a = new Date(prev.time * 1000);
-  const b = new Date(cur.time * 1000);
-  return intraday ? a.getDate() !== b.getDate() : a.getMonth() !== b.getMonth() || a.getFullYear() !== b.getFullYear();
+  const a = parts(prev.time, utc);
+  const b = parts(cur.time, utc);
+  return intraday ? a.day !== b.day : a.mo !== b.mo || a.y !== b.y;
 }
 
 // ---- indicator maths (pure) ----------------------------------------------
@@ -1067,4 +1088,36 @@ export function placeAxisTag(y: number, h: number, slots: AxisSlot[], anchor?: n
   }
   slots.push({ y0: at - half, y1: at + half });
   return at;
+}
+
+// ---- forward projection geometry ------------------------------------------
+// Pure arithmetic, extracted so it is testable: the chart class needs a canvas and a DOM, and the
+// test runner only picks up src/**/*.test.ts. Off-by-one here shows up as a forecast that is
+// unreachable by panning, or one whose first column is silently clipped.
+
+/** Empty columns kept right of the newest bar, in bar widths, for a projection of `projLen`. */
+export function rightMarginBars(projLen: number): number {
+  return 6 + Math.max(0, projLen);
+}
+
+/**
+ * How far left the viewport may be dragged, in bar widths past the newest bar.
+ *
+ * Must clear the right margin, or a projection longer than the old fixed ceiling could be drawn
+ * into a region the user cannot pan to.
+ */
+export function panFloorBars(projLen: number): number {
+  return Math.max(20, rightMarginBars(projLen) + 4);
+}
+
+/**
+ * The projection columns on screen, as inclusive `[first, last]` indices into the projection
+ * arrays, given the visible COLUMN range and the real bar count. Returns an empty range
+ * (`[0, -1]`) when none is visible, so callers can loop without a special case.
+ */
+export function projVisibleRange(firstCol: number, lastCol: number, n: number, K: number): [number, number] {
+  if (K <= 0) return [0, -1];
+  const first = Math.max(0, firstCol - n);
+  const last = Math.min(K - 1, lastCol - n);
+  return last < first ? [0, -1] : [first, last];
 }
