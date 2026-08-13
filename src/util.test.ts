@@ -3,7 +3,7 @@
 // definitions: NaN padding, the exact formulas, and the invariants each family must hold.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange, fitBarCount } from "./util.ts";
+import { ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange, fitBarCount, visibleIndexRange } from "./util.ts";
 import type { AxisSlot } from "./util.ts";
 import type { Bar } from "./types.ts";
 
@@ -256,4 +256,20 @@ test("fitBarCount tolerates a zero-width plot during first layout", () => {
   assert.equal(fitBarCount(0, 800), 800);
   assert.equal(fitBarCount(-10, 800), 800);
   assert.equal(fitBarCount(320, 0), 0);
+});
+
+test("visibleIndexRange returns an inverted range for an empty series", () => {
+  // The crash this pins: clamping into [0, n-1] with n === 0 gives -1 for BOTH ends, which every
+  // `for (i = f; i <= l)` in the engine reads as one bar at index -1 — and `src[-1].low` throws.
+  const [f, l] = visibleIndexRange(0, 0, 5);
+  assert.ok(l < f, "empty range must be inverted so loops run zero times");
+  let iterations = 0;
+  for (let i = f; i <= l; i++) iterations++;
+  assert.equal(iterations, 0);
+});
+
+test("visibleIndexRange clamps both ends into the series", () => {
+  assert.deepEqual(visibleIndexRange(10, -4, 99), [0, 9]);
+  assert.deepEqual(visibleIndexRange(10, 2, 7), [2, 7]);
+  assert.deepEqual(visibleIndexRange(1, 0, 0), [0, 0]);
 });

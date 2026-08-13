@@ -1101,6 +1101,20 @@ export function rightMarginBars(projLen: number): number {
 }
 
 /**
+ * Clamp a raw first/last bar index into a series of `n` bars.
+ *
+ * Returns an INVERTED range when the series is empty. Clamping 0 into `[0, n-1]` with `n === 0`
+ * gives -1 for both ends, which reads as "one bar, at index -1" to every `for (i = f; i <= l)`
+ * loop in the engine — and dereferencing bar -1 throws. An inverted range makes those loops run
+ * zero times, which is what "nothing is visible" should mean.
+ */
+export function visibleIndexRange(n: number, rawFirst: number, rawLast: number): [number, number] {
+  if (n <= 0) return [0, -1];
+  const cl = (v: number) => Math.max(0, Math.min(n - 1, v));
+  return [cl(Math.floor(rawFirst)), cl(Math.ceil(rawLast))];
+}
+
+/**
  * How many bars an initial fit should show.
  *
  * This used to be a flat 160 for every chart, which reads as "a sensible default" and is

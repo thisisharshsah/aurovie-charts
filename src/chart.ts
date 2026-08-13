@@ -18,6 +18,7 @@ import {
   rightMarginBars,
   panFloorBars,
   fitBarCount,
+  visibleIndexRange,
   projVisibleRange,
   alpha,
   mix,
@@ -540,7 +541,12 @@ export class Chart {
    * as the axes being broken rather than as a prop being ignored.
    */
   setAxes(axes: boolean | { price?: boolean; time?: boolean } | undefined) {
+    const w = this.axisW;
+    const h = this.axisH;
     this.applyAxes(axes);
+    // Hosts pass object literals, which are a new reference every render; without this a
+    // re-render would relayout and repaint the whole chart for a value that did not change.
+    if (w === this.axisW && h === this.axisH) return;
     this.layout();
     this.requestDraw();
   }
@@ -1136,10 +1142,7 @@ export class Chart {
     // Clamp BOTH ends into [0, n-1]: when the series is scrolled fully off-screen (reachable at high
     // zoom where <20 bars fit), an unclamped `first` runs past end-of-data and the out-of-loop
     // this.bars[f] reads (compare base, baseline base) crash the rAF tick and freeze the chart.
-    const n = this.n();
-    const first = clamp(Math.floor(this.indexAt(0)), 0, n - 1);
-    const last = clamp(Math.ceil(this.indexAt(this.plotW())), 0, n - 1);
-    return [first, last];
+    return visibleIndexRange(this.n(), this.indexAt(0), this.indexAt(this.plotW()));
   }
   private fitContent() {
     const pw = this.plotW();
@@ -1168,6 +1171,13 @@ export class Chart {
   // The price pane's TARGET range for the current visible window (low/high of bars + overlay
   // values, then the manual priceZoom stretch). The tick loop eases dispMin/dispMax toward this.
   private priceTarget(): { min: number; max: number } {
+    // NO BARS, NO RANGE. `visible()` clamps into `0..n-1`, which with an empty series is
+    // `0..-1` — and clamping 0 into that gives -1, so both ends come back as -1 and every loop
+    // below runs exactly once against `src[-1]`. It never surfaced while this was only reached
+    // from the draw path, which returns early on an empty chart; `setAxes` re-lays out on demand
+    // and can arrive before the first bar does. A guard at the source covers both callers and
+    // any future one.
+    if (!this.n()) return { min: 0, max: 1 };
     const [f, l] = this.visible();
     let mn = Infinity,
       mx = -Infinity;

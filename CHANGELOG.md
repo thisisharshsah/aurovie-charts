@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.15] - 2026-08-13
+
+### Fixed
+
+- **Crash — "Cannot read properties of undefined (reading 'low')" on a chart with no bars yet.**
+  `visible()` clamped both ends of the range into `[0, n - 1]`, and with `n === 0` that is
+  `[0, -1]`, so clamping 0 gives **-1 for both ends**. Every `for (i = f; i <= l)` in the engine
+  then ran exactly once against bar -1.
+
+  It was latent until 0.8.12: the only path that reached the autoscale was `draw()`, which
+  returns early on an empty chart. `setAxes` re-lays out on demand and can arrive before the
+  first bar does. The clamp is now `visibleIndexRange`, exported and tested, and returns an
+  inverted range for an empty series so those loops run zero times — which is what "nothing is
+  visible" should mean. `priceTarget` also short-circuits on an empty series rather than
+  returning an `Infinity` range.
+
+- `setAxes` no longer relayouts when the resolved gutter widths are unchanged. Hosts pass object
+  literals, which are a new reference every render, so a re-render repainted the whole chart for
+  a value that had not changed.
+
 ## [0.8.14] - 2026-08-13
 
 ### Fixed
