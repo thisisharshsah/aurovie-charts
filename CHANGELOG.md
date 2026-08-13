@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.2] - 2026-08-13
+
+No functional change. Version bump only — `src/`, `react/` and the built `dist/` are
+identical to 0.8.1.
+
 ## [0.8.1] - 2026-08-13
 
 ### Added
