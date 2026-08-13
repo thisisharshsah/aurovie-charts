@@ -223,10 +223,10 @@ export function ScriptEditor({
   /**
    * The workspace toggle.
    *
-   * Collapsed, the editor is a dock over the chart — fine for tweaking a line and re-running.
-   * Expanded, it takes the whole chart area, because reading a backtest is not that task: a
-   * scorecard, a per-symbol table, a sweep and the source that produced them do not fit in a
-   * 62%-of-360px box, and stacking them there left every pane a scrolling slit.
+   * Docked, the editor is a panel under the plot — enough room to write in without hiding the
+   * chart. Expanded, it claims the rest of the widget, because reading a backtest is a different
+   * task from tweaking a line: a scorecard, a per-symbol table, a sweep and the source that
+   * produced them do not fit in a dock, and stacking them there leaves every pane a slit.
    */
   const [expanded, setExpanded] = useState(false);
   // Side-by-side only when the width can carry two readable columns. An expanded editor on a
@@ -295,22 +295,18 @@ export function ScriptEditor({
       ref={rootRef}
       onClick={(e) => e.stopPropagation()}
       style={{
-        position: "absolute",
-        left: 8,
-        right: 8,
-        bottom: 8,
-        top: expanded ? 8 : undefined,
-        zIndex: 12,
+        // DOCKED, not floating. As an overlay it had to be translucent and shadowed to sit over
+        // the plot without hiding it entirely, which is a lot of treatment for a code editor and
+        // still covered the chart being scripted. As a flex sibling it is simply a region of the
+        // widget: opaque, square with its neighbours, and it takes its height from the layout
+        // instead of stealing it from the plot.
         display: "flex",
         flexDirection: "column",
-        maxHeight: expanded ? undefined : "62%",
-        borderRadius: 12,
+        flex: expanded ? "1 1 auto" : "0 0 clamp(240px, 42%, 420px)",
+        minHeight: 0,
         overflow: "hidden",
-        background: `color-mix(in srgb, ${th.paneBackground} 96%, transparent)`,
-        backdropFilter: "blur(10px)",
-        WebkitBackdropFilter: "blur(10px)",
-        border: `1px solid ${th.border}`,
-        boxShadow: "0 16px 44px rgba(0,0,0,0.5)",
+        background: th.paneBackground,
+        borderTop: `1px solid ${th.border}`,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderBottom: `1px solid ${th.border}` }}>

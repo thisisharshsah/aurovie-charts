@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.9] - 2026-08-13
+
+### Changed
+
+- **The script editor docks below the plot instead of floating over it.** It was absolutely
+  positioned inside the chart at 62% of its height, so writing a script covered the chart the
+  script is written against — and the space it did get was shared between source, library, error
+  strip and a backtest scorecard, each in its own scrolling slit.
+
+  It is now a sibling of the plot: a real region of the widget that takes height out of the
+  layout rather than stealing it from the chart. The plot shrinks, both are fully visible, and
+  the dock is `clamp(240px, 42%, 420px)` — enough to write in on a tall chart without swallowing
+  a short one. Expanded still claims the rest of the widget for reading a backtest. Being docked
+  rather than floating, it also drops the translucency, blur and drop shadow it only needed in
+  order to sit on top of something.
+
 ## [0.8.8] - 2026-08-13
 
 ### Changed

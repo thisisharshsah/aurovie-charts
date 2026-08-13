@@ -2081,93 +2081,6 @@ export function TradingChart({
               </div>
             </div>
           )}
-          {scriptOpen && onRunScript && (
-            <ScriptEditor
-              theme={th}
-              value={scriptSrc}
-              onChange={(src) => {
-                setScriptSrc(src);
-                // A result belongs to the source that produced it. Keeping either visible while the
-                // script changes underneath would attribute one strategy's record to another.
-                setScorecard(null);
-                setSweep(null);
-              }}
-              onRun={runScript}
-              onClose={() => setScriptOpen(false)}
-              running={scriptRunning}
-              error={scriptErr}
-              status={scriptStatus}
-              library={scriptLibrary}
-              onBacktest={
-                onBacktestScript
-                  ? async () => {
-                      setBacktesting(true);
-                      try {
-                        setScorecard(await onBacktestScript(scriptSrc, loadedSaved?.id));
-                      } catch {
-                        // the host toasts the reason; the panel simply stays empty rather than
-                        // showing a stale scorecard for a script that is no longer the one on screen
-                        setScorecard(null);
-                      } finally {
-                        setBacktesting(false);
-                      }
-                    }
-                  : undefined
-              }
-              scorecard={scorecard}
-              backtesting={backtesting}
-              onSweep={
-                onSweepScript
-                  ? async () => {
-                      setSweeping(true);
-                      try {
-                        setSweep(await onSweepScript(scriptSrc));
-                      } catch {
-                        setSweep(null);
-                      } finally {
-                        setSweeping(false);
-                      }
-                    }
-                  : undefined
-              }
-              sweep={sweep}
-              sweeping={sweeping}
-              savedLibrary={savedLibrary}
-              onSelectSaved={(sv) => {
-                setScriptSrc(sv.source);
-                setLoadedSaved(sv);
-                setScorecard(null);
-                setSweep(null);
-                setScriptErr(null);
-              }}
-              onSave={
-                loadedSaved && onSaveScript
-                  ? async () => {
-                      await onSaveScript(scriptSrc, loadedSaved.id);
-                      // Clear "dirty" by remembering the source we just persisted.
-                      setLoadedSaved((prev) => (prev ? { ...prev, source: scriptSrc } : prev));
-                    }
-                  : undefined
-              }
-              onSaveAs={
-                onSaveAsScript
-                  ? async (title) => {
-                      const sv = await onSaveAsScript(scriptSrc, title);
-                      if (sv) setLoadedSaved(sv); // now editing the newly-saved strategy
-                    }
-                  : undefined
-              }
-              onDeleteSaved={
-                onDeleteSavedScript
-                  ? async (id) => {
-                      await onDeleteSavedScript(id);
-                      setLoadedSaved((prev) => (prev && prev.id === id ? null : prev));
-                    }
-                  : undefined
-              }
-              dirty={loadedSaved ? scriptSrc !== loadedSaved.source : undefined}
-            />
-          )}
           {/* Keyboard shortcuts — the chart's own keys, live while the pointer is over the plot */}
           {shortcuts && (
             <>
@@ -2377,6 +2290,99 @@ export function TradingChart({
           )}
         </div>
       </div>
+      {/* THE SCRIPT EDITOR IS A SIBLING OF THE PLOT, NOT A SHEET OVER IT.
+          It used to sit absolutely inside the plot at 62% of its height, so writing a script
+          meant covering the chart the script is written against — and the space it did get
+          was split between source, library, errors and a scorecard, each in its own scrolling
+          slit. Docked below it takes real height out of the layout: the plot shrinks, both
+          are fully visible, and the editor is big enough to work in. */}
+          {scriptOpen && onRunScript && (
+            <ScriptEditor
+              theme={th}
+              value={scriptSrc}
+              onChange={(src) => {
+                setScriptSrc(src);
+                // A result belongs to the source that produced it. Keeping either visible while the
+                // script changes underneath would attribute one strategy's record to another.
+                setScorecard(null);
+                setSweep(null);
+              }}
+              onRun={runScript}
+              onClose={() => setScriptOpen(false)}
+              running={scriptRunning}
+              error={scriptErr}
+              status={scriptStatus}
+              library={scriptLibrary}
+              onBacktest={
+                onBacktestScript
+                  ? async () => {
+                      setBacktesting(true);
+                      try {
+                        setScorecard(await onBacktestScript(scriptSrc, loadedSaved?.id));
+                      } catch {
+                        // the host toasts the reason; the panel simply stays empty rather than
+                        // showing a stale scorecard for a script that is no longer the one on screen
+                        setScorecard(null);
+                      } finally {
+                        setBacktesting(false);
+                      }
+                    }
+                  : undefined
+              }
+              scorecard={scorecard}
+              backtesting={backtesting}
+              onSweep={
+                onSweepScript
+                  ? async () => {
+                      setSweeping(true);
+                      try {
+                        setSweep(await onSweepScript(scriptSrc));
+                      } catch {
+                        setSweep(null);
+                      } finally {
+                        setSweeping(false);
+                      }
+                    }
+                  : undefined
+              }
+              sweep={sweep}
+              sweeping={sweeping}
+              savedLibrary={savedLibrary}
+              onSelectSaved={(sv) => {
+                setScriptSrc(sv.source);
+                setLoadedSaved(sv);
+                setScorecard(null);
+                setSweep(null);
+                setScriptErr(null);
+              }}
+              onSave={
+                loadedSaved && onSaveScript
+                  ? async () => {
+                      await onSaveScript(scriptSrc, loadedSaved.id);
+                      // Clear "dirty" by remembering the source we just persisted.
+                      setLoadedSaved((prev) => (prev ? { ...prev, source: scriptSrc } : prev));
+                    }
+                  : undefined
+              }
+              onSaveAs={
+                onSaveAsScript
+                  ? async (title) => {
+                      const sv = await onSaveAsScript(scriptSrc, title);
+                      if (sv) setLoadedSaved(sv); // now editing the newly-saved strategy
+                    }
+                  : undefined
+              }
+              onDeleteSaved={
+                onDeleteSavedScript
+                  ? async (id) => {
+                      await onDeleteSavedScript(id);
+                      setLoadedSaved((prev) => (prev && prev.id === id ? null : prev));
+                    }
+                  : undefined
+              }
+              dirty={loadedSaved ? scriptSrc !== loadedSaved.source : undefined}
+            />
+          )}
     </div>
   );
 }
