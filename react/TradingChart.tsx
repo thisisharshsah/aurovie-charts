@@ -4,7 +4,7 @@
 // all wired to the framework-agnostic Chart engine and fed by a DataFeed. Drop it into any app.
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Chart, type Tool } from "../src/chart";
-import { Icon } from "./icons";
+import { Icon, hasIcon } from "./icons";
 import { ScriptEditor, type ScriptError, type ScriptPreset, type ScriptScorecard, type ScriptSweep, type SavedStrategy } from "./ScriptEditor";
 import { parseScriptDraw, type ScriptRender } from "../src/script";
 import { DARK, LIGHT, THEMES, THEME_NAMES, SERIES_PALETTE as IND_PALETTE, SWATCHES, CMP_COLORS, CHIP_INK } from "../src/util";
@@ -367,6 +367,21 @@ const RAIL_GROUPS: { id: string; label: string; tools: RailTool[] }[] = [
   },
 ];
 // tool id → human label, for the objects panel (a drawing's `type` is its tool id).
+/**
+ * Render a quick action's mark.
+ *
+ * The rail has always drawn real SVG icons, but the quick dock, the command palette and the
+ * pin editor fell back to raw Unicode — `▮ ⊢ ◫ ∿ ⌐ ◺ ⇌ ▤ ⌇ ⚙ ⬇ ◑`. Those are typography, not
+ * iconography: they carry a font's own weight and baseline rather than the stroke width
+ * every real icon here shares, they sit differently on every platform, and several fall back
+ * to a completely different face. Beside an SVG icon in the same row they read as
+ * placeholders. The icon set already covers every tool and chart type, so this prefers it and
+ * keeps the glyph only for the few actions that have no drawn mark.
+ */
+function ActionMark({ id, glyph, size = 15 }: { id: string; glyph: string; size?: number }) {
+  return hasIcon(id) ? <Icon name={id} size={size} /> : <span aria-hidden>{glyph}</span>;
+}
+
 const TOOL_LABEL: Record<string, string> = Object.fromEntries(RAIL_GROUPS.flatMap((g) => g.tools.map((t) => [t.t, t.label])));
 const DEFAULT_GUIDED_PINS = ["cross", "trend", "indicators", "replay", "settings"];
 const GUIDED_PIN_CHOICES = ["cross", "trend", "indicators", "replay", "settings", "fit", "realtime", "vpvr", "datawindow", "save", "theme", "compare", "script"];
@@ -1184,7 +1199,29 @@ export function TradingChart({
   const clusterBtn = (on = false): CSSProperties => ({ height: 23, minWidth: 23, padding: "0 7px", border: `1px solid ${on ? soft(th.line, 45) : th.border}`, borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: th.font, background: on ? `color-mix(in srgb, ${th.line} 20%, ${th.paneBackground})` : `color-mix(in srgb, ${th.paneBackground} 88%, transparent)`, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", color: on ? th.line : th.text, display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.28)", transition: "background 140ms ease, color 140ms ease, border-color 140ms ease" });
 
   return (
-    <div ref={rootRef} style={{ display: "flex", flexDirection: "column", height, background: th.background, border: `1px solid ${th.border}`, borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.2), 0 8px 28px rgba(0,0,0,0.16)", transition: "background 220ms ease, border-color 220ms ease" }}>
+    <div ref={rootRef} data-aurovie-chart style={{ display: "flex", flexDirection: "column", height, background: th.background, border: `1px solid ${th.border}`, borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.2), 0 8px 28px rgba(0,0,0,0.16)", transition: "background 220ms ease, border-color 220ms ease" }}>
+      {/*
+        Keyboard focus. This widget is built from inline styles, and inline styles cannot
+        express a pseudo-class — so until now NOTHING in it had a focus ring: a keyboard user
+        tabbing through the toolbar, the drawing rail and every menu got no indication of
+        where they were, across the whole component.
+
+        One scoped block, keyed on the root's data attribute so it cannot leak into the host
+        page. `:focus-visible` (not `:focus`) keeps the ring off mouse clicks. `currentColor`
+        rather than a theme value: every control already carries a themed colour, so the ring
+        follows the theme for free and stays visible on the light presets too.
+      */}
+      <style>{`
+        [data-aurovie-chart] :is(button,summary,input,textarea,select,[tabindex]):focus-visible {
+          outline: 2px solid currentColor;
+          outline-offset: 1px;
+          border-radius: 4px;
+        }
+        [data-aurovie-chart] canvas:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+        @media (prefers-reduced-motion: reduce) {
+          [data-aurovie-chart] * { transition-duration: 1ms !important; animation-duration: 1ms !important; }
+        }
+      `}</style>
       {header && (
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 14, padding: "11px 13px", borderBottom: `1px solid ${th.border}`, fontFamily: th.font }}>
           <div style={{ minWidth: 0 }}>
@@ -1551,7 +1588,7 @@ export function TradingChart({
                         )}
                         <button style={{ ...item(i === cmdIndex || !!a.active), justifyContent: "space-between" }} onClick={() => { runQuickAction(a.id); setCmdOpen(false); }}>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ width: 20, color: th.text }}>{a.glyph}</span>
+                            <span style={{ width: 20, color: th.text, display: "flex", justifyContent: "center" }}><ActionMark id={a.id} glyph={a.glyph} size={15} /></span>
                             {a.label}
                           </span>
                           <span onClick={(e) => { e.stopPropagation(); toggleCmdFav(a.id); }} style={{ color: cmdFav.includes(a.id) ? th.line : th.text, fontSize: 13, padding: "0 3px" }} title="Favorite (F)">{cmdFav.includes(a.id) ? "★" : "☆"}</span>
@@ -1691,12 +1728,12 @@ export function TradingChart({
                 .slice(0, 3)
                 .map((a) => (
                   <button key={`rec-${a.id}`} style={clusterBtn(!!a.active)} title={`Recommended: ${a.label}`} onClick={() => runQuickAction(a.id)}>
-                    {a.glyph}
+                    <ActionMark id={a.id} glyph={a.glyph} />
                   </button>
                 ))}
               {visibleGuidedPins.map((id) => {
                 const a = quickById[id];
-                return <button key={id} style={clusterBtn(!!a.active)} title={a.label} onClick={() => runQuickAction(id)}>{a.glyph}</button>;
+                return <button key={id} style={clusterBtn(!!a.active)} title={a.label} onClick={() => runQuickAction(id)}><ActionMark id={id} glyph={a.glyph} /></button>;
               })}
               <button style={clusterBtn(dockEditOpen)} title="Customize quick dock" onClick={() => setDockEditOpen((o) => !o)}>⋯</button>
               <span style={{ marginLeft: 2, color: th.text, fontFamily: th.font, fontSize: 11, whiteSpace: "nowrap" }}>Press G for Pro mode</span>
@@ -1712,7 +1749,7 @@ export function TradingChart({
                 return (
                   <button key={id} style={item(on)} onClick={() => toggleGuidedPin(id)}>
                     <span style={{ width: 16, color: on ? th.line : th.text }}>{on ? "✓" : ""}</span>
-                    <span style={{ width: 18, color: th.text }}>{a.glyph}</span>
+                    <span style={{ width: 18, color: th.text, display: "flex", justifyContent: "center" }}><ActionMark id={a.id} glyph={a.glyph} size={14} /></span>
                     {a.label}
                   </button>
                 );

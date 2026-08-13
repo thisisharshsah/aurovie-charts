@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-08-12
+
+### Added
+
+- **Real icons in the quick dock, command palette and pin editor.** The drawing rail always
+  drew SVG icons, but those three surfaces fell back to raw Unicode (`▮ ⊢ ◫ ∿ ⌐ ◺ ⇌ ▤ ⌇ ⚙ ⬇ ◑`).
+  Unicode is typography, not iconography: it carries a font's own weight and baseline instead
+  of the stroke width every real icon shares, sits differently on each platform, and several
+  of those characters fall back to an entirely different face — beside an SVG icon in the same
+  row they read as placeholders. Five missing marks were drawn (settings, fit, realtime, save,
+  theme) and `hasIcon` lets a caller fall back deliberately rather than render the placeholder
+  dot, which looks like a bug rather than an absence.
+- **Keyboard focus, everywhere.** The widget is built from inline styles, which cannot
+  express a pseudo-class, so nothing in it had a focus ring — a keyboard user tabbing
+  the toolbar, the drawing rail and every menu got no indication of where they were,
+  across the whole component. One scoped `:focus-visible` block, keyed on the root's
+  data attribute so it cannot leak into the host page, drawn in `currentColor` so it
+  follows the theme and stays visible on the light presets.
+- **`prefers-reduced-motion`** is now honoured: transitions and animations collapse to
+  1ms rather than being merely shortened.
+
 ## [0.6.0] - 2026-08-12
 
 ### Added

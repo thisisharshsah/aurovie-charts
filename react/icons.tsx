@@ -312,6 +312,37 @@ const ICONS: Record<string, ReactNode> = {
       <polyline points="15,7 19,12 15,17" />
     </>
   ),
+  settings: (
+    <>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />
+    </>
+  ),
+  fit: (
+    <>
+      <path d="M3 8V4h4M21 8V4h-4M3 16v4h4M21 16v4h-4" />
+      <path d="M8 12h8" />
+    </>
+  ),
+  realtime: (
+    <>
+      <path d="M4 7l6 5-6 5M12 7l6 5-6 5" />
+      <path d="M21 4v16" />
+    </>
+  ),
+  save: (
+    <>
+      <path d="M12 3v12" />
+      <path d="M7 11l5 4 5-4" />
+      <path d="M4 19h16" />
+    </>
+  ),
+  theme: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none" />
+    </>
+  ),
   layout: (
     <>
       <rect x="3.5" y="4" width="17" height="16" rx="2" />
@@ -319,6 +350,12 @@ const ICONS: Record<string, ReactNode> = {
     </>
   ),
 };
+
+/** Is there a drawn mark for this id? Lets a caller fall back rather than render the
+ *  placeholder dot, which looks like a bug rather than an absence. */
+export function hasIcon(name: string): boolean {
+  return name in ICONS;
+}
 
 export function Icon({ name, size = 16, style }: { name: string; size?: number; style?: CSSProperties }) {
   return (
