@@ -1826,6 +1826,41 @@ export function TradingChart({
               )}
             </div>
             {/* interactive indicator legend — hover a chip to step its period or remove it */}
+            {/* CLEAR ALL — one action for what was N.
+                Every overlay had its own ✕ and nothing removed them together, so getting back to
+                a clean chart after trying five studies and a script meant six precise clicks on
+                12px targets. Script output counts: closing the editor left its plots drawn, and
+                nothing else in the interface offered to take them down. Only shown when there is
+                more than one thing to clear, so it never appears as clutter over a bare chart. */}
+            {activeInds.length + (scripts.length > 0 ? 1 : 0) > 1 && (
+              <button
+                onClick={() => {
+                  setActive([]);
+                  setScripts([]);
+                }}
+                title="Remove all indicators and script output"
+                style={{
+                  pointerEvents: "auto",
+                  width: "fit-content",
+                  marginTop: 1,
+                  padding: "2px 7px",
+                  border: `1px solid ${soft(th.border, 70)}`,
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontFamily: th.font,
+                  fontSize: 10.5,
+                  fontWeight: 600,
+                  letterSpacing: "0.04em",
+                  textTransform: "uppercase",
+                  background: `color-mix(in srgb, ${th.paneBackground} 82%, transparent)`,
+                  backdropFilter: "blur(6px)",
+                  WebkitBackdropFilter: "blur(6px)",
+                  color: th.text,
+                }}
+              >
+                Clear all
+              </button>
+            )}
             {activeInds.map((d) => {
               const val = legend.values.find((v) => v.id === d.id) ?? legend.values.find((v) => !v.id && v.color.toLowerCase() === d.color.toLowerCase());
               const hov = hoverInd === d.id;

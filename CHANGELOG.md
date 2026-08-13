@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.7] - 2026-08-13
+
+### Added
+
+- **Clear all** in the on-chart legend — removes every active indicator and any script output in
+  one action. Each overlay had its own ✕ and nothing took them down together, so returning to a
+  clean chart after trying five studies meant five precise clicks on 12px targets.
+
+  It also fixes a real dead end: **script output had no removal affordance at all.** Closing the
+  editor left its plots drawn, and no other control in the interface offered to remove them — the
+  only ways out were changing symbol or interval, both of which clear scripts as a side effect of
+  doing something else. The button therefore appears whenever a script is drawn, even alone, and
+  otherwise only once there are two indicators to clear, so it never sits over a bare chart.
+
 ## [0.8.6] - 2026-08-13
 
 ### Changed
