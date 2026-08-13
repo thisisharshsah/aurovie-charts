@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.2] - 2026-08-13
+
+### Fixed
+
+- **The left chip column could invert, and pointed nowhere when zoomed out.** 0.7.1
+  gave the chips collision slots but handed them out in host order, so the column's
+  vertical sequence did not match the prices — a stop above a target above an entry.
+  A reader takes a stacked column as ordered, and an unordered one is worse than an
+  overlapping one because it is confidently wrong about which level sits where. Chips
+  are now placed top-down by price.
+- A chip that cannot sit within ~28px of its own line is no longer drawn. Zoomed out, a
+  plan's levels compress into a few pixels, and fanning five chips into a 90px column
+  left every one of them beside a line it was nowhere near. The line and its right-axis
+  tag still carry the number; only the word is dropped, and the word was the part that
+  was lying.
+
 ## [0.7.1] - 2026-08-13
 
 ### Fixed

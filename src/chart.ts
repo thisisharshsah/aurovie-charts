@@ -59,6 +59,10 @@ import {
 } from "./util";
 
 const RIGHT_AXIS_W = 64;
+/// How far a left chip may be nudged from its own line before it is dropped instead. About
+/// one and a half chip heights: enough to separate a couple of neighbours, not enough to
+/// build a column that no longer points at anything.
+const MAX_CHIP_OFFSET = 28;
 const BOTTOM_AXIS_H = 22;
 const MIN_BAR_SPACING = 1.5;
 const MAX_BAR_SPACING = 64;
@@ -2716,7 +2720,15 @@ export class Chart {
     if (!this.priceLines.length || this.scaleMode === "percent") return;
     ctx.font = this.theme.monoFont;
     const pw = this.plotW();
-    for (const pl of this.priceLines) {
+    // TOP-DOWN, so the chip column can never invert.
+    //
+    // Slots are handed out in iteration order, so drawing in host order produced a column
+    // whose vertical sequence did not match the prices — a stop above a target above an
+    // entry, in whatever order they happened to be pushed. A reader takes a stacked column
+    // as ordered; an unordered one is worse than an overlapping one, because it is
+    // confidently wrong about which level sits where.
+    const ordered = [...this.priceLines].sort((a, b) => b.price - a.price);
+    for (const pl of ordered) {
       const y = this.priceToY(p, pl.price);
       if (y < p.top + 2 || y > p.top + p.height - 2) continue;
       ctx.strokeStyle = pl.color;
@@ -2757,6 +2769,13 @@ export class Chart {
       // on the right axis have always stepped apart; the chips had no such treatment.
       // The LINE stays at the true price and only the chip moves, so the geometry never lies.
       const cy = placeAxisTag(y, 18, this.chipSlots, this.lastPriceY ?? undefined);
+      // A chip that cannot sit NEAR its line is not drawn at all.
+      //
+      // Zoomed out, a plan's levels compress into a few pixels, and fanning five chips into
+      // a 90px column leaves every one of them pointing at a line it is nowhere near — the
+      // labels stop describing the chart. The line and its right-axis tag still carry the
+      // number, so nothing is lost but the word, and the word is what was lying.
+      if (Math.abs(cy - y) > MAX_CHIP_OFFSET) continue;
       if (Math.abs(cy - y) > 1) {
         // Displaced far enough to notice → a hairline leader back to the real level, the same
         // way a nudged axis pill draws one. Without it the chip silently misreports its line.
