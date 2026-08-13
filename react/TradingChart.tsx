@@ -183,6 +183,15 @@ export interface TradingChartProps {
    */
   ranges?: RangePreset[] | false;
   /**
+   * Handed the live `Chart` once it exists, and `null` when it goes away.
+   *
+   * For chrome the widget cannot host: a range strip in a host header, a fullscreen layout that
+   * needs `showSince`, a keyboard shortcut of the host's own. Everything the toolbar does is
+   * reachable this way, so hiding the toolbar no longer means losing its capabilities — which is
+   * what forced hosts to choose between a clean chart and a controllable one.
+   */
+  onReady?: (chart: Chart | null) => void;
+  /**
    * An instrument identity block above the toolbar — ticker, name, sector, and whatever reference
    * stats the host actually has. Omitted entirely when absent, so a chart embedded in a page that
    * already names the instrument doesn't say it twice.
@@ -454,11 +463,16 @@ export function TradingChart({
   utc,
   projection,
   ranges,
+  onReady,
   header,
 }: TradingChartProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<Chart | null>(null);
+  // Held in a ref so an inline arrow from the host is not a dependency of chart construction —
+  // that would rebuild the engine on every host render.
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
   const hoveredRef = useRef(false); // pointer is over the plot → chart keyboard shortcuts are live
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; price: number } | null>(null); // right-click menu
   const [narrow, setNarrow] = useState(false); // compact layout on small screens (phones)
@@ -707,8 +721,10 @@ export function TradingChart({
       },
     });
     chartRef.current = chart;
+    onReadyRef.current?.(chart);
     return () => {
       chart.destroy();
+      onReadyRef.current?.(null);
       chartRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

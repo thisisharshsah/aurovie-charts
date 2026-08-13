@@ -38,6 +38,12 @@ All notable changes to this project are documented here. The format follows
   old dock unchanged. Narrow stays single-column: splitting a phone into two columns makes both
   unreadable, which is the problem, not the fix.
 
+- **`onReady`** — hands the host the live `Chart` (and `null` on teardown). For chrome the
+  widget cannot host: a range strip in the host's own header, a layout that needs `showSince`,
+  a host keyboard shortcut. Everything the toolbar does is reachable through it, so hiding the
+  toolbar no longer costs its capabilities — which is what forced hosts to choose between a
+  clean chart and a controllable one.
+
 - **A drawing on/off switch, first in the rail.** The rail was always-on whenever `drawingRail`
   was set, with no way to put the tools away. The new first item collapses it to a single icon
   — and resets the active tool to the crosshair, because a "drawing off" that still draws on the
