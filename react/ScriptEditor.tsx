@@ -7,6 +7,7 @@
 // The gutter highlights the line an error names, because a compile error whose line you cannot
 // find is barely better than no message at all.
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Icon } from "./icons";
 import type { Theme } from "../src/types";
 
 export interface ScriptError {
@@ -219,6 +220,29 @@ export function ScriptEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * The workspace toggle.
+   *
+   * Collapsed, the editor is a dock over the chart — fine for tweaking a line and re-running.
+   * Expanded, it takes the whole chart area, because reading a backtest is not that task: a
+   * scorecard, a per-symbol table, a sweep and the source that produced them do not fit in a
+   * 62%-of-360px box, and stacking them there left every pane a scrolling slit.
+   */
+  const [expanded, setExpanded] = useState(false);
+  // Side-by-side only when the width can carry two readable columns. An expanded editor on a
+  // phone is still one column — splitting it there would make both halves too narrow to read,
+  // which is the problem being fixed, not a fix for it.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([e]) => setWide(e.contentRect.width >= 720));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const split = expanded && wide;
+
   // Keep the gutter aligned with the textarea's own scrolling.
   useEffect(() => {
     if (gutterRef.current) gutterRef.current.scrollTop = scrollTop;
@@ -268,16 +292,18 @@ export function ScriptEditor({
 
   return (
     <div
+      ref={rootRef}
       onClick={(e) => e.stopPropagation()}
       style={{
         position: "absolute",
         left: 8,
         right: 8,
         bottom: 8,
+        top: expanded ? 8 : undefined,
         zIndex: 12,
         display: "flex",
         flexDirection: "column",
-        maxHeight: "62%",
+        maxHeight: expanded ? undefined : "62%",
         borderRadius: 12,
         overflow: "hidden",
         background: `color-mix(in srgb, ${th.paneBackground} 96%, transparent)`,
@@ -349,6 +375,15 @@ export function ScriptEditor({
         <button style={btn(true)} onClick={onRun} disabled={running} title="Run (Ctrl/Cmd + Enter)">
           {running ? "Running…" : "▶ Run"}
         </button>
+        <button
+          style={btn(expanded)}
+          onClick={() => setExpanded((v) => !v)}
+          aria-pressed={expanded}
+          title={expanded ? "Restore the editor to a dock" : "Expand to a full workspace"}
+          aria-label={expanded ? "Collapse editor" : "Expand editor"}
+        >
+          <Icon name={expanded ? "collapse" : "expand"} size={14} />
+        </button>
         <button style={btn()} onClick={onClose} aria-label="Close editor">✕</button>
       </div>
 
@@ -395,577 +430,598 @@ export function ScriptEditor({
         </div>
       )}
 
-      {browsing && (
+      {/* CODE and RESULTS.
+          Stacked they are the old dock, in the old order. Split (expanded, and only when
+          the width can carry two readable columns) the source sits beside the scorecard it
+          produced, instead of the two taking turns in one short scrolling box. */}
+      <div style={{ display: "flex", flexDirection: split ? "row" : "column", flex: 1, minHeight: 0, minWidth: 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, minWidth: 0, order: split ? 0 : 1 }}>
+        <div style={{ display: "flex", flex: 1, minHeight: 0, background: th.background }}>
+          <div
+            ref={gutterRef}
+            style={{
+              overflow: "hidden",
+              padding: "8px 0",
+              width: 40,
+              flex: "none",
+              textAlign: "right",
+              fontFamily: mono,
+              fontSize: 12,
+              lineHeight: "18px",
+              color: soft(th.text, 70),
+              borderRight: `1px solid ${th.border}`,
+              userSelect: "none",
+            }}
+          >
+            {Array.from({ length: lines }, (_, i) => {
+              const bad = error && error.line === i + 1;
+              return (
+                <div
+                  key={i}
+                  style={{
+                    padding: "0 7px 0 0",
+                    background: bad ? soft(th.down, 22) : "transparent",
+                    color: bad ? th.down : undefined,
+                    fontWeight: bad ? 700 : undefined,
+                  }}
+                >
+                  {i + 1}
+                </div>
+              );
+            })}
+          </div>
+          <textarea
+            ref={taRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onScroll={(e) => setScrollTop((e.target as HTMLTextAreaElement).scrollTop)}
+            onKeyDown={(e) => {
+              // Ctrl/Cmd+Enter runs. Everything else must stay inside the textarea — the chart's own
+              // global key handler only guards INPUT/TEXTAREA/SELECT by tag, so stopping propagation
+              // here is what keeps Backspace from reaching the engine and deleting a drawing.
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+                onRun();
+              }
+              if (e.key === "Tab") {
+                e.preventDefault();
+                const t = e.currentTarget;
+                const [a, b] = [t.selectionStart, t.selectionEnd];
+                const next = value.slice(0, a) + "    " + value.slice(b);
+                onChange(next);
+                requestAnimationFrame(() => t.setSelectionRange(a + 4, a + 4));
+              }
+              e.stopPropagation();
+            }}
+            spellCheck={false}
+            autoComplete="off"
+            style={{
+              flex: 1,
+              minWidth: 0,
+              resize: "none",
+              border: "none",
+              outline: "none",
+              padding: "8px 10px",
+              background: "transparent",
+              color: th.textStrong,
+              fontFamily: mono,
+              fontSize: 12,
+              lineHeight: "18px",
+              tabSize: 4,
+            }}
+          />
+        </div>
+
+        {error && (
+          <div
+            style={{
+              padding: "7px 10px",
+              borderTop: `1px solid ${th.border}`,
+              background: soft(th.down, 12),
+              color: th.down,
+              fontFamily: th.monoFont,
+              fontSize: 11.5,
+            }}
+          >
+            line {error.line}: {error.message}
+          </div>
+        )}
+        </div>
         <div
           style={{
             display: "flex",
             flexDirection: "column",
-            maxHeight: 260,
-            overflowY: "auto",
-            background: th.background,
-            borderBottom: `1px solid ${th.border}`,
+            minHeight: 0,
+            minWidth: 0,
+            order: split ? 1 : 0,
+            flex: split ? "0 0 42%" : "none",
+            overflowY: split ? "auto" : undefined,
+            borderLeft: split ? `1px solid ${th.border}` : undefined,
           }}
         >
+        {browsing && (
           <div
             style={{
-              padding: "8px 12px 4px",
-              fontFamily: th.font,
-              fontSize: 11,
-              lineHeight: 1.5,
-              color: soft(th.text, 80),
+              display: "flex",
+              flexDirection: "column",
+              maxHeight: 260,
+              overflowY: "auto",
+              background: th.background,
+              borderBottom: `1px solid ${th.border}`,
             }}
           >
-            Independent implementations of published techniques — a starting point to read and edit,
-            not a product. Loading one replaces the editor's contents.
-          </div>
-          {presets.length > 0 && saved.length > 0 && (
-            <div style={sectionLabel}>Built-in · read-only</div>
-          )}
-          {presets.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => {
-                onChange(p.source);
-                setBrowsing(false);
-                taRef.current?.focus();
-              }}
-              title={`Load ${p.title}`}
+            <div
               style={{
-                display: "block",
-                width: "100%",
-                textAlign: "left",
-                padding: "8px 12px",
-                border: "none",
-                borderTop: `1px solid ${soft(th.border, 60)}`,
-                background: "transparent",
-                cursor: "pointer",
+                padding: "8px 12px 4px",
                 fontFamily: th.font,
+                fontSize: 11,
+                lineHeight: 1.5,
+                color: soft(th.text, 80),
               }}
             >
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: th.textStrong }}>{p.title}</div>
-              <div style={{ fontSize: 11, lineHeight: 1.45, color: soft(th.text, 85), marginTop: 2 }}>
-                {gist(p.description)}
-              </div>
-            </button>
-          ))}
-          {saved.length > 0 && (
-            <>
-              <div style={sectionLabel}>Yours · editable</div>
-              {saved.map((sv) => (
-                <div
-                  key={String(sv.id)}
-                  style={{ display: "flex", alignItems: "center", borderTop: `1px solid ${soft(th.border, 60)}` }}
-                >
-                  <button
-                    onClick={() => {
-                      if (onSelectSaved) onSelectSaved(sv);
-                      else onChange(sv.source);
-                      setBrowsing(false);
-                      taRef.current?.focus();
-                    }}
-                    title={`Load ${sv.title}`}
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      textAlign: "left",
-                      padding: "8px 12px",
-                      border: "none",
-                      background: "transparent",
-                      cursor: "pointer",
-                      fontFamily: th.font,
-                    }}
-                  >
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: th.textStrong }}>{sv.title}</div>
-                    {sv.badge && (
-                      <div style={{ fontSize: 11, lineHeight: 1.45, color: soft(th.text, 85), marginTop: 2, fontFamily: mono }}>
-                        {sv.badge}
-                      </div>
-                    )}
-                  </button>
-                  {onDeleteSaved && (
-                    <button
-                      onClick={() => onDeleteSaved(sv.id)}
-                      title={`Delete ${sv.title}`}
-                      style={{ ...btn(), height: 22, marginRight: 8, color: th.down }}
-                    >
-                      ✕
-                    </button>
-                  )}
+              Independent implementations of published techniques — a starting point to read and edit,
+              not a product. Loading one replaces the editor's contents.
+            </div>
+            {presets.length > 0 && saved.length > 0 && (
+              <div style={sectionLabel}>Built-in · read-only</div>
+            )}
+            {presets.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => {
+                  onChange(p.source);
+                  setBrowsing(false);
+                  taRef.current?.focus();
+                }}
+                title={`Load ${p.title}`}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "8px 12px",
+                  border: "none",
+                  borderTop: `1px solid ${soft(th.border, 60)}`,
+                  background: "transparent",
+                  cursor: "pointer",
+                  fontFamily: th.font,
+                }}
+              >
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: th.textStrong }}>{p.title}</div>
+                <div style={{ fontSize: 11, lineHeight: 1.45, color: soft(th.text, 85), marginTop: 2 }}>
+                  {gist(p.description)}
                 </div>
-              ))}
-            </>
-          )}
-        </div>
-      )}
-
-      {sweep && !browsing && (
-        <div style={{ padding: "10px 12px 12px", background: th.background, borderBottom: `1px solid ${th.border}` }}>
-          {(() => {
-            const s = sweep;
-            // Defensive for the same reason the host reads payloads defensively: this renders
-            // inside an error boundary that blanks the chart, so one absent field would cost the
-            // whole view rather than one line of it.
-            const d = s.dispersion ?? { tested: 0, traded: 0, profitable: 0, hit_rate: 0, median_return: 0, best_return: 0, worst_return: 0, spread: 0, top_contribution: 0 };
-            const p = s.pooled ?? ({} as ScriptMetrics);
-            const caveats = s.caveats ?? [];
-            const rows = s.per_symbol ?? [];
-            const num = (v: unknown, d2 = 0) => (typeof v === "number" && Number.isFinite(v) ? v : d2);
-            const tone =
-              s.verdict === "clears-exam-one" ? th.up : s.verdict === "no-evidence" ? th.text : th.down;
-            const label =
-              s.verdict === "clears-exam-one"
-                ? "Clears exam one"
-                : s.verdict === "no-evidence"
-                  ? "No evidence"
-                  : "Below the bar";
-            const pct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(0)}%`;
-            const tile = (l: string, v: string) => (
-              <div key={l} style={{ minWidth: 78 }}>
-                <div style={{ fontFamily: mono, fontSize: 13, fontWeight: 600, color: th.textStrong, fontVariantNumeric: "tabular-nums" }}>{v}</div>
-                <div style={{ fontFamily: th.font, fontSize: 10, color: soft(th.text, 85), marginTop: 1 }}>{l}</div>
-              </div>
-            );
-            return (
+              </button>
+            ))}
+            {saved.length > 0 && (
               <>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <span style={{ fontFamily: th.font, fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: soft(th.text, 90) }}>
-                    Universe sweep
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: th.font,
-                      fontSize: 10.5,
-                      fontWeight: 700,
-                      letterSpacing: "0.04em",
-                      textTransform: "uppercase",
-                      color: tone,
-                      border: `1px solid ${soft(tone, 45)}`,
-                      background: soft(tone, 12),
-                      borderRadius: 5,
-                      padding: "2px 7px",
-                    }}
+                <div style={sectionLabel}>Yours · editable</div>
+                {saved.map((sv) => (
+                  <div
+                    key={String(sv.id)}
+                    style={{ display: "flex", alignItems: "center", borderTop: `1px solid ${soft(th.border, 60)}` }}
                   >
-                    {label}
-                  </span>
-                  <span style={{ fontFamily: th.font, fontSize: 11, color: soft(th.text, 90) }}>
-                    {num(s.total_trades)} trades across {d.tested} instruments · {num(s.span_years).toFixed(1)}y
-                  </span>
-                </div>
-
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 15, marginBottom: 9 }}>
-                  {tile("Deflated Sharpe", num(s.deflated_sharpe).toFixed(2))}
-                  {tile("Pooled return", pct(num(p.total_return)))}
-                  {tile("Max drawdown", `${(num(p.max_drawdown) * 100).toFixed(1)}%`)}
-                  {tile("Median name", pct(num(d.median_return)))}
-                  {tile("Profitable", `${d.profitable}/${d.traded}`)}
-                  {tile("Top name's share", `${(d.top_contribution * 100).toFixed(0)}%`)}
-                </div>
-
-                {/* WHICH instruments, not just how many. The dispersion numbers say 71% were
-                    profitable and one name carried 24% of the profit; without the per-instrument
-                    rows there is no way to check either claim, or to notice that the winners are
-                    all one sector. Best and worst both shown — a list truncated to winners would
-                    be the most flattering possible reading of a sweep. */}
-                {rows.length > 0 && (
-                  <div style={{ marginBottom: 9 }}>
                     <button
-                      style={{ ...btn(showRows), height: 20, padding: "0 8px", fontSize: 10.5, marginBottom: showRows ? 5 : 0 }}
-                      onClick={() => setShowRows((v) => !v)}
+                      onClick={() => {
+                        if (onSelectSaved) onSelectSaved(sv);
+                        else onChange(sv.source);
+                        setBrowsing(false);
+                        taRef.current?.focus();
+                      }}
+                      title={`Load ${sv.title}`}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        textAlign: "left",
+                        padding: "8px 12px",
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        fontFamily: th.font,
+                      }}
                     >
-                      {showRows ? "Hide instruments" : `Show all ${rows.length} instruments`}
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: th.textStrong }}>{sv.title}</div>
+                      {sv.badge && (
+                        <div style={{ fontSize: 11, lineHeight: 1.45, color: soft(th.text, 85), marginTop: 2, fontFamily: mono }}>
+                          {sv.badge}
+                        </div>
+                      )}
                     </button>
-                    {showRows && (
-                      <div style={{ maxHeight: 150, overflowY: "auto", border: `1px solid ${soft(th.border, 70)}`, borderRadius: 6 }}>
-                        {rows.map((r, i) => (
-                          <div
-                            key={r.symbol}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
-                              padding: "3px 8px",
-                              borderTop: i === 0 ? "none" : `1px solid ${soft(th.border, 45)}`,
-                              fontFamily: mono,
-                              fontSize: 11,
-                              fontVariantNumeric: "tabular-nums",
-                            }}
-                          >
-                            <span style={{ width: 62, color: th.textStrong }}>{r.symbol}</span>
-                            <span style={{ width: 62, textAlign: "right", color: r.total_return >= 0 ? th.up : th.down }}>
-                              {pct(num(r.total_return))}
-                            </span>
-                            <span style={{ width: 58, textAlign: "right", color: soft(th.text, 85) }}>
-                              −{(num(r.max_drawdown) * 100).toFixed(0)}%
-                            </span>
-                            <span style={{ width: 46, textAlign: "right", color: soft(th.text, 85) }}>
-                              {r.trades}t
-                            </span>
-                            <span style={{ flex: 1, textAlign: "right", color: soft(th.text, 60), fontSize: 10 }}>
-                              {r.bars} bars
-                            </span>
+                    {onDeleteSaved && (
+                      <button
+                        onClick={() => onDeleteSaved(sv.id)}
+                        title={`Delete ${sv.title}`}
+                        style={{ ...btn(), height: 22, marginRight: 8, color: th.down }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        )}
+
+        {sweep && !browsing && (
+          <div style={{ padding: "10px 12px 12px", background: th.background, borderBottom: `1px solid ${th.border}` }}>
+            {(() => {
+              const s = sweep;
+              // Defensive for the same reason the host reads payloads defensively: this renders
+              // inside an error boundary that blanks the chart, so one absent field would cost the
+              // whole view rather than one line of it.
+              const d = s.dispersion ?? { tested: 0, traded: 0, profitable: 0, hit_rate: 0, median_return: 0, best_return: 0, worst_return: 0, spread: 0, top_contribution: 0 };
+              const p = s.pooled ?? ({} as ScriptMetrics);
+              const caveats = s.caveats ?? [];
+              const rows = s.per_symbol ?? [];
+              const num = (v: unknown, d2 = 0) => (typeof v === "number" && Number.isFinite(v) ? v : d2);
+              const tone =
+                s.verdict === "clears-exam-one" ? th.up : s.verdict === "no-evidence" ? th.text : th.down;
+              const label =
+                s.verdict === "clears-exam-one"
+                  ? "Clears exam one"
+                  : s.verdict === "no-evidence"
+                    ? "No evidence"
+                    : "Below the bar";
+              const pct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(0)}%`;
+              const tile = (l: string, v: string) => (
+                <div key={l} style={{ minWidth: 78 }}>
+                  <div style={{ fontFamily: mono, fontSize: 13, fontWeight: 600, color: th.textStrong, fontVariantNumeric: "tabular-nums" }}>{v}</div>
+                  <div style={{ fontFamily: th.font, fontSize: 10, color: soft(th.text, 85), marginTop: 1 }}>{l}</div>
+                </div>
+              );
+              return (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontFamily: th.font, fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: soft(th.text, 90) }}>
+                      Universe sweep
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: th.font,
+                        fontSize: 10.5,
+                        fontWeight: 700,
+                        letterSpacing: "0.04em",
+                        textTransform: "uppercase",
+                        color: tone,
+                        border: `1px solid ${soft(tone, 45)}`,
+                        background: soft(tone, 12),
+                        borderRadius: 5,
+                        padding: "2px 7px",
+                      }}
+                    >
+                      {label}
+                    </span>
+                    <span style={{ fontFamily: th.font, fontSize: 11, color: soft(th.text, 90) }}>
+                      {num(s.total_trades)} trades across {d.tested} instruments · {num(s.span_years).toFixed(1)}y
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 15, marginBottom: 9 }}>
+                    {tile("Deflated Sharpe", num(s.deflated_sharpe).toFixed(2))}
+                    {tile("Pooled return", pct(num(p.total_return)))}
+                    {tile("Max drawdown", `${(num(p.max_drawdown) * 100).toFixed(1)}%`)}
+                    {tile("Median name", pct(num(d.median_return)))}
+                    {tile("Profitable", `${d.profitable}/${d.traded}`)}
+                    {tile("Top name's share", `${(d.top_contribution * 100).toFixed(0)}%`)}
+                  </div>
+
+                  {/* WHICH instruments, not just how many. The dispersion numbers say 71% were
+                      profitable and one name carried 24% of the profit; without the per-instrument
+                      rows there is no way to check either claim, or to notice that the winners are
+                      all one sector. Best and worst both shown — a list truncated to winners would
+                      be the most flattering possible reading of a sweep. */}
+                  {rows.length > 0 && (
+                    <div style={{ marginBottom: 9 }}>
+                      <button
+                        style={{ ...btn(showRows), height: 20, padding: "0 8px", fontSize: 10.5, marginBottom: showRows ? 5 : 0 }}
+                        onClick={() => setShowRows((v) => !v)}
+                      >
+                        {showRows ? "Hide instruments" : `Show all ${rows.length} instruments`}
+                      </button>
+                      {showRows && (
+                        <div style={{ maxHeight: 150, overflowY: "auto", border: `1px solid ${soft(th.border, 70)}`, borderRadius: 6 }}>
+                          {rows.map((r, i) => (
+                            <div
+                              key={r.symbol}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                padding: "3px 8px",
+                                borderTop: i === 0 ? "none" : `1px solid ${soft(th.border, 45)}`,
+                                fontFamily: mono,
+                                fontSize: 11,
+                                fontVariantNumeric: "tabular-nums",
+                              }}
+                            >
+                              <span style={{ width: 62, color: th.textStrong }}>{r.symbol}</span>
+                              <span style={{ width: 62, textAlign: "right", color: r.total_return >= 0 ? th.up : th.down }}>
+                                {pct(num(r.total_return))}
+                              </span>
+                              <span style={{ width: 58, textAlign: "right", color: soft(th.text, 85) }}>
+                                −{(num(r.max_drawdown) * 100).toFixed(0)}%
+                              </span>
+                              <span style={{ width: 46, textAlign: "right", color: soft(th.text, 85) }}>
+                                {r.trades}t
+                              </span>
+                              <span style={{ flex: 1, textAlign: "right", color: soft(th.text, 60), fontSize: 10 }}>
+                                {r.bars} bars
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* The caveats are the point of a pooled figure, not a footnote to it. */}
+                  {caveats.length > 0 && (
+                    <div
+                      style={{
+                        fontFamily: th.font,
+                        fontSize: 10.5,
+                        lineHeight: 1.55,
+                        color: soft(th.text, 92),
+                        borderLeft: `2px solid ${soft(th.down, 55)}`,
+                        paddingLeft: 9,
+                      }}
+                    >
+                      {caveats.map((c, i) => (
+                        <div key={i} style={{ marginBottom: i === caveats.length - 1 ? 0 : 4 }}>
+                          {c}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        )}
+
+        {scorecard && !browsing && (
+          <div style={{ padding: "10px 12px 12px", background: th.background, borderBottom: `1px solid ${th.border}` }}>
+            {(() => {
+              const sc = scorecard;
+              const o = sc.out_of_sample;
+              const is = sc.in_sample;
+              // Status colour ALWAYS travels with the word — never colour alone.
+              const verdict =
+                sc.verdict === "clears-exam-one"
+                  ? { label: "Clears exam one", tone: th.up, note: "earns a paper burn-in — not capital" }
+                  : sc.verdict === "no-evidence"
+                    ? { label: "No evidence", tone: th.text, note: "no completed out-of-sample trade — untested, not disproven" }
+                    : { label: "Below the bar", tone: th.down, note: "real out-of-sample trades, not good enough" };
+              const pct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%`;
+              const num = (v: number, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : "—");
+              // Tabular figures in the tile ROW so the columns line up; the hero keeps
+              // proportional figures, which is what a large standalone number wants.
+              const tile = (label: string, val: string) => (
+                <div key={label} style={{ minWidth: 74 }}>
+                  <div style={{ fontFamily: mono, fontSize: 13.5, fontWeight: 600, color: th.textStrong, fontVariantNumeric: "tabular-nums" }}>
+                    {val}
+                  </div>
+                  <div style={{ fontFamily: th.font, fontSize: 10, color: soft(th.text, 85), marginTop: 1 }}>{label}</div>
+                </div>
+              );
+              return (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span
+                      style={{
+                        fontFamily: th.font,
+                        fontSize: 10.5,
+                        fontWeight: 700,
+                        letterSpacing: "0.04em",
+                        textTransform: "uppercase",
+                        color: verdict.tone,
+                        border: `1px solid ${soft(verdict.tone, 45)}`,
+                        background: soft(verdict.tone, 12),
+                        borderRadius: 5,
+                        padding: "2px 7px",
+                      }}
+                    >
+                      {verdict.label}
+                    </span>
+                    <span style={{ fontFamily: th.font, fontSize: 11, color: soft(th.text, 90) }}>{verdict.note}</span>
+                  </div>
+
+                  {/* Exactly one hero figure, and it is the OUT-OF-SAMPLE return. */}
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 9 }}>
+                    <div style={{ fontFamily: th.font, fontSize: 30, fontWeight: 600, lineHeight: 1.05, color: o.trades > 0 ? (o.total_return >= 0 ? th.up : th.down) : th.text }}>
+                      {o.trades > 0 ? pct(o.total_return) : "—"}
+                    </div>
+                    <div style={{ fontFamily: th.font, fontSize: 11, color: soft(th.text, 90) }}>
+                      Out-of-sample return · {o.trades} closed {o.trades === 1 ? "trade" : "trades"} over {o.bars} bars
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 9 }}>
+                    {tile("Sharpe", num(o.sharpe))}
+                    {tile("Max drawdown", `${(o.max_drawdown * 100).toFixed(1)}%`)}
+                    {tile("Expectancy", `${(o.expectancy * 100).toFixed(2)}%`)}
+                    {tile("Profit factor", num(o.profit_factor))}
+                    {tile("Exposure", `${(o.exposure * 100).toFixed(0)}%`)}
+                    {tile("Win rate", `${(o.win_rate * 100).toFixed(0)}%`)}
+                  </div>
+
+                  {(() => {
+                    // WHY. Every claim carries the numbers it rests on, so a reader can check the
+                    // sentence rather than trust it — the host's whole acceptance test is that no
+                    // factual sentence is an orphan. Fatal first: someone scanning this is looking
+                    // for what disqualifies the result.
+                    const fs = sc.findings ?? [];
+                    if (!fs.length) return null;
+                    // Fatal and warning share the loss hue at different weights — one colour, one meaning
+                    // (the one-colour rule). A third hue for "warning" would make the palette say two things.
+                    const tone = (sev: string) => (sev === "fatal" ? th.down : sev === "warning" ? soft(th.down, 80) : soft(th.text, 75));
+                    return (
+                      <div style={{ marginBottom: 9 }}>
+                        {fs.map((f) => (
+                          <div key={f.code} style={{ fontFamily: th.font, fontSize: 10.5, lineHeight: 1.6, marginBottom: 4 }}>
+                            <span style={{ color: tone(f.severity), fontWeight: 600, textTransform: "uppercase", fontSize: 9 }}>
+                              {f.severity}
+                            </span>{" "}
+                            <span style={{ color: soft(th.text, 92) }}>{f.claim}</span>
+                            {f.evidence.length > 0 && (
+                              <span style={{ color: soft(th.text, 65) }}>
+                                {"  "}
+                                {f.evidence.map((e) => `${e.name.replace(/_/g, " ")} ${e.rendered}`).join(" · ")}
+                              </span>
+                            )}
                           </div>
                         ))}
                       </div>
-                    )}
-                  </div>
-                )}
+                    );
+                  })()}
 
-                {/* The caveats are the point of a pooled figure, not a footnote to it. */}
-                {caveats.length > 0 && (
-                  <div
-                    style={{
-                      fontFamily: th.font,
-                      fontSize: 10.5,
-                      lineHeight: 1.55,
-                      color: soft(th.text, 92),
-                      borderLeft: `2px solid ${soft(th.down, 55)}`,
-                      paddingLeft: 9,
-                    }}
-                  >
-                    {caveats.map((c, i) => (
-                      <div key={i} style={{ marginBottom: i === caveats.length - 1 ? 0 : 4 }}>
-                        {c}
+                  {(() => {
+                    // WHAT DOING NOTHING EARNED, on the same bars, under the same costs. Shown next
+                    // to the headline because a return without it is unreadable: a long-biased
+                    // strategy in a rising market inherits the market's result, and "+464%" reads as
+                    // a triumph until you learn that holding returned +7,282% over the same window.
+                    const b = sc.benchmark;
+                    if (!b || o.trades === 0) return null;
+                    const won = sc.beats_hold === true;
+                    return (
+                      <div style={{ fontFamily: th.font, fontSize: 10.5, lineHeight: 1.6, color: soft(th.text, 85), marginBottom: 7 }}>
+                        Buy and hold, same bars ·{" "}
+                        <span style={{ color: soft(th.text, 95) }}>{pct(b.total_return)} return</span>
+                        {" · "}
+                        <span style={{ color: soft(th.text, 95) }}>Sharpe {num(b.sharpe)}</span>
+                        {" — "}
+                        <span style={{ color: won ? th.up : th.down, fontWeight: 600 }}>
+                          {won ? "this strategy beats it" : "this strategy LOSES to it"}
+                        </span>
+                        {!won && (
+                          <span style={{ color: soft(th.text, 75) }}>
+                            {" "}· doing nothing was better per unit of risk, so exam one is not cleared however good the Sharpe looks.
+                          </span>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            );
-          })()}
-        </div>
-      )}
+                    );
+                  })()}
 
-      {scorecard && !browsing && (
-        <div style={{ padding: "10px 12px 12px", background: th.background, borderBottom: `1px solid ${th.border}` }}>
-          {(() => {
-            const sc = scorecard;
-            const o = sc.out_of_sample;
-            const is = sc.in_sample;
-            // Status colour ALWAYS travels with the word — never colour alone.
-            const verdict =
-              sc.verdict === "clears-exam-one"
-                ? { label: "Clears exam one", tone: th.up, note: "earns a paper burn-in — not capital" }
-                : sc.verdict === "no-evidence"
-                  ? { label: "No evidence", tone: th.text, note: "no completed out-of-sample trade — untested, not disproven" }
-                  : { label: "Below the bar", tone: th.down, note: "real out-of-sample trades, not good enough" };
-            const pct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%`;
-            const num = (v: number, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : "—");
-            // Tabular figures in the tile ROW so the columns line up; the hero keeps
-            // proportional figures, which is what a large standalone number wants.
-            const tile = (label: string, val: string) => (
-              <div key={label} style={{ minWidth: 74 }}>
-                <div style={{ fontFamily: mono, fontSize: 13.5, fontWeight: 600, color: th.textStrong, fontVariantNumeric: "tabular-nums" }}>
-                  {val}
-                </div>
-                <div style={{ fontFamily: th.font, fontSize: 10, color: soft(th.text, 85), marginTop: 1 }}>{label}</div>
-              </div>
-            );
-            return (
-              <>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <span
-                    style={{
-                      fontFamily: th.font,
-                      fontSize: 10.5,
-                      fontWeight: 700,
-                      letterSpacing: "0.04em",
-                      textTransform: "uppercase",
-                      color: verdict.tone,
-                      border: `1px solid ${soft(verdict.tone, 45)}`,
-                      background: soft(verdict.tone, 12),
-                      borderRadius: 5,
-                      padding: "2px 7px",
-                    }}
-                  >
-                    {verdict.label}
-                  </span>
-                  <span style={{ fontFamily: th.font, fontSize: 11, color: soft(th.text, 90) }}>{verdict.note}</span>
-                </div>
+                  {(() => {
+                    // HOW the trades ended. A stop that is armed but never touched is a stop that did
+                    // nothing, and the difference decides whether the protective level IS the strategy
+                    // or is decoration. Rendered only when the record actually carries the breakdown,
+                    // so an older host shows nothing rather than three confident zeros.
+                    const st = o.stopped_out, tg = o.took_target, sg = o.signal_exits;
+                    if (st == null || tg == null || sg == null || o.trades === 0) return null;
+                    const share = (n: number) => `${((n / o.trades) * 100).toFixed(0)}%`;
+                    return (
+                      <div style={{ fontFamily: th.font, fontSize: 10.5, lineHeight: 1.6, color: soft(th.text, 85), marginBottom: 7 }}>
+                        How trades ended ·{" "}
+                        <span style={{ color: st > 0 ? th.down : soft(th.text, 70) }}>{st} stopped out ({share(st)})</span>
+                        {" · "}
+                        <span style={{ color: tg > 0 ? th.up : soft(th.text, 70) }}>{tg} hit target ({share(tg)})</span>
+                        {" · "}
+                        <span>{sg} on signal ({share(sg)})</span>
+                        {st === 0 && tg === 0 && (
+                          <span style={{ color: soft(th.text, 70) }}>
+                            {" "}— no protective level was ever touched, so the stop changed nothing here.
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
 
-                {/* Exactly one hero figure, and it is the OUT-OF-SAMPLE return. */}
-                <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 9 }}>
-                  <div style={{ fontFamily: th.font, fontSize: 30, fontWeight: 600, lineHeight: 1.05, color: o.trades > 0 ? (o.total_return >= 0 ? th.up : th.down) : th.text }}>
-                    {o.trades > 0 ? pct(o.total_return) : "—"}
-                  </div>
-                  <div style={{ fontFamily: th.font, fontSize: 11, color: soft(th.text, 90) }}>
-                    Out-of-sample return · {o.trades} closed {o.trades === 1 ? "trade" : "trades"} over {o.bars} bars
-                  </div>
-                </div>
+                  {(() => {
+                    // "BELOW THE BAR" IS THE NORMAL ANSWER, and saying so is not softening the
+                    // verdict — it is the context that makes the verdict readable. Across the shipped
+                    // library over 20 years and 325 instruments, two of seventeen beat buy-and-hold,
+                    // both by margins indistinguishable from noise. A user seeing their first
+                    // "below-the-bar" without that concludes the tool is broken; a user who knows it
+                    // concludes what the number actually says.
+                    //
+                    // Shown only on a NEGATIVE verdict. Printing it beside a pass would read as
+                    // undermining a result the scorer just certified.
+                    if (sc.verdict === "clears-exam-one" || o.trades === 0) return null;
+                    return (
+                      <div style={{ fontFamily: th.font, fontSize: 10, lineHeight: 1.6, color: soft(th.text, 62), marginBottom: 7 }}>
+                        Most strategies land here. Of the seventeen in this library, two beat buy-and-hold
+                        over twenty years — both by margins indistinguishable from noise. A negative
+                        verdict is the usual outcome of an honest test, not a fault in the strategy or
+                        the test.
+                      </div>
+                    );
+                  })()}
 
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 9 }}>
-                  {tile("Sharpe", num(o.sharpe))}
-                  {tile("Max drawdown", `${(o.max_drawdown * 100).toFixed(1)}%`)}
-                  {tile("Expectancy", `${(o.expectancy * 100).toFixed(2)}%`)}
-                  {tile("Profit factor", num(o.profit_factor))}
-                  {tile("Exposure", `${(o.exposure * 100).toFixed(0)}%`)}
-                  {tile("Win rate", `${(o.win_rate * 100).toFixed(0)}%`)}
-                </div>
-
-                {(() => {
-                  // WHY. Every claim carries the numbers it rests on, so a reader can check the
-                  // sentence rather than trust it — the host's whole acceptance test is that no
-                  // factual sentence is an orphan. Fatal first: someone scanning this is looking
-                  // for what disqualifies the result.
-                  const fs = sc.findings ?? [];
-                  if (!fs.length) return null;
-                  // Fatal and warning share the loss hue at different weights — one colour, one meaning
-                  // (the one-colour rule). A third hue for "warning" would make the palette say two things.
-                  const tone = (sev: string) => (sev === "fatal" ? th.down : sev === "warning" ? soft(th.down, 80) : soft(th.text, 75));
-                  return (
-                    <div style={{ marginBottom: 9 }}>
-                      {fs.map((f) => (
-                        <div key={f.code} style={{ fontFamily: th.font, fontSize: 10.5, lineHeight: 1.6, marginBottom: 4 }}>
-                          <span style={{ color: tone(f.severity), fontWeight: 600, textTransform: "uppercase", fontSize: 9 }}>
-                            {f.severity}
-                          </span>{" "}
-                          <span style={{ color: soft(th.text, 92) }}>{f.claim}</span>
-                          {f.evidence.length > 0 && (
-                            <span style={{ color: soft(th.text, 65) }}>
-                              {"  "}
-                              {f.evidence.map((e) => `${e.name.replace(/_/g, " ")} ${e.rendered}`).join(" · ")}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-
-                {(() => {
-                  // WHAT DOING NOTHING EARNED, on the same bars, under the same costs. Shown next
-                  // to the headline because a return without it is unreadable: a long-biased
-                  // strategy in a rising market inherits the market's result, and "+464%" reads as
-                  // a triumph until you learn that holding returned +7,282% over the same window.
-                  const b = sc.benchmark;
-                  if (!b || o.trades === 0) return null;
-                  const won = sc.beats_hold === true;
-                  return (
-                    <div style={{ fontFamily: th.font, fontSize: 10.5, lineHeight: 1.6, color: soft(th.text, 85), marginBottom: 7 }}>
-                      Buy and hold, same bars ·{" "}
-                      <span style={{ color: soft(th.text, 95) }}>{pct(b.total_return)} return</span>
-                      {" · "}
-                      <span style={{ color: soft(th.text, 95) }}>Sharpe {num(b.sharpe)}</span>
-                      {" — "}
-                      <span style={{ color: won ? th.up : th.down, fontWeight: 600 }}>
-                        {won ? "this strategy beats it" : "this strategy LOSES to it"}
-                      </span>
-                      {!won && (
-                        <span style={{ color: soft(th.text, 75) }}>
-                          {" "}· doing nothing was better per unit of risk, so exam one is not cleared however good the Sharpe looks.
-                        </span>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {(() => {
-                  // HOW the trades ended. A stop that is armed but never touched is a stop that did
-                  // nothing, and the difference decides whether the protective level IS the strategy
-                  // or is decoration. Rendered only when the record actually carries the breakdown,
-                  // so an older host shows nothing rather than three confident zeros.
-                  const st = o.stopped_out, tg = o.took_target, sg = o.signal_exits;
-                  if (st == null || tg == null || sg == null || o.trades === 0) return null;
-                  const share = (n: number) => `${((n / o.trades) * 100).toFixed(0)}%`;
-                  return (
-                    <div style={{ fontFamily: th.font, fontSize: 10.5, lineHeight: 1.6, color: soft(th.text, 85), marginBottom: 7 }}>
-                      How trades ended ·{" "}
-                      <span style={{ color: st > 0 ? th.down : soft(th.text, 70) }}>{st} stopped out ({share(st)})</span>
-                      {" · "}
-                      <span style={{ color: tg > 0 ? th.up : soft(th.text, 70) }}>{tg} hit target ({share(tg)})</span>
-                      {" · "}
-                      <span>{sg} on signal ({share(sg)})</span>
-                      {st === 0 && tg === 0 && (
-                        <span style={{ color: soft(th.text, 70) }}>
-                          {" "}— no protective level was ever touched, so the stop changed nothing here.
-                        </span>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {(() => {
-                  // "BELOW THE BAR" IS THE NORMAL ANSWER, and saying so is not softening the
-                  // verdict — it is the context that makes the verdict readable. Across the shipped
-                  // library over 20 years and 325 instruments, two of seventeen beat buy-and-hold,
-                  // both by margins indistinguishable from noise. A user seeing their first
-                  // "below-the-bar" without that concludes the tool is broken; a user who knows it
-                  // concludes what the number actually says.
-                  //
-                  // Shown only on a NEGATIVE verdict. Printing it beside a pass would read as
-                  // undermining a result the scorer just certified.
-                  if (sc.verdict === "clears-exam-one" || o.trades === 0) return null;
-                  return (
-                    <div style={{ fontFamily: th.font, fontSize: 10, lineHeight: 1.6, color: soft(th.text, 62), marginBottom: 7 }}>
-                      Most strategies land here. Of the seventeen in this library, two beat buy-and-hold
-                      over twenty years — both by margins indistinguishable from noise. A negative
-                      verdict is the usual outcome of an honest test, not a fault in the strategy or
-                      the test.
-                    </div>
-                  );
-                })()}
-
-                {(() => {
-                  // WHAT TO TRY NEXT. Labelled DRAFT on every entry, because these are proposals
-                  // about a future that has not happened — no evidence can make one true in
-                  // advance, and the design rule is explicit that nothing machine-written appears unlabelled.
-                  // Each cites the finding it answers, so the chain is followable: this number,
-                  // therefore this observation, therefore this experiment.
-                  const ds = sc.drafts ?? [];
-                  if (!ds.length) return null;
-                  return (
-                    <div style={{ marginBottom: 9, paddingTop: 7, borderTop: `1px solid ${soft(th.text, 15)}` }}>
-                      {ds.map((d) => (
-                        <div key={d.code} style={{ fontFamily: th.font, fontSize: 10.5, lineHeight: 1.6, marginBottom: 6 }}>
-                          <span
-                            style={{
-                              color: th.background,
-                              background: soft(th.text, 55),
-                              fontSize: 8.5,
-                              fontWeight: 700,
-                              padding: "1px 4px",
-                              borderRadius: 2,
-                              letterSpacing: 0.4,
-                            }}
-                          >
-                            DRAFT
-                          </span>{" "}
-                          <span style={{ color: soft(th.text, 92) }}>{d.suggestion}</span>{" "}
-                          <span style={{ color: soft(th.text, 62) }}>{d.rationale}</span>
-                          {d.edit_snippet && (
-                            <pre
+                  {(() => {
+                    // WHAT TO TRY NEXT. Labelled DRAFT on every entry, because these are proposals
+                    // about a future that has not happened — no evidence can make one true in
+                    // advance, and the design rule is explicit that nothing machine-written appears unlabelled.
+                    // Each cites the finding it answers, so the chain is followable: this number,
+                    // therefore this observation, therefore this experiment.
+                    const ds = sc.drafts ?? [];
+                    if (!ds.length) return null;
+                    return (
+                      <div style={{ marginBottom: 9, paddingTop: 7, borderTop: `1px solid ${soft(th.text, 15)}` }}>
+                        {ds.map((d) => (
+                          <div key={d.code} style={{ fontFamily: th.font, fontSize: 10.5, lineHeight: 1.6, marginBottom: 6 }}>
+                            <span
                               style={{
-                                margin: "4px 0 0",
-                                padding: 6,
-                                background: soft(th.text, 8),
-                                borderRadius: 3,
-                                fontSize: 10,
-                                whiteSpace: "pre-wrap",
-                                color: soft(th.text, 80),
+                                color: th.background,
+                                background: soft(th.text, 55),
+                                fontSize: 8.5,
+                                fontWeight: 700,
+                                padding: "1px 4px",
+                                borderRadius: 2,
+                                letterSpacing: 0.4,
                               }}
                             >
-                              {d.edit_what ? `// ${d.edit_what}\n` : ""}
-                              {d.edit_snippet}
-                            </pre>
-                          )}
-                        </div>
-                      ))}
+                              DRAFT
+                            </span>{" "}
+                            <span style={{ color: soft(th.text, 92) }}>{d.suggestion}</span>{" "}
+                            <span style={{ color: soft(th.text, 62) }}>{d.rationale}</span>
+                            {d.edit_snippet && (
+                              <pre
+                                style={{
+                                  margin: "4px 0 0",
+                                  padding: 6,
+                                  background: soft(th.text, 8),
+                                  borderRadius: 3,
+                                  fontSize: 10,
+                                  whiteSpace: "pre-wrap",
+                                  color: soft(th.text, 80),
+                                }}
+                              >
+                                {d.edit_what ? `// ${d.edit_what}\n` : ""}
+                                {d.edit_snippet}
+                              </pre>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
+                  <div style={{ fontFamily: th.font, fontSize: 10.5, lineHeight: 1.6, color: soft(th.text, 85) }}>
+                    <div>
+                      {sc.deflated_sharpe == null
+                        ? `Nothing to deflate — the out-of-sample half never traded.`
+                        : `Deflated Sharpe ${num(sc.deflated_sharpe)} · had to clear ${num(sc.search_benchmark, 3)} because ${sc.n_trials} strategies were tried${
+                            sc.confidence == null ? "" : ` · confidence ${(sc.confidence * 100).toFixed(0)}%`
+                          }`}
                     </div>
-                  );
-                })()}
+                    <div>
+                      Costs charged {(sc.total_cost * 100).toFixed(3)}% of the account at {sc.cost_bps_per_side}bp per side
+                      {sc.unfilled > 0 ? ` · ${sc.unfilled} order signalled on the last bar never filled` : ""}
+                    </div>
+                    <div style={{ color: soft(th.text, 65) }}>
+                      In-sample, for contrast only: {pct(is.total_return)}, Sharpe {num(is.sharpe)} over {is.bars} bars.
+                      A wide gap to the figure above is the strategy telling you it was fitted.
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
 
-                <div style={{ fontFamily: th.font, fontSize: 10.5, lineHeight: 1.6, color: soft(th.text, 85) }}>
-                  <div>
-                    {sc.deflated_sharpe == null
-                      ? `Nothing to deflate — the out-of-sample half never traded.`
-                      : `Deflated Sharpe ${num(sc.deflated_sharpe)} · had to clear ${num(sc.search_benchmark, 3)} because ${sc.n_trials} strategies were tried${
-                          sc.confidence == null ? "" : ` · confidence ${(sc.confidence * 100).toFixed(0)}%`
-                        }`}
-                  </div>
-                  <div>
-                    Costs charged {(sc.total_cost * 100).toFixed(3)}% of the account at {sc.cost_bps_per_side}bp per side
-                    {sc.unfilled > 0 ? ` · ${sc.unfilled} order signalled on the last bar never filled` : ""}
-                  </div>
-                  <div style={{ color: soft(th.text, 65) }}>
-                    In-sample, for contrast only: {pct(is.total_return)}, Sharpe {num(is.sharpe)} over {is.bars} bars.
-                    A wide gap to the figure above is the strategy telling you it was fitted.
-                  </div>
-                </div>
-              </>
-            );
-          })()}
         </div>
-      )}
-
-      <div style={{ display: "flex", flex: 1, minHeight: 0, background: th.background }}>
-        <div
-          ref={gutterRef}
-          style={{
-            overflow: "hidden",
-            padding: "8px 0",
-            width: 40,
-            flex: "none",
-            textAlign: "right",
-            fontFamily: mono,
-            fontSize: 12,
-            lineHeight: "18px",
-            color: soft(th.text, 70),
-            borderRight: `1px solid ${th.border}`,
-            userSelect: "none",
-          }}
-        >
-          {Array.from({ length: lines }, (_, i) => {
-            const bad = error && error.line === i + 1;
-            return (
-              <div
-                key={i}
-                style={{
-                  padding: "0 7px 0 0",
-                  background: bad ? soft(th.down, 22) : "transparent",
-                  color: bad ? th.down : undefined,
-                  fontWeight: bad ? 700 : undefined,
-                }}
-              >
-                {i + 1}
-              </div>
-            );
-          })}
-        </div>
-        <textarea
-          ref={taRef}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onScroll={(e) => setScrollTop((e.target as HTMLTextAreaElement).scrollTop)}
-          onKeyDown={(e) => {
-            // Ctrl/Cmd+Enter runs. Everything else must stay inside the textarea — the chart's own
-            // global key handler only guards INPUT/TEXTAREA/SELECT by tag, so stopping propagation
-            // here is what keeps Backspace from reaching the engine and deleting a drawing.
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-              e.preventDefault();
-              onRun();
-            }
-            if (e.key === "Tab") {
-              e.preventDefault();
-              const t = e.currentTarget;
-              const [a, b] = [t.selectionStart, t.selectionEnd];
-              const next = value.slice(0, a) + "    " + value.slice(b);
-              onChange(next);
-              requestAnimationFrame(() => t.setSelectionRange(a + 4, a + 4));
-            }
-            e.stopPropagation();
-          }}
-          spellCheck={false}
-          autoComplete="off"
-          style={{
-            flex: 1,
-            minWidth: 0,
-            resize: "none",
-            border: "none",
-            outline: "none",
-            padding: "8px 10px",
-            background: "transparent",
-            color: th.textStrong,
-            fontFamily: mono,
-            fontSize: 12,
-            lineHeight: "18px",
-            tabSize: 4,
-          }}
-        />
       </div>
-
-      {error && (
-        <div
-          style={{
-            padding: "7px 10px",
-            borderTop: `1px solid ${th.border}`,
-            background: soft(th.down, 12),
-            color: th.down,
-            fontFamily: th.monoFont,
-            fontSize: 11.5,
-          }}
-        >
-          line {error.line}: {error.message}
-        </div>
-      )}
     </div>
   );
 }

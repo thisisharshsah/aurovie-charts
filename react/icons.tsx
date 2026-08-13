@@ -337,6 +337,20 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M4 19h16" />
     </>
   ),
+  expand: (
+    <>
+      <path d="M14 4h6v6" />
+      <path d="M10 20H4v-6" />
+      <path d="M20 4l-7 7" />
+      <path d="M4 20l7-7" />
+    </>
+  ),
+  collapse: (
+    <>
+      <path d="M20 4l-6 6M14 10V5M14 10h5" />
+      <path d="M4 20l6-6M10 14v5M10 14H5" />
+    </>
+  ),
   theme: (
     <>
       <circle cx="12" cy="12" r="9" />

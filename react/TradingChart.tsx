@@ -472,6 +472,10 @@ export function TradingChart({
   const [active, setActive] = useState<string[]>(indicators ?? ["ma50"]);
   const [indInputs, setIndInputs] = useState<Record<string, number[]>>({}); // per-indicator period overrides
   const [indHidden, setIndHidden] = useState<string[]>([]); // active-but-hidden indicators (eye toggled off)
+  // Whether the rail's TOOLS are showing. Collapsed leaves only the toggle, so the rail costs
+  // one icon's width instead of a column — and drops the active tool, because a "drawing off"
+  // that still draws on the next click is not off.
+  const [railOpen, setRailOpen] = useState(true);
   const [hoverInd, setHoverInd] = useState<string | null>(null); // legend chip under the cursor
   const colorAssign = useRef<Record<string, string>>({}); // stable per-indicator colour (kept across add/remove)
   const [scaleMode, setScaleMode] = useState<ScaleMode>("normal");
@@ -1450,7 +1454,23 @@ export function TradingChart({
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
         {drawingRail && !narrow && !guided && (
           <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "5px 4px", background: th.paneBackground, borderRight: `1px solid ${th.border}` }}>
-            {RAIL_GROUPS.map((g) => {
+            {/* The switch, first in the list — the rail's own on/off, before any tool it holds. */}
+            <button
+              title={railOpen ? "Hide drawing tools" : "Drawing tools"}
+              aria-pressed={railOpen}
+              style={railBtn(railOpen)}
+              onClick={() => {
+                setRailOpen((o) => {
+                  if (o) applyTool("cross");
+                  return !o;
+                });
+                setRailMenu(null);
+              }}
+            >
+              <Icon name="brush" size={17} />
+            </button>
+            {railOpen && <span style={{ height: 1, background: th.border, margin: "3px 5px" }} />}
+            {railOpen && RAIL_GROUPS.map((g) => {
               const cur = groupTool[g.id] ?? g.tools[0].t;
               const isActive = g.tools.some((t) => t.t === tool);
               const multi = g.tools.length > 1;
@@ -1482,13 +1502,18 @@ export function TradingChart({
                 </span>
               );
             })}
-            <span style={{ height: 1, background: th.border, margin: "3px 5px" }} />
+            {railOpen && <span style={{ height: 1, background: th.border, margin: "3px 5px" }} />}
+            {railOpen && (
             <button title="Delete selected" style={railBtn(false)} onClick={() => applyTool("delete")}>
               <Icon name="delete" size={17} />
             </button>
+            )}
+            {railOpen && (
             <button title="Clear all drawings" style={railBtn(false)} onClick={() => applyTool("clear")}>
               <Icon name="trash" size={17} />
             </button>
+            )}
+            {railOpen && (
             <span style={{ position: "relative" }}>
               <button
                 title="Objects — manage drawings"
@@ -1518,6 +1543,7 @@ export function TradingChart({
                 </div>
               )}
             </span>
+            )}
           </div>
         )}
         <div

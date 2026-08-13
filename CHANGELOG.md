@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] - 2026-08-13
+
+### Added
+
+- **The script editor expands into a real workspace.** It was a dock pinned to 62% of the chart
+  height — on a 360px chart that is ~220px holding a source pane, a library browser, an error
+  strip, a sweep and a full backtest scorecard with a per-symbol table. Every one of those was
+  given its own scrolling slit, so reading a result meant scrolling a 150px window inside a
+  220px window, and the editor covered the chart it was testing.
+
+  A toggle in the header now takes it to the full chart area, and past 720px the source sits
+  BESIDE the results rather than above them — reading a backtest against the code that produced
+  it is the whole task, and it was the one layout the dock could not do. Collapsed, it is the
+  old dock unchanged. Narrow stays single-column: splitting a phone into two columns makes both
+  unreadable, which is the problem, not the fix.
+
+- **A drawing on/off switch, first in the rail.** The rail was always-on whenever `drawingRail`
+  was set, with no way to put the tools away. The new first item collapses it to a single icon
+  — and resets the active tool to the crosshair, because a "drawing off" that still draws on the
+  next click is not off.
+
 ## [0.9.0] - 2026-08-13
 
 ### Added
