@@ -127,8 +127,9 @@ export interface TradingChartProps {
    * printing a high and a low beside it reports two numbers the reader cannot see and did not
    * ask for, and invites them to read a range off a shape that has none.
    *
-   * `"ohlc"` and `"price"` force either regardless of series; `"none"` drops the readout and
-   * leaves only the ticker and interval, for glance charts that carry their price elsewhere.
+   * `"ohlc"` and `"price"` force either regardless of series; `"none"` removes the on-canvas
+   * legend entirely — ticker and interval included — for hosts whose own header already carries
+   * the instrument, where leaving it would print the same word a third time in one screenful.
    */
   legend?: "auto" | "ohlc" | "price" | "none";
   /**
@@ -209,6 +210,16 @@ export interface InstrumentHeader {
    * flash-on-change). The widget owns the layout; the host owns the motion.
    */
   priceSlot?: ReactNode;
+  /**
+   * A full-width row beneath the identity and price, for the values that CHANGE — an OHLC +
+   * volume readout, a spread, a countdown.
+   *
+   * Deliberately a slot rather than a typed list: the widget cannot know that this host's open
+   * is coloured against the previous close, or that its volume abbreviates in lakhs. Static
+   * instrument facts belong in `stats`, which the widget does render itself; this row is for
+   * anything that follows the crosshair.
+   */
+  metrics?: ReactNode;
 }
 
 export interface RangePreset {
@@ -1275,6 +1286,7 @@ export function TradingChart({
               )}
             </div>
           )}
+          {header.metrics && <div style={{ flexBasis: "100%", minWidth: 0 }}>{header.metrics}</div>}
         </div>
       )}
       {toolbar && (
@@ -1659,6 +1671,7 @@ export function TradingChart({
             </>
           )}
           {/* legend */}
+          {legendShows !== "none" && (
           <div style={{ position: "absolute", top: 7, left: 9, zIndex: 5, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 3, fontFamily: th.monoFont, fontSize: 11, color: th.text }}>
             <div
               style={{
@@ -1678,7 +1691,7 @@ export function TradingChart({
             >
               <span style={{ color: th.textStrong, fontWeight: 700, fontFamily: th.font, fontSize: 12.5, letterSpacing: "0.01em" }}>{symbol}</span>
               <span style={{ fontFamily: th.font, fontSize: 10.5, fontWeight: 600, color: th.text, background: soft(th.text, 14), borderRadius: 4, padding: "1px 5px" }}>{TF_SHORT[resolution] ?? resolution}</span>
-              {legendBar && legendShows !== "none" && (
+              {legendBar && (
                 <>
                   {legendShows === "ohlc" ? (
                     <>
@@ -1743,6 +1756,7 @@ export function TradingChart({
               );
             })}
           </div>
+          )}
           <div ref={hostRef} style={{ position: "absolute", inset: 0 }} />
           {overlay}
           {guided && (

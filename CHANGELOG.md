@@ -4,6 +4,25 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] - 2026-08-13
+
+### Added
+
+- **`InstrumentHeader.metrics`** — a full-width slot beneath the identity and price rows, for the
+  values that CHANGE: an OHLC + volume readout, a spread, a countdown. `stats` renders static
+  instrument facts and the widget styles those itself; `metrics` is a slot because the widget
+  cannot know that a host colours its open against the previous close, or abbreviates volume in
+  lakhs. It is the supported way to lift the bar readout out of the canvas and into real chrome,
+  where it can be laid out, aligned and read.
+
+### Changed
+
+- **`legend="none"` now removes the on-canvas legend entirely**, ticker and interval included,
+  rather than keeping the identity line. A host passing `none` has its own header by definition,
+  and the old behaviour left the ticker printed a third time in one screenful — beside the header
+  that already names the instrument and the toolbar that used to. (`legend` ships in this same
+  unpublished line, so nothing released changes behaviour.)
+
 ## [0.8.1] - 2026-08-13
 
 ### Fixed
