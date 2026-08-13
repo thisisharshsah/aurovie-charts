@@ -201,6 +201,17 @@ export interface TradingChartProps {
    */
   frame?: boolean;
   /**
+   * Fired when a built-in range preset is picked, with the preset itself.
+   *
+   * The widget can only move the VIEWPORT — it calls `showSince` and stops there. It cannot know
+   * that five years of five-minute bars is not a chart, or that one day of monthly bars is a
+   * single candle; only the host knows what resolutions its feed serves and what each range is
+   * worth asking for at. Without this hook the range strip was a viewport control pretending to
+   * be a period control, and picking "5Y" on an intraday interval produced a window with almost
+   * nothing in it.
+   */
+  onRangeChange?: (preset: RangePreset) => void;
+  /**
    * A trade plan drawn as risk/reward zones beneath the series. `null` clears it.
    *
    * Prefer this over three `priceLines` for a bracket: the zones state the ratio the levels
@@ -495,6 +506,7 @@ export function TradingChart({
   volumeEmphasis = false,
   axes = true,
   frame = true,
+  onRangeChange,
   header,
 }: TradingChartProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -521,6 +533,10 @@ export function TradingChart({
   // one icon's width instead of a column — and drops the active tool, because a "drawing off"
   // that still draws on the next click is not off.
   const [railOpen, setRailOpen] = useState(true);
+  // Which preset is applied. The strip drew every button in the inactive style, so a reader
+  // could pick a range and get no confirmation that anything had been selected — and coming
+  // back to the chart later, no way to tell what window they were looking at.
+  const [activeRange, setActiveRange] = useState<string | null>(null);
   const [hoverInd, setHoverInd] = useState<string | null>(null); // legend chip under the cursor
   const colorAssign = useRef<Record<string, string>>({}); // stable per-indicator colour (kept across add/remove)
   const [scaleMode, setScaleMode] = useState<ScaleMode>("normal");
@@ -1428,7 +1444,16 @@ export function TradingChart({
           {rangeList.length > 0 && (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 1 }} title="Visible range">
               {rangeList.map((r) => (
-                <button key={r.label} style={{ ...btn(false), padding: "0 7px" }} onClick={() => applyRange(r.days)}>
+                <button
+                  key={r.label}
+                  aria-pressed={activeRange === r.label}
+                  style={{ ...btn(activeRange === r.label), padding: "0 7px" }}
+                  onClick={() => {
+                    applyRange(r.days);
+                    setActiveRange(r.label);
+                    onRangeChange?.(r);
+                  }}
+                >
                   {r.label}
                 </button>
               ))}

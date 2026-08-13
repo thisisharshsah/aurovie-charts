@@ -4,7 +4,33 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.4] - 2026-08-13
+
+### Added
+
+- **`onRangeChange`** — fired when a built-in range preset is picked, with the preset. The widget
+  can only move the VIEWPORT: it calls `showSince` and stops. It cannot know that five years of
+  five-minute bars is not a chart, or that one day of monthly bars is a single candle — only the
+  host knows what its feed serves and what each range is worth asking for at. Without the hook
+  the range strip was a viewport control pretending to be a period control.
+
+### Fixed
+
+- **The range strip had no active state.** Every preset drew in the inactive style, so picking a
+  range gave no confirmation that anything had been selected, and returning to a chart later
+  there was no way to tell which window was applied.
+- **`frame` was announced in 0.8.3 but not in the published tarball** — 0.8.3 was cut before the
+  feature landed, so it shipped identical to 0.8.2 and a consumer passing `frame` could not
+  compile. `frame` and the drawing-rail fix below are genuinely in this release.
+- **A collapsed drawing rail still cost a full column.** The rail's on/off switch was the first
+  item *inside the rail*, so turning the tools off could not remove the rail — it had to keep
+  rendering to hold its own button. The switch moved to the horizontal toolbar and the rail now
+  disappears entirely when off.
+
 ## [0.8.3] - 2026-08-13
+
+Published identical to 0.8.2 — the version was cut before the work below landed, so these notes
+describe 0.8.4. Kept for the record rather than rewritten.
 
 ### Added
 
