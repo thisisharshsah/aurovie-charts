@@ -193,7 +193,12 @@ export interface ChartOptions {
    * host — an embedded sparkline, a price-header "hero" chart — with the full plot area used for
    * the series instead of reserving gutters for labels.
    */
-  axes?: boolean;
+  /**
+   * The axis gutters. `false` drops both so a bare plot fills the host; an object controls them
+   * separately, which is what a glance chart usually wants — a price scale but no time scale,
+   * since "what is it worth" survives the loss of chrome and "which Tuesday" mostly does not.
+   */
+  axes?: boolean | { price?: boolean; time?: boolean };
   /**
    * Respond to pan, zoom, and drawing input. `false` makes the chart read-only; the crosshair
    * still tracks the pointer, so `onCrosshair` keeps driving a host's scrub readout.

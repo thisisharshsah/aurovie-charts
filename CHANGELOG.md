@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.12] - 2026-08-13
+
+### Fixed
+
+- **`axes` was construction-only, so toggling it did nothing.** It was read once in the Chart
+  constructor; a host switching the same mounted widget between a bare glance view and a full
+  chart kept whatever it was built with. A chart built bare stayed bare — which reads as the
+  price and time scales being broken, not as a prop being ignored. `Chart.setAxes()` applies it
+  live and the React binding calls it on change.
+
+### Added
+
+- **`axes` accepts `{ price, time }`** as well as a boolean, so a host can keep one gutter and
+  drop the other. That is what a glance chart usually wants: a price scale but no time scale,
+  because "what is it worth" survives the loss of chrome and "which Tuesday" mostly does not.
+
 ## [0.8.11] - 2026-08-13
 
 ### Changed

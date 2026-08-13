@@ -243,9 +243,10 @@ export interface TradingChartProps {
    * For glance charts whose price lives in host chrome: an axis exists so a reader can put a
    * number on a point they are looking at, and a chart with one headline figure above it and no
    * intention of being measured is spending two gutters on a question nobody is asking.
-   * `ChartOptions.axes` has supported this since 0.3.0; the widget simply never passed it.
+   * Accepts `{ price, time }` to keep one gutter and drop the other — a glance chart usually
+   * wants the price scale and not the time scale. Applied on change, not only at mount.
    */
-  axes?: boolean;
+  axes?: boolean | { price?: boolean; time?: boolean };
   /**
    * An instrument identity block above the toolbar — ticker, name, sector, and whatever reference
    * stats the host actually has. Omitted entirely when absent, so a chart embedded in a page that
@@ -844,6 +845,12 @@ export function TradingChart({
   useEffect(() => {
     chartRef.current?.setPlan(plan);
   }, [plan]);
+
+  // `axes` used to be construction-only, so a host toggling between a bare view and a full one
+  // on the same mounted chart never got its gutters back.
+  useEffect(() => {
+    chartRef.current?.setAxes(axes);
+  }, [axes]);
 
   useEffect(() => {
     chartRef.current?.setTheme(th);

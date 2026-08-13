@@ -251,10 +251,7 @@ export class Chart {
     // and a shading can never disagree about which day a bar belongs to.
     const s = opts.session ?? US_EQUITIES_SESSION;
     this.session = s.utc === undefined ? { ...s, utc: this.utc } : s;
-    if (opts.axes === false) {
-      this.axisW = 0;
-      this.axisH = 0;
-    }
+    this.applyAxes(opts.axes);
     this.interactive = opts.interactive !== false;
     host.style.position = host.style.position || "relative";
     host.style.userSelect = "none";
@@ -534,6 +531,25 @@ export class Chart {
     return this.drawings.map((d) => ({ ...d, points: d.points.map((p) => ({ ...p })) }));
   }
   /** The trade plan drawn beneath the series. `null` clears it. */
+  /**
+   * Show or hide the axis gutters. Accepts `true`/`false` or `{ price, time }`.
+   *
+   * REACTIVE, which it was not before: `axes` was read once in the constructor, so a host that
+   * changed it — switching between a glance view and a full chart on the same mounted widget —
+   * kept whatever the chart was built with. A chart built bare stayed bare forever, which read
+   * as the axes being broken rather than as a prop being ignored.
+   */
+  setAxes(axes: boolean | { price?: boolean; time?: boolean } | undefined) {
+    this.applyAxes(axes);
+    this.layout();
+    this.requestDraw();
+  }
+  private applyAxes(axes: boolean | { price?: boolean; time?: boolean } | undefined) {
+    const price = axes === undefined ? true : typeof axes === "boolean" ? axes : axes.price !== false;
+    const time = axes === undefined ? true : typeof axes === "boolean" ? axes : axes.time !== false;
+    this.axisW = price ? RIGHT_AXIS_W : 0;
+    this.axisH = time ? BOTTOM_AXIS_H : 0;
+  }
   setPlan(plan: TradePlan | null) {
     this.plan = plan && [plan.entry, plan.target, plan.stop].every((v) => Number.isFinite(v) && v > 0) ? plan : null;
     this.requestDraw();
