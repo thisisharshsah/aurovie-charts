@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.5] - 2026-08-13
+
+### Added
+
+- **`endpointMarker`** — marks the final point of a line/area/step series with a live dot: a
+  halo, a filled centre, and a hairline ring in the pane colour so it holds its shape over a
+  dense area fill. A line otherwise just stops at its right edge, which tells a reader nothing
+  about whether they are looking at the present or at a window ending somewhere in the past. The
+  mark says "this is now", and it is most of what separates a glance chart from a plotted array.
+
+  Static, not pulsing. An animated marker means an unending frame loop per chart purely for
+  decoration, and a page carrying several of them pays that in battery for no information —
+  a halo reads as live without the loop. Drawn only when the newest bar is actually in view:
+  once the viewport is panned into history the last VISIBLE point is not the last point, and
+  marking it there would claim a recency the chart cannot support.
+
 ## [0.8.4] - 2026-08-13
 
 ### Added

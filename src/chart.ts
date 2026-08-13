@@ -147,6 +147,7 @@ export class Chart {
   private volumeEmphasis = false;
   private gridOn = true; // grid lines (axis labels stay regardless)
   private lastPriceOn = true; // dashed last-price line + axis tag
+  private endpointMarker = false; // live dot on the final point of a line/area series
   private atRealtime = true; // is the newest bar parked at the right edge? (drives "go to realtime")
   private lastAutoScale = true; // last-reported price-scale-auto state (to gate onViewChange)
   private magnet = false; // magnet mode: snap drawing anchors + the crosshair to the nearest OHLC
@@ -244,6 +245,7 @@ export class Chart {
     this.seriesType = opts.seriesType ?? "candles";
     this.showVolume = opts.showVolume ?? true;
     this.volumeEmphasis = opts.volumeEmphasis ?? false;
+    this.endpointMarker = opts.endpointMarker ?? false;
     this.utc = opts.utc ?? false;
     // One clock for the whole chart: the session inherits `utc` unless it names its own, so an axis
     // and a shading can never disagree about which day a bar belongs to.
@@ -2029,6 +2031,40 @@ export class Chart {
       ctx.lineWidth = 1.7;
       ctx.stroke();
       ctx.lineCap = "butt";
+      /**
+       * The live endpoint.
+       *
+       * A line series just stops at its right edge, which tells a reader nothing about whether
+       * they are looking at the present or at a window that ends somewhere in the past. A mark
+       * on the final point says "this is now, and this is the number" — it is the detail that
+       * separates a glance chart from a plotted array, and it costs one arc.
+       *
+       * Deliberately NOT animated. A pulse would be prettier and would also mean an unending
+       * rAF loop per chart for decoration; on a page carrying several of them that is real
+       * battery for no information. A halo reads as live without the loop.
+       *
+       * Only on the newest bar: with the viewport panned into history, the last VISIBLE point
+       * is not the last point, and marking it there would be a claim about recency that the
+       * chart cannot support.
+       */
+      if (this.endpointMarker && l === this.n() - 1 && this.replayTo == null) {
+        const ex = this.x(l);
+        const ey = this.priceToY(p, this.bars[l].close); // same source the trace uses, so the dot cannot drift off the line
+        if (ex <= this.plotW() + 1) {
+          ctx.beginPath();
+          ctx.arc(ex, ey, 7, 0, Math.PI * 2);
+          ctx.fillStyle = alpha(t.line, 0.18);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(ex, ey, 3.2, 0, Math.PI * 2);
+          ctx.fillStyle = t.line;
+          ctx.fill();
+          // A ring in the pane's own colour, so the dot keeps its shape over a dense area fill.
+          ctx.lineWidth = 1.4;
+          ctx.strokeStyle = t.paneBackground ?? t.background;
+          ctx.stroke();
+        }
+      }
       return;
     }
     if (this.seriesType === "baseline") {

@@ -176,6 +176,19 @@ export interface ChartOptions {
    */
   volumeEmphasis?: boolean;
   /**
+   * Mark the final point of a line/area/step series with a live dot.
+   *
+   * A line just stops at its right edge, which says nothing about whether the reader is looking
+   * at the present or at a window that ends somewhere in the past. A mark on the last point says
+   * "this is now" — the detail that separates a glance chart from a plotted array.
+   *
+   * Static, not pulsing: an animated marker means an unending frame loop per chart purely for
+   * decoration, and a page carrying several of them pays that in battery for no information.
+   * Drawn only when the newest bar is in view, since the last VISIBLE point is not the last
+   * point once the viewport is panned into history.
+   */
+  endpointMarker?: boolean;
+  /**
    * Draw the right price axis and the bottom time axis. `false` gives a bare plot that fills the
    * host — an embedded sparkline, a price-header "hero" chart — with the full plot area used for
    * the series instead of reserving gutters for labels.

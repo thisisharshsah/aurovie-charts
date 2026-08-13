@@ -220,6 +220,8 @@ export interface TradingChartProps {
   plan?: TradePlan | null;
   /** Brighten volume bars that exceed their own moving average. See `ChartOptions.volumeEmphasis`. */
   volumeEmphasis?: boolean;
+  /** Mark the final point of a line/area series with a live dot. See `ChartOptions.endpointMarker`. */
+  endpointMarker?: boolean;
   /**
    * Draw the price and time gutters. `false` gives the plot the full width and height.
    *
@@ -504,6 +506,7 @@ export function TradingChart({
   onReady,
   plan = null,
   volumeEmphasis = false,
+  endpointMarker = false,
   axes = true,
   frame = true,
   onRangeChange,
@@ -748,6 +751,7 @@ export function TradingChart({
       utc,
       session,
       volumeEmphasis,
+      endpointMarker,
       axes,
       onCrosshair: (bar, values) => {
         setLegend({ bar, values });
