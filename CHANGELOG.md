@@ -6,8 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [0.8.2] - 2026-08-13
 
-No functional change. Version bump only — `src/`, `react/` and the built `dist/` are
-identical to 0.8.1.
+### Added
+
+- **`axes`** on `TradingChart` — `false` drops the price and time gutters so the plot fills the
+  host. `ChartOptions.axes` has supported this since 0.3.0 and the widget simply never passed it
+  through, so the one binding most hosts use could not build a glance chart. An axis exists so a
+  reader can put a number on a point they are looking at; a chart with its headline figure in
+  host chrome above it, not meant to be measured, is spending two gutters on a question nobody
+  is asking.
 
 ## [0.8.1] - 2026-08-13
 

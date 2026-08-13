@@ -201,6 +201,15 @@ export interface TradingChartProps {
   /** Brighten volume bars that exceed their own moving average. See `ChartOptions.volumeEmphasis`. */
   volumeEmphasis?: boolean;
   /**
+   * Draw the price and time gutters. `false` gives the plot the full width and height.
+   *
+   * For glance charts whose price lives in host chrome: an axis exists so a reader can put a
+   * number on a point they are looking at, and a chart with one headline figure above it and no
+   * intention of being measured is spending two gutters on a question nobody is asking.
+   * `ChartOptions.axes` has supported this since 0.3.0; the widget simply never passed it.
+   */
+  axes?: boolean;
+  /**
    * An instrument identity block above the toolbar — ticker, name, sector, and whatever reference
    * stats the host actually has. Omitted entirely when absent, so a chart embedded in a page that
    * already names the instrument doesn't say it twice.
@@ -475,6 +484,7 @@ export function TradingChart({
   onReady,
   plan = null,
   volumeEmphasis = false,
+  axes = true,
   header,
 }: TradingChartProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -712,6 +722,7 @@ export function TradingChart({
       utc,
       session,
       volumeEmphasis,
+      axes,
       onCrosshair: (bar, values) => {
         setLegend({ bar, values });
         crosshairRef.current?.(bar, values);
