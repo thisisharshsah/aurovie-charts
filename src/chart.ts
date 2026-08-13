@@ -148,6 +148,9 @@ export class Chart {
   private markers: ChartMarker[] = []; // host-supplied bar-anchored events (fills)
   // Right-axis pill slots claimed this frame, so opaque tags can't bury one another. Cleared per draw.
   private axisSlots: { y0: number; y1: number }[] = [];
+  // Separate from `axisSlots`: the left chips and the right pills are two independent
+  // columns, so a chip must not be pushed aside by a pill it can never overlap.
+  private chipSlots: { y0: number; y1: number }[] = [];
   private lastPriceY: number | null = null; // what level tags step away from
   private srOn = false; // auto support/resistance overlay (pivot levels off the real bars)
   private srCache: { key: string; levels: { price: number; kind: "s" | "r" }[] } = { key: "", levels: [] };
@@ -1699,6 +1702,7 @@ export class Chart {
     if (!this.comparing) {
       if (this.vpvrOn) this.drawVpvr(ctx, price, f, l);
       this.axisSlots = [];
+      this.chipSlots = [];
       this.lastPriceY = null;
       const paintLastPriceTag = this.lastPriceOn ? this.drawLastPrice(ctx, price) : null;
       this.drawSR(ctx, price);
@@ -2747,29 +2751,49 @@ export class Chart {
       const closeW = pl.removable ? 15 : 0;
       const chipW = 10 + tw + (text && closeW ? 6 : 0) + closeW;
       const chipX = 4;
+      // Chips are OPAQUE, so two levels within a chip-height of each other hid one another
+      // entirely — and an entry, a stop and the live price sit within a few percent by
+      // construction, which makes that the ordinary case rather than an edge case. The pills
+      // on the right axis have always stepped apart; the chips had no such treatment.
+      // The LINE stays at the true price and only the chip moves, so the geometry never lies.
+      const cy = placeAxisTag(y, 18, this.chipSlots, this.lastPriceY ?? undefined);
+      if (Math.abs(cy - y) > 1) {
+        // Displaced far enough to notice → a hairline leader back to the real level, the same
+        // way a nudged axis pill draws one. Without it the chip silently misreports its line.
+        ctx.strokeStyle = pl.color;
+        ctx.globalAlpha = 0.5;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(chipX + chipW / 2, crisp(y));
+        ctx.lineTo(chipX + chipW / 2, crisp(cy));
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
       ctx.save();
       ctx.shadowColor = "rgba(0,0,0,0.3)";
       ctx.shadowBlur = 5;
       ctx.shadowOffsetY = 1;
       ctx.fillStyle = pl.color;
-      roundRectPath(ctx, chipX, y - 9, chipW, 18, 5);
+      roundRectPath(ctx, chipX, cy - 9, chipW, 18, 5);
       ctx.fill();
       ctx.restore();
       ctx.fillStyle = ink;
       ctx.textBaseline = "middle";
       ctx.textAlign = "left";
-      if (text) ctx.fillText(text, chipX + 6, y + 0.5);
+      if (text) ctx.fillText(text, chipX + 6, cy + 0.5);
       if (pl.removable) {
         const cxx = chipX + chipW - closeW + 3;
         ctx.strokeStyle = ink;
         ctx.lineWidth = 1.4;
         ctx.beginPath();
-        ctx.moveTo(cxx, y - 3.5);
-        ctx.lineTo(cxx + 7, y + 3.5);
-        ctx.moveTo(cxx + 7, y - 3.5);
-        ctx.lineTo(cxx, y + 3.5);
+        ctx.moveTo(cxx, cy - 3.5);
+        ctx.lineTo(cxx + 7, cy + 3.5);
+        ctx.moveTo(cxx + 7, cy - 3.5);
+        ctx.lineTo(cxx, cy + 3.5);
         ctx.stroke();
-        this.priceLineHits.push({ id: pl.id, x: chipX + chipW - closeW - 2, y: y - 9, w: closeW + 4, h: 18 });
+        // The hit rect follows the DRAWN chip, not the line — a ✕ you can see but not click
+        // is worse than none.
+        this.priceLineHits.push({ id: pl.id, x: chipX + chipW - closeW - 2, y: cy - 9, w: closeW + 4, h: 18 });
       }
     }
   }

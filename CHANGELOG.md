@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.1] - 2026-08-13
+
+### Fixed
+
+- **Left price-line chips overlapped each other.** The right-axis pills have always
+  stepped apart (`placeAxisTag`), but the chips rode the true price with no collision
+  handling — and an entry, a stop and the live price sit within a few percent of one
+  another by construction, so two chips hiding a third was the ordinary case rather
+  than an edge case. Chips now reserve slots in their own column (independent of the
+  axis pills, which they can never overlap), draw a hairline leader back to the real
+  level when displaced, and keep their ✕ hit-rect on the drawn chip rather than the
+  line — a close button you can see but not click is worse than none.
+
 ## [0.7.0] - 2026-08-12
 
 ### Added
