@@ -4,9 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [0.8.3] - unreleased
+## [0.8.3] - 2026-08-13
 
-Open. No source change yet — `src/`, `react/` and `dist/` are identical to 0.8.2.
+### Added
+
+- **`frame`** — `false` drops the widget's border, corner radius and drop shadow so it renders
+  flush. The frame is right for a chart dropped into a page as a card and wrong for one that IS
+  the page: a host with its own header above the plot and its own controls below ended up with a
+  rounded, shadowed box wedged between two bare rows, and the three read as three unrelated
+  components rather than one instrument.
+
+### Fixed
+
+- **A collapsed drawing rail still cost a full column.** The rail's on/off switch was the first
+  item *inside the rail*, so turning the tools off could not remove the rail — it had to keep
+  rendering to hold its own button, leaving a gutter down the left of every chart whose owner
+  was not drawing. The switch moved to the horizontal toolbar, where it belongs, and the rail now
+  disappears entirely when off. The plot gets the width back.
 
 ## [0.8.2] - 2026-08-13
 

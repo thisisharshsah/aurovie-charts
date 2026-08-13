@@ -192,6 +192,15 @@ export interface TradingChartProps {
    */
   onReady?: (chart: Chart | null) => void;
   /**
+   * Draw the widget's own border, corner radius and drop shadow. `false` renders it flush.
+   *
+   * The frame is right for a chart dropped into a page as a card. It is wrong for one that IS
+   * the page: a host with its own header above the plot and its own controls below ends up with
+   * a rounded, shadowed box wedged between two bare rows, and the three read as three unrelated
+   * components rather than one instrument.
+   */
+  frame?: boolean;
+  /**
    * A trade plan drawn as risk/reward zones beneath the series. `null` clears it.
    *
    * Prefer this over three `priceLines` for a bracket: the zones state the ratio the levels
@@ -485,6 +494,7 @@ export function TradingChart({
   plan = null,
   volumeEmphasis = false,
   axes = true,
+  frame = true,
   header,
 }: TradingChartProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -1277,7 +1287,7 @@ export function TradingChart({
   const clusterBtn = (on = false): CSSProperties => ({ height: 23, minWidth: 23, padding: "0 7px", border: `1px solid ${on ? soft(th.line, 45) : th.border}`, borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: th.font, background: on ? `color-mix(in srgb, ${th.line} 20%, ${th.paneBackground})` : `color-mix(in srgb, ${th.paneBackground} 88%, transparent)`, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", color: on ? th.line : th.text, display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.28)", transition: "background 140ms ease, color 140ms ease, border-color 140ms ease" });
 
   return (
-    <div ref={rootRef} data-aurovie-chart style={{ display: "flex", flexDirection: "column", height, background: th.background, border: `1px solid ${th.border}`, borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.2), 0 8px 28px rgba(0,0,0,0.16)", transition: "background 220ms ease, border-color 220ms ease" }}>
+    <div ref={rootRef} data-aurovie-chart style={{ display: "flex", flexDirection: "column", height, background: th.background, border: frame ? `1px solid ${th.border}` : "none", borderRadius: frame ? 12 : 0, overflow: "hidden", boxShadow: frame ? "0 1px 2px rgba(0,0,0,0.2), 0 8px 28px rgba(0,0,0,0.16)" : "none", transition: "background 220ms ease, border-color 220ms ease" }}>
       {/*
         Keyboard focus. This widget is built from inline styles, and inline styles cannot
         express a pseudo-class — so until now NOTHING in it had a focus ring: a keyboard user
@@ -1341,6 +1351,28 @@ export function TradingChart({
           {/* The header already names the instrument; repeating it here (and again in the
               on-canvas legend) prints the same ticker three times in one screenful. */}
           {!narrow && !header && <span style={{ fontSize: 13, fontWeight: 700, color: th.textStrong, marginRight: 4 }}>{symbol}</span>}
+          {/* The drawing switch belongs in the HORIZONTAL bar, not inside the rail it controls.
+              A switch that lives in the thing it hides cannot turn that thing back on, so the
+              collapsed rail had to keep rendering just to hold its own button — which meant a
+              column of empty gutter down the left of every chart whose owner was not drawing.
+              Out here the rail can disappear completely, and the plot gets the width back. */}
+          {drawingRail && !narrow && !guided && (
+            <button
+              title={railOpen ? "Hide drawing tools" : "Drawing tools"}
+              aria-label={railOpen ? "Hide drawing tools" : "Show drawing tools"}
+              aria-pressed={railOpen}
+              style={{ ...btn(railOpen), padding: "0 8px" }}
+              onClick={() => {
+                setRailOpen((o) => {
+                  if (o) applyTool("cross"); // an "off" that still draws on the next click is not off
+                  return !o;
+                });
+                setRailMenu(null);
+              }}
+            >
+              <Icon name="brush" size={15} />
+            </button>
+          )}
           <span style={{ display: "inline-flex", gap: 1, alignItems: "center" }}>
             {(narrow ? [resolution] : TF_ORDER.filter((v) => favTf.includes(v) || v === resolution)).map((v) => (
               <button key={v} style={btn(v === resolution)} onClick={() => pickRes(v)}>
@@ -1495,25 +1527,9 @@ export function TradingChart({
         </div>
       )}
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-        {drawingRail && !narrow && !guided && (
+        {drawingRail && railOpen && !narrow && !guided && (
           <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "5px 4px", background: th.paneBackground, borderRight: `1px solid ${th.border}` }}>
-            {/* The switch, first in the list — the rail's own on/off, before any tool it holds. */}
-            <button
-              title={railOpen ? "Hide drawing tools" : "Drawing tools"}
-              aria-pressed={railOpen}
-              style={railBtn(railOpen)}
-              onClick={() => {
-                setRailOpen((o) => {
-                  if (o) applyTool("cross");
-                  return !o;
-                });
-                setRailMenu(null);
-              }}
-            >
-              <Icon name="brush" size={17} />
-            </button>
-            {railOpen && <span style={{ height: 1, background: th.border, margin: "3px 5px" }} />}
-            {railOpen && RAIL_GROUPS.map((g) => {
+            {RAIL_GROUPS.map((g) => {
               const cur = groupTool[g.id] ?? g.tools[0].t;
               const isActive = g.tools.some((t) => t.t === tool);
               const multi = g.tools.length > 1;
@@ -1545,18 +1561,13 @@ export function TradingChart({
                 </span>
               );
             })}
-            {railOpen && <span style={{ height: 1, background: th.border, margin: "3px 5px" }} />}
-            {railOpen && (
+            <span style={{ height: 1, background: th.border, margin: "3px 5px" }} />
             <button title="Delete selected" style={railBtn(false)} onClick={() => applyTool("delete")}>
               <Icon name="delete" size={17} />
             </button>
-            )}
-            {railOpen && (
             <button title="Clear all drawings" style={railBtn(false)} onClick={() => applyTool("clear")}>
               <Icon name="trash" size={17} />
             </button>
-            )}
-            {railOpen && (
             <span style={{ position: "relative" }}>
               <button
                 title="Objects — manage drawings"
@@ -1586,7 +1597,6 @@ export function TradingChart({
                 </div>
               )}
             </span>
-            )}
           </div>
         )}
         <div
