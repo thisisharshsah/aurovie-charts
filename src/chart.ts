@@ -152,7 +152,7 @@ export class Chart {
   private lastAutoScale = true; // last-reported price-scale-auto state (to gate onViewChange)
   private magnet = false; // magnet mode: snap drawing anchors + the crosshair to the nearest OHLC
   private priceLines: PriceLine[] = []; // host-supplied horizontal lines (alerts/orders/targets)
-  private plan: TradePlan | null = null; // host-supplied trade plan, drawn as risk/reward zones
+  private plans: TradePlan[] = []; // host-supplied trade plans, drawn as risk/reward zones
   private markers: ChartMarker[] = []; // host-supplied bar-anchored events (fills)
   // Right-axis pill slots claimed this frame, so opaque tags can't bury one another. Cleared per draw.
   private axisSlots: { y0: number; y1: number }[] = [];
@@ -550,8 +550,15 @@ export class Chart {
     this.axisW = price ? RIGHT_AXIS_W : 0;
     this.axisH = time ? BOTTOM_AXIS_H : 0;
   }
-  setPlan(plan: TradePlan | null) {
-    this.plan = plan && [plan.entry, plan.target, plan.stop].every((v) => Number.isFinite(v) && v > 0) ? plan : null;
+  /**
+   * The trade plans drawn beneath the series. `null` clears them.
+   *
+   * Takes one or many: a chart usually carries a live call plus the closed ones behind it, and
+   * those are the same object with different dates, not two features.
+   */
+  setPlan(plan: TradePlan | TradePlan[] | null) {
+    const list = plan == null ? [] : Array.isArray(plan) ? plan : [plan];
+    this.plans = list.filter((x) => [x.entry, x.target, x.stop].every((v) => Number.isFinite(v) && v > 0));
     this.requestDraw();
   }
   /**
@@ -564,31 +571,36 @@ export class Chart {
    * it somewhere meaningless.
    */
   private drawPlan(ctx: CanvasRenderingContext2D, p: Pane) {
-    const plan = this.plan;
-    if (!plan || this.comparing || this.scaleMode === "percent") return;
-    const yE = this.priceToY(p, plan.entry);
-    const yT = this.priceToY(p, plan.target);
-    const yS = this.priceToY(p, plan.stop);
-    const x0 = plan.from != null ? Math.max(0, this.xAtTime(plan.from)) : 0;
-    const x1 = this.plotW();
-    if (!(x1 > x0)) return;
-    const w = x1 - x0;
+    if (!this.plans.length || this.comparing || this.scaleMode === "percent") return;
+    const pw = this.plotW();
     ctx.save();
-    ctx.fillStyle = alpha(this.theme.up, 0.1);
-    ctx.fillRect(x0, Math.min(yE, yT), w, Math.abs(yT - yE));
-    ctx.fillStyle = alpha(this.theme.down, 0.1);
-    ctx.fillRect(x0, Math.min(yE, yS), w, Math.abs(yS - yE));
-    // The two outer edges carry a hairline so the plan still reads where a zone is only a few
-    // pixels tall — a fill that thin is invisible, and a level that vanishes is worse than none.
-    ctx.setLineDash([]);
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = alpha(this.theme.up, 0.75);
-    ctx.beginPath(); ctx.moveTo(x0, yT); ctx.lineTo(x1, yT); ctx.stroke();
-    ctx.strokeStyle = alpha(this.theme.down, 0.75);
-    ctx.beginPath(); ctx.moveTo(x0, yS); ctx.lineTo(x1, yS); ctx.stroke();
-    ctx.setLineDash([4, 3]);
-    ctx.strokeStyle = alpha(this.theme.textStrong, 0.55);
-    ctx.beginPath(); ctx.moveTo(x0, yE); ctx.lineTo(x1, yE); ctx.stroke();
+    for (const plan of this.plans) {
+      const yE = this.priceToY(p, plan.entry);
+      const yT = this.priceToY(p, plan.target);
+      const yS = this.priceToY(p, plan.stop);
+      const x0 = plan.from != null ? Math.max(0, this.xAtTime(plan.from)) : 0;
+      const x1 = plan.to != null ? Math.min(pw, this.xAtTime(plan.to)) : pw;
+      if (!(x1 > x0)) continue;
+      const w = x1 - x0;
+      // Closed plans are HISTORY and draw back. A season of past calls at the same weight as the
+      // one being carried buries the live plan in its own track record.
+      const closed = plan.to != null;
+      const fill = closed ? 0.055 : 0.1;
+      const edge = closed ? 0.4 : 0.75;
+      ctx.fillStyle = alpha(this.theme.up, fill);
+      ctx.fillRect(x0, Math.min(yE, yT), w, Math.abs(yT - yE));
+      ctx.fillStyle = alpha(this.theme.down, fill);
+      ctx.fillRect(x0, Math.min(yE, yS), w, Math.abs(yS - yE));
+      ctx.setLineDash([]);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = alpha(this.theme.up, edge);
+      ctx.beginPath(); ctx.moveTo(x0, yT); ctx.lineTo(x1, yT); ctx.stroke();
+      ctx.strokeStyle = alpha(this.theme.down, edge);
+      ctx.beginPath(); ctx.moveTo(x0, yS); ctx.lineTo(x1, yS); ctx.stroke();
+      ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = alpha(this.theme.textStrong, closed ? 0.3 : 0.55);
+      ctx.beginPath(); ctx.moveTo(x0, yE); ctx.lineTo(x1, yE); ctx.stroke();
+    }
     ctx.restore();
   }
   setDrawings(list: Drawing[]) {

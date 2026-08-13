@@ -223,7 +223,7 @@ export interface TradingChartProps {
    * Prefer this over three `priceLines` for a bracket: the zones state the ratio the levels
    * only imply, and a plan cannot be dragged out of agreement with the model that produced it.
    */
-  plan?: TradePlan | null;
+  plan?: TradePlan | TradePlan[] | null;
   /** Brighten volume bars that exceed their own moving average. See `ChartOptions.volumeEmphasis`. */
   volumeEmphasis?: boolean;
   /** Mark the final point of a line/area series with a live dot. See `ChartOptions.endpointMarker`. */

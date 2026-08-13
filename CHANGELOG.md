@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.13] - 2026-08-13
+
+### Added
+
+- **`plan` accepts an array, and `TradePlan` gains `to`.** A chart normally carries a live call
+  plus the closed ones behind it, and those are the same object with different dates rather than
+  two features. `to` bounds a plan's right edge; a plan with `to` set is history and draws back
+  (lighter fill, softer edges), so a season of past calls cannot bury the one being carried.
+
+  This exists so past trades can be shown in the SAME visual language as the current one. A
+  marker glyph can say a trade happened and nothing else — not what was risked, not whether the
+  target was ever reached. The zones say all of it, and a reader learns one vocabulary instead
+  of two.
+
 ## [0.8.12] - 2026-08-13
 
 ### Fixed

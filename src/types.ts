@@ -70,6 +70,13 @@ export interface TradePlan {
   stop: number;
   /** Bar time the plan starts at. Omitted spans the visible width. */
   from?: number;
+  /**
+   * Bar time the plan ENDED. Omitted means still open, and the zones run to the right edge.
+   *
+   * A closed plan is drawn back — it is history, and a chart showing a season of past calls at
+   * the same strength as the one you are carrying buries the live one in its own track record.
+   */
+  to?: number;
   /** Names the plan's author on the entry chip — a model, a strategy. */
   label?: string;
 }
