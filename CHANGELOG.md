@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.1] - 2026-08-13
+
+### Added
+
+- **`volumeEmphasis`** — brighten volume bars that exceed their own moving average, step back the
+  ones that do not. Volume is on a price chart to answer "was there anything behind this move?",
+  and a row of equally-bright columns cannot answer it: every bar looks as important as every
+  other and the reader compares heights by eye against a baseline that is off-screen for most of
+  them. Keying brightness to the MA the chart already draws puts the answer in the ink. Direction
+  colour is kept on both, so nothing is lost. Off by default — it changes how an existing chart
+  reads.
+
+### Fixed
+
+- Nothing else — this release exists because `volumeEmphasis` landed after 0.8.0 was published,
+  and a consumer passing the prop against 0.8.0 fails to compile.
+
 ## [0.8.0] - 2026-08-13
 
 ### Added
@@ -37,14 +54,6 @@ All notable changes to this project are documented here. The format follows
   it is the whole task, and it was the one layout the dock could not do. Collapsed, it is the
   old dock unchanged. Narrow stays single-column: splitting a phone into two columns makes both
   unreadable, which is the problem, not the fix.
-
-- **`volumeEmphasis`** — brighten volume bars that exceed their own moving average, step back the
-  ones that do not. Volume is on a price chart to answer "was there anything behind this move?",
-  and a row of equally-bright columns cannot answer it: every bar looks as important as every
-  other and the reader compares heights by eye against a baseline that is off-screen for most of
-  them. Keying brightness to the MA the chart already draws puts the answer in the ink. Direction
-  colour is kept on both, so nothing is lost. Off by default — it changes how an existing chart
-  reads.
 
 - **`TradePlan` / `plan`** — a bracket drawn as a POSITION rather than three loose lines: a
   reward zone from entry to target, a risk zone from entry to stop, shaded and stopping at the
