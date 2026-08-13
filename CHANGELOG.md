@@ -4,9 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [0.10.0] - 2026-08-13
+## [0.8.0] - 2026-08-13
 
 ### Added
+
+- **`legend`** on `TradingChart` — `"auto"` (default) | `"ohlc"` | `"price"` | `"none"`. Under
+  `auto` the readout keys on the series actually on screen: an OHLC series keeps the full
+  `O H L C · change · Vol`, a close-based one (line, area, step, baseline) shows the price and
+  its change alone, and `"none"` removes the on-canvas legend entirely.
+
+  This is a correctness fix wearing a feature's clothes. A line chart draws ONE number per bar
+  and the legend printed four — a high and a low the reader cannot see anywhere in the shape in
+  front of them, inviting them to read a bar's range off a series that never plotted one. It
+  resolves against the live type rather than the seeded prop, so a user switching candles→line
+  in the toolbar sees the readout follow.
+
+- **`InstrumentHeader.metrics`** — a full-width slot beneath the identity and price rows, for the
+  values that CHANGE: an OHLC + volume readout, a spread, a countdown. `stats` renders static
+  instrument facts and the widget styles those itself; `metrics` is a slot because the widget
+  cannot know that a host colours its open against the previous close, or abbreviates volume in
+  lakhs. It is the supported way to lift the bar readout out of the canvas and into real chrome,
+  where it can be laid out, aligned and read.
 
 - **The script editor expands into a real workspace.** It was a dock pinned to 62% of the chart
   height — on a 360px chart that is ~220px holding a source pane, a library browser, an error
@@ -25,27 +43,6 @@ All notable changes to this project are documented here. The format follows
   — and resets the active tool to the crosshair, because a "drawing off" that still draws on the
   next click is not off.
 
-## [0.9.0] - 2026-08-13
-
-### Added
-
-- **`InstrumentHeader.metrics`** — a full-width slot beneath the identity and price rows, for the
-  values that CHANGE: an OHLC + volume readout, a spread, a countdown. `stats` renders static
-  instrument facts and the widget styles those itself; `metrics` is a slot because the widget
-  cannot know that a host colours its open against the previous close, or abbreviates volume in
-  lakhs. It is the supported way to lift the bar readout out of the canvas and into real chrome,
-  where it can be laid out, aligned and read.
-
-### Changed
-
-- **`legend="none"` now removes the on-canvas legend entirely**, ticker and interval included,
-  rather than keeping the identity line. A host passing `none` has its own header by definition,
-  and the old behaviour left the ticker printed a third time in one screenful — beside the header
-  that already names the instrument and the toolbar that used to. (`legend` ships in this same
-  unpublished line, so nothing released changes behaviour.)
-
-## [0.8.1] - 2026-08-13
-
 ### Fixed
 
 - **The initial fit was a desktop measurement hardcoded as a constant.** Every chart opened on
@@ -60,22 +57,6 @@ All notable changes to this project are documented here. The format follows
   30 bars and capped at the same 160 — desktop fits are byte-identical, narrow ones stop opening
   crushed. A reader can always zoom out; what they could not do was un-crush a chart that opened
   that way. `fitBarCount` is exported and pinned by tests.
-
-## [0.8.0] - 2026-08-13
-
-### Added
-
-- **`legend`** on `TradingChart` — `"auto"` (default) | `"ohlc"` | `"price"` | `"none"`. Under
-  `auto` the readout keys on the series actually on screen: an OHLC series keeps the full
-  `O H L C · change · Vol`, while a close-based one (line, area, step, baseline) shows the price
-  and its change alone.
-
-  This is a correctness fix wearing a feature's clothes. A line chart draws ONE number per bar,
-  and the legend printed four — a high and a low the reader cannot see anywhere in the shape in
-  front of them, inviting them to read a bar's range off a series that never plotted one. It
-  resolves against the live type rather than the seeded prop, so a user switching candles→line
-  in the toolbar sees the readout follow. `"none"` drops the readout entirely, for glance charts
-  that carry their price in host chrome above the canvas.
 
 ## [0.7.2] - 2026-08-13
 
