@@ -38,6 +38,14 @@ All notable changes to this project are documented here. The format follows
   old dock unchanged. Narrow stays single-column: splitting a phone into two columns makes both
   unreadable, which is the problem, not the fix.
 
+- **`volumeEmphasis`** — brighten volume bars that exceed their own moving average, step back the
+  ones that do not. Volume is on a price chart to answer "was there anything behind this move?",
+  and a row of equally-bright columns cannot answer it: every bar looks as important as every
+  other and the reader compares heights by eye against a baseline that is off-screen for most of
+  them. Keying brightness to the MA the chart already draws puts the answer in the ink. Direction
+  colour is kept on both, so nothing is lost. Off by default — it changes how an existing chart
+  reads.
+
 - **`TradePlan` / `plan`** — a bracket drawn as a POSITION rather than three loose lines: a
   reward zone from entry to target, a risk zone from entry to stop, shaded and stopping at the
   entry from both sides so the boundary between them IS the entry. Whether a plan is worth

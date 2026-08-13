@@ -144,6 +144,7 @@ export class Chart {
   private replayArming = false; // waiting for the user to click a start bar
   private seriesType: SeriesType = "candles";
   private showVolume = true;
+  private volumeEmphasis = false;
   private gridOn = true; // grid lines (axis labels stay regardless)
   private lastPriceOn = true; // dashed last-price line + axis tag
   private atRealtime = true; // is the newest bar parked at the right edge? (drives "go to realtime")
@@ -242,6 +243,7 @@ export class Chart {
     this.theme = { ...DARK, ...(opts.theme ?? {}) };
     this.seriesType = opts.seriesType ?? "candles";
     this.showVolume = opts.showVolume ?? true;
+    this.volumeEmphasis = opts.volumeEmphasis ?? false;
     this.utc = opts.utc ?? false;
     // One clock for the whole chart: the session inherits `utc` unless it names its own, so an axis
     // and a shading can never disagree about which day a bar belongs to.
@@ -2575,19 +2577,29 @@ export class Chart {
     const base = p.top + p.height;
     // one gradient per direction, reused across bars: bright at the top of the column, fading into
     // the pane floor, so the volume row reads as depth rather than a solid block
-    const grad = (c: string) => {
+    const gradAt = (c: string, top: number, bottom: number) => {
       const g = ctx.createLinearGradient(0, p.top, 0, base);
-      g.addColorStop(0, alpha(c, 0.95));
-      g.addColorStop(1, alpha(c, 0.28));
+      g.addColorStop(0, alpha(c, top));
+      g.addColorStop(1, alpha(c, bottom));
       return g;
     };
+    const grad = (c: string) => gradAt(c, 0.95, 0.28);
     const gUp = grad(t.volumeUp);
     const gDown = grad(t.volumeDown);
+    // Quiet bars, for the emphasis mode: the same hue, stepped back, so a heavy bar reads as
+    // heavy without the quiet ones losing their direction.
+    const qUp = this.volumeEmphasis ? gradAt(t.volumeUp, 0.34, 0.1) : gUp;
+    const qDown = this.volumeEmphasis ? gradAt(t.volumeDown, 0.34, 0.1) : gDown;
     for (let i = f; i <= l; i++) {
       const b = this.bars[i];
       const v = b.volume ?? 0;
       const y = this.priceToY(p, v);
-      ctx.fillStyle = b.close >= b.open ? gUp : gDown;
+      const up = b.close >= b.open;
+      // `>=` its own average, so a flat series is all "heavy" rather than all "quiet" — the
+      // reverse would render a chart with no volume variation as uniformly dim and look broken.
+      const ma = this.volMa[i];
+      const heavy = !this.volumeEmphasis || !Number.isFinite(ma) || v >= ma;
+      ctx.fillStyle = heavy ? (up ? gUp : gDown) : up ? qUp : qDown;
       ctx.fillRect(Math.round(this.x(i) - bw / 2), Math.round(y), Math.round(bw), Math.max(1, base - y));
     }
     // The volume moving average across the pane — the "is this bar unusual?" reference line. Its

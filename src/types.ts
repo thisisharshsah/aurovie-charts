@@ -164,6 +164,18 @@ export interface ChartOptions {
   seriesType?: SeriesType;
   showVolume?: boolean;
   /**
+   * Emphasise volume bars that exceed their own moving average.
+   *
+   * Volume is on a price chart to answer one question — "was there anything behind this move?" —
+   * and a row of equally-bright columns cannot answer it: every bar looks as important as every
+   * other, and the reader is left comparing heights by eye against a baseline that is off-screen
+   * for most of them. Keying brightness to the volume MA puts the answer in the ink: heavy bars
+   * step forward, quiet ones recede, and the direction colour is preserved on both.
+   *
+   * Off by default — it changes how an existing chart reads.
+   */
+  volumeEmphasis?: boolean;
+  /**
    * Draw the right price axis and the bottom time axis. `false` gives a bare plot that fills the
    * host — an embedded sparkline, a price-header "hero" chart — with the full plot area used for
    * the series instead of reserving gutters for labels.

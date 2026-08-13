@@ -198,6 +198,8 @@ export interface TradingChartProps {
    * only imply, and a plan cannot be dragged out of agreement with the model that produced it.
    */
   plan?: TradePlan | null;
+  /** Brighten volume bars that exceed their own moving average. See `ChartOptions.volumeEmphasis`. */
+  volumeEmphasis?: boolean;
   /**
    * An instrument identity block above the toolbar — ticker, name, sector, and whatever reference
    * stats the host actually has. Omitted entirely when absent, so a chart embedded in a page that
@@ -472,6 +474,7 @@ export function TradingChart({
   ranges,
   onReady,
   plan = null,
+  volumeEmphasis = false,
   header,
 }: TradingChartProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -708,6 +711,7 @@ export function TradingChart({
       theme: th,
       utc,
       session,
+      volumeEmphasis,
       onCrosshair: (bar, values) => {
         setLegend({ bar, values });
         crosshairRef.current?.(bar, values);
