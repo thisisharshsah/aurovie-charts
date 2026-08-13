@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-08-13
+
+### Added
+
+- **`legend`** on `TradingChart` — `"auto"` (default) | `"ohlc"` | `"price"` | `"none"`. Under
+  `auto` the readout keys on the series actually on screen: an OHLC series keeps the full
+  `O H L C · change · Vol`, while a close-based one (line, area, step, baseline) shows the price
+  and its change alone.
+
+  This is a correctness fix wearing a feature's clothes. A line chart draws ONE number per bar,
+  and the legend printed four — a high and a low the reader cannot see anywhere in the shape in
+  front of them, inviting them to read a bar's range off a series that never plotted one. It
+  resolves against the live type rather than the seeded prop, so a user switching candles→line
+  in the toolbar sees the readout follow. `"none"` drops the readout entirely, for glance charts
+  that carry their price in host chrome above the canvas.
+
 ## [0.7.2] - 2026-08-13
 
 ### Fixed

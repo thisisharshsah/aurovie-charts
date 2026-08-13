@@ -119,6 +119,19 @@ export interface TradingChartProps {
   /** Delete a saved strategy by id. */
   onDeleteSavedScript?: (id: string | number) => Promise<void>;
   /**
+   * How much the on-chart legend reports.
+   *
+   * `"auto"` (default) keys on the series type: an OHLC series (candles, bars, heikin…) gets the
+   * full `O H L C` readout, while a close-based one (line, area, step, baseline) gets just the
+   * price and its change. That is not a cosmetic trim — a line chart DRAWS only the close, so
+   * printing a high and a low beside it reports two numbers the reader cannot see and did not
+   * ask for, and invites them to read a range off a shape that has none.
+   *
+   * `"ohlc"` and `"price"` force either regardless of series; `"none"` drops the readout and
+   * leaves only the ticker and interval, for glance charts that carry their price elsewhere.
+   */
+  legend?: "auto" | "ohlc" | "price" | "none";
+  /**
    * Mirror of the crosshair readout the widget already renders in its own legend, so a host can
    * drive chrome OUTSIDE the chart from the hovered bar (a price header that follows the scrub,
    * say). Null bar = the pointer left the plot.
@@ -288,6 +301,9 @@ const INDS: { id: string; kind: string; inputs: number[]; pane: "price" | "separ
   { id: "mom", kind: "MOM", inputs: [10], pane: "separate", label: "Momentum" },
   { id: "trix", kind: "TRIX", inputs: [14, 9], pane: "separate", label: "TRIX" },
 ];
+/** Series that actually DRAW a high and a low; everything else is a close-derived path. */
+const OHLC_SERIES: SeriesType[] = ["candles", "bars", "hollow", "heikin", "renko", "pnf", "kagi"];
+
 // Colours the engine assigns to indicators by order — mirrored here so the on-chart legend chips
 // match the drawn lines exactly.
 // Single-period kinds whose period the legend chip can step (multi-param kinds keep their defaults).
@@ -402,6 +418,7 @@ export function TradingChart({
   onResolutionChange,
   indicators,
   chartType,
+  legend: legendMode = "auto",
   compareSymbols,
   sr,
   overlay,
@@ -1165,6 +1182,9 @@ export function TradingChart({
   // bar there, so the at-rest fallback must not step in and reprint the newest one under a forecast.
   const overProjection = legend.bar === null && legend.values.length > 0;
   const legendBar = legend.bar ?? (overProjection ? null : latest);
+  // Resolved against the LIVE series type, not the seeded prop — the user's own toolbar pick
+  // is what is on screen, so switching candles→line under "auto" has to follow.
+  const legendShows = legendMode === "auto" ? (OHLC_SERIES.includes(type) ? "ohlc" : "price") : legendMode;
   const up = legendBar ? legendBar.close >= legendBar.open : true;
   const barCol = up ? th.up : th.down;
 
@@ -1658,18 +1678,24 @@ export function TradingChart({
             >
               <span style={{ color: th.textStrong, fontWeight: 700, fontFamily: th.font, fontSize: 12.5, letterSpacing: "0.01em" }}>{symbol}</span>
               <span style={{ fontFamily: th.font, fontSize: 10.5, fontWeight: 600, color: th.text, background: soft(th.text, 14), borderRadius: 4, padding: "1px 5px" }}>{TF_SHORT[resolution] ?? resolution}</span>
-              {legendBar && (
+              {legendBar && legendShows !== "none" && (
                 <>
-                  <span>O <b style={{ color: barCol }}>{legendBar.open.toFixed(2)}</b></span>
-                  <span>H <b style={{ color: barCol }}>{legendBar.high.toFixed(2)}</b></span>
-                  <span>L <b style={{ color: barCol }}>{legendBar.low.toFixed(2)}</b></span>
-                  <span>C <b style={{ color: barCol }}>{legendBar.close.toFixed(2)}</b></span>
+                  {legendShows === "ohlc" ? (
+                    <>
+                      <span>O <b style={{ color: barCol }}>{legendBar.open.toFixed(2)}</b></span>
+                      <span>H <b style={{ color: barCol }}>{legendBar.high.toFixed(2)}</b></span>
+                      <span>L <b style={{ color: barCol }}>{legendBar.low.toFixed(2)}</b></span>
+                      <span>C <b style={{ color: barCol }}>{legendBar.close.toFixed(2)}</b></span>
+                    </>
+                  ) : (
+                    <b style={{ color: barCol, fontSize: 12.5 }}>{legendBar.close.toFixed(2)}</b>
+                  )}
                   <span style={{ color: barCol, fontWeight: 700 }}>
                     {legendBar.close - legendBar.open >= 0 ? "+" : ""}
                     {(legendBar.close - legendBar.open).toFixed(2)}
                     {legendBar.open ? ` (${(((legendBar.close - legendBar.open) / legendBar.open) * 100).toFixed(2)}%)` : ""}
                   </span>
-                  {legendBar.volume ? <span>Vol {fmtVol(legendBar.volume)}</span> : null}
+                  {legendBar.volume && legendShows === "ohlc" ? <span>Vol {fmtVol(legendBar.volume)}</span> : null}
                 </>
               )}
             </div>
