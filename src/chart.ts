@@ -17,6 +17,7 @@ import {
   isTimeBoundary,
   rightMarginBars,
   panFloorBars,
+  fitBarCount,
   projVisibleRange,
   alpha,
   mix,
@@ -1057,7 +1058,7 @@ export class Chart {
   private fitContent() {
     const pw = this.plotW();
     if (this.bars.length === 0 || pw <= 0) return;
-    const target = Math.min(this.n(), 160);
+    const target = fitBarCount(pw, this.n());
     this.barSpacing = clamp(pw / target, MIN_BAR_SPACING, MAX_BAR_SPACING);
     this.tBarSpacing = this.barSpacing;
     this.zoomAnchor = null;

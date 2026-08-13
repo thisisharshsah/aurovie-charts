@@ -1101,6 +1101,32 @@ export function rightMarginBars(projLen: number): number {
 }
 
 /**
+ * How many bars an initial fit should show.
+ *
+ * This used to be a flat 160 for every chart, which reads as "a sensible default" and is
+ * really a desktop measurement wearing a constant's clothes. 160 bars across a 1200px plot
+ * is a comfortable 7.5px each; across a 320px phone plot it is TWO PIXELS — a body barely
+ * over a pixel wide with a wick somewhere inside it. The chart was not small at that size,
+ * it was illegible: no candle in it could be read individually, which is the entire reason
+ * to draw candles rather than a line.
+ *
+ * So the count follows the width, at a spacing where a candle is still a candle, and keeps
+ * the old 160 ceiling — desktop fits are unchanged, narrow ones stop lying about how much
+ * history they can legibly show. The reader can always zoom out; what they could not do was
+ * un-crush a chart that opened crushed.
+ */
+export function fitBarCount(plotW: number, barCount: number, comfortable = 7): number {
+  if (!(plotW > 0) || barCount <= 0) return Math.max(0, barCount);
+  const byWidth = Math.round(plotW / comfortable);
+  return Math.min(barCount, Math.max(MIN_FIT_BARS, Math.min(MAX_FIT_BARS, byWidth)));
+}
+
+/** Never open on fewer than this — a handful of giant candles is its own kind of useless. */
+const MIN_FIT_BARS = 30;
+/** The long-standing desktop fit; a wider monitor gets bigger bars, not more history. */
+const MAX_FIT_BARS = 160;
+
+/**
  * How far left the viewport may be dragged, in bar widths past the newest bar.
  *
  * Must clear the right margin, or a projection longer than the old fixed ceiling could be drawn

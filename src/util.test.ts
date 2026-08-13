@@ -3,7 +3,7 @@
 // definitions: NaN padding, the exact formulas, and the invariants each family must hold.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange } from "./util.ts";
+import { ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange, fitBarCount } from "./util.ts";
 import type { AxisSlot } from "./util.ts";
 import type { Bar } from "./types.ts";
 
@@ -229,4 +229,31 @@ test("projVisibleRange returns an empty range rather than an inverted one", () =
   let iterations = 0;
   for (let k = f; k <= l; k++) iterations++;
   assert.equal(iterations, 0);
+});
+
+test("fitBarCount keeps a candle legible on a narrow plot", () => {
+  // The bug: a 375px phone (≈320px plot) opened on 160 bars — 2px each.
+  const phone = fitBarCount(320, 800);
+  assert.ok(phone <= 50, `phone fit should be modest, got ${phone}`);
+  assert.ok(320 / phone >= 6, `phone bars should stay legible, got ${320 / phone}px`);
+});
+
+test("fitBarCount leaves the desktop fit where it was", () => {
+  assert.equal(fitBarCount(1200, 800), 160);
+  assert.equal(fitBarCount(3000, 800), 160); // a wider monitor gets bigger bars, not more history
+});
+
+test("fitBarCount never asks for more bars than exist", () => {
+  assert.equal(fitBarCount(1200, 40), 40);
+  assert.equal(fitBarCount(320, 12), 12);
+});
+
+test("fitBarCount floors at a handful rather than a few giant candles", () => {
+  assert.equal(fitBarCount(60, 800), 30);
+});
+
+test("fitBarCount tolerates a zero-width plot during first layout", () => {
+  assert.equal(fitBarCount(0, 800), 800);
+  assert.equal(fitBarCount(-10, 800), 800);
+  assert.equal(fitBarCount(320, 0), 0);
 });

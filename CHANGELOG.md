@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.1] - 2026-08-13
+
+### Fixed
+
+- **The initial fit was a desktop measurement hardcoded as a constant.** Every chart opened on
+  160 bars regardless of how wide it was. Across a 1200px plot that is a comfortable 7.5px per
+  bar; across a 320px phone plot it is TWO PIXELS — a body barely over a pixel with a wick
+  somewhere inside it. The chart was not merely small at that size, it was illegible: no candle
+  could be read individually, which is the whole reason to draw candles instead of a line. Worse,
+  it hit hardest on phones, where the chart is usually the entire screen rather than one card
+  among several.
+
+  The fit now follows the plot width at a spacing where a candle is still a candle, floored at
+  30 bars and capped at the same 160 — desktop fits are byte-identical, narrow ones stop opening
+  crushed. A reader can always zoom out; what they could not do was un-crush a chart that opened
+  that way. `fitBarCount` is exported and pinned by tests.
+
 ## [0.8.0] - 2026-08-13
 
 ### Added
