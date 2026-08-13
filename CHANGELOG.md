@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.10] - 2026-08-13
+
+### Added
+
+- **`volume`** — force the volume pane on or off, overriding the user's saved preference for as
+  long as it is passed. A host building a glance view needs it: volume is a working tool, and a
+  chart stripped to a price line with no axes and no grid should not still carry a histogram
+  under it. Omitted, the pref decides as before, so "this view has no volume" stays distinct from
+  "this user turned volume off".
+
+### Fixed
+
+- **The theme control was a Unicode placeholder and a redundant word.** It rendered `◑ Theme ▾`
+  — a circle character standing in for an icon the package has actually drawn since 0.7.0, plus
+  a label for a control whose whole vocabulary is a picture. It was the widest item in a crowded
+  toolbar and said nothing the mark does not. Now icon-only, with the name on `aria-label`.
+
 ## [0.8.9] - 2026-08-13
 
 ### Changed

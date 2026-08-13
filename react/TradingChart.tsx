@@ -229,6 +229,15 @@ export interface TradingChartProps {
   /** Mark the final point of a line/area series with a live dot. See `ChartOptions.endpointMarker`. */
   endpointMarker?: boolean;
   /**
+   * Force the volume pane on or off. Omitted, the user's own saved preference decides.
+   *
+   * A host building a glance view needs this: volume is a working tool, and a chart stripped to
+   * a price line with no axes and no grid should not still be carrying a histogram under it.
+   * Passing a value takes the decision away from the pref for as long as it is passed, which is
+   * what "this view does not have volume" means — as opposed to "this user turned volume off".
+   */
+  volume?: boolean;
+  /**
    * Draw the price and time gutters. `false` gives the plot the full width and height.
    *
    * For glance charts whose price lives in host chrome: an axis exists so a reader can put a
@@ -513,6 +522,7 @@ export function TradingChart({
   plan = null,
   volumeEmphasis = false,
   endpointMarker = false,
+  volume,
   axes = true,
   frame = true,
   onRangeChange,
@@ -930,7 +940,7 @@ export function TradingChart({
   useEffect(() => chartRef.current?.setScaleMode(scaleMode), [scaleMode]);
   useEffect(() => chartRef.current?.setSR(!!sr), [sr]);
   useEffect(() => chartRef.current?.setGrid(gridOn), [gridOn]);
-  useEffect(() => chartRef.current?.setVolume(showVol), [showVol]);
+  useEffect(() => chartRef.current?.setVolume(volume ?? showVol), [volume, showVol]);
   useEffect(() => chartRef.current?.setLastPriceLine(priceLineOn), [priceLineOn]);
   // Markers come from two places and must not fight: whatever the host supplied, plus the fills of
   // the most recent backtest. Backtest fills are DERIVED state — clearing the scorecard clears them,
@@ -1545,8 +1555,19 @@ export function TradingChart({
             <Icon name="replay" size={13} /> Replay
           </button>}
           <span style={{ position: "relative", marginLeft: "auto" }}>
-            <button style={btn(menu === "theme")} title="Chart theme" onClick={() => setMenu(menu === "theme" ? null : "theme")}>
-              ◑ Theme ▾
+            {/* ICON ONLY. This still read "◑ Theme ▾" — a Unicode circle standing in for an icon
+                we have actually drawn since 0.7.0, plus a word for a control whose entire
+                vocabulary is a picture. The label was the widest thing in a crowded bar and told
+                a reader nothing the mark does not; the accessible name carries it instead. */}
+            <button
+              style={{ ...btn(menu === "theme"), padding: "0 8px" }}
+              title="Chart theme"
+              aria-label="Chart theme"
+              aria-haspopup="menu"
+              aria-expanded={menu === "theme"}
+              onClick={() => setMenu(menu === "theme" ? null : "theme")}
+            >
+              <Icon name="theme" size={15} />
             </button>
             {menu === "theme" && (
               <div style={{ ...menuBox, right: 0 }}>
