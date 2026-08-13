@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.11] - 2026-08-13
+
+### Changed
+
+- **The scale and navigation controls moved off the plot into a bottom bar.** Auto, Log, %, the
+  volume-profile and data-window toggles, go-to-realtime and the settings gear were a cluster
+  floating over the plot's bottom-right corner — which is where a chart puts controls when it has
+  nowhere else for them: translucent so as not to hide the candles, and therefore sitting on the
+  data it is trying not to hide.
+
+  They are chart-wide switches, not annotations on a price, so they belong in chrome. As a real
+  bar they also stop colliding with the axis corner, the bar countdown, and anything the host
+  draws in `overlay`.
+
 ## [0.8.10] - 2026-08-13
 
 ### Added

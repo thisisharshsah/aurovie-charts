@@ -1969,68 +1969,6 @@ export function TradingChart({
               </button>
             </div>
           )}
-          {/* bottom-right scale + navigation cluster (over the axis corner, TradingView-style) */}
-          <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", right: 70, bottom: 28, zIndex: 6, display: "flex", alignItems: "flex-end", gap: 3 }}>
-            {!view.atRealtime && (
-              <button style={clusterBtn(false)} title="Scroll to the latest bar" aria-label="Go to realtime" onClick={() => chartRef.current?.scrollToRealtime()}>»|</button>
-            )}
-            <button style={clusterBtn(vpvr)} title="Visible-range volume profile" aria-label="Visible-range volume profile" onClick={() => setVpvr((v) => !v)}>
-              <Icon name="vpvr" size={13} />
-            </button>
-            <button style={clusterBtn(dataWindow)} title="Data window — every value at the cursor" aria-label="Data window" onClick={() => setDataWindow((v) => !v)}>
-              <Icon name="datawindow" size={13} />
-            </button>
-            <button style={clusterBtn(!view.autoScale)} title="Reset price scale to auto" aria-label="Reset price scale" onClick={() => chartRef.current?.resetPriceScale()}>Auto</button>
-            <button style={clusterBtn(scaleMode === "log")} title="Logarithmic price scale" aria-label="Logarithmic scale" onClick={() => setScaleMode((m) => (m === "log" ? "normal" : "log"))}>Log</button>
-            <button style={clusterBtn(scaleMode === "percent")} title="Percent price scale" aria-label="Percent scale" onClick={() => setScaleMode((m) => (m === "percent" ? "normal" : "percent"))}>%</button>
-            <span style={{ position: "relative" }}>
-              <button style={clusterBtn(settingsOpen)} title="Chart settings" aria-label="Chart settings" onClick={() => setSettingsOpen((o) => !o)}>⚙</button>
-              {settingsOpen && (
-                <div style={{ position: "absolute", right: 0, bottom: 30, zIndex: 20, background: th.paneBackground, border: `1px solid ${th.border}`, borderRadius: 10, padding: 6, boxShadow: "0 12px 34px rgba(0,0,0,0.5)", minWidth: 226, maxHeight: 340, overflowY: "auto" }}>
-                  <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text, padding: "2px 8px 6px" }}>Appearance</div>
-                  {(
-                    [
-                      ["Grid lines", gridOn, setGridOn],
-                      ["Volume pane", showVol, setShowVol],
-                      ["Last-price line", priceLineOn, setPriceLineOn],
-                      ["Bar-close countdown", countdown, setCountdown],
-                      ["Symbol watermark", watermark, setWatermarkOn],
-                      ["Extended-hours shading", sessions, setSessions],
-                      ["Stop / target levels", levelsOn, setLevelsOn],
-                    ] as const
-                  ).map(([label, val, set]) => (
-                    <button key={label} style={item(false)} onClick={() => set((v) => !v)}>
-                      <span style={{ width: 16, color: val ? th.line : th.text }}>{val ? "✓" : ""}</span> {label}
-                    </button>
-                  ))}
-                  <div style={{ height: 1, background: th.border, margin: "5px 0" }} />
-                  <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text, padding: "2px 8px 6px" }}>Analysis</div>
-                  {(
-                    [
-                      ["Visible-range volume profile", vpvr, setVpvr],
-                      ["Data window", dataWindow, setDataWindow],
-                      ["Magnet (snap to OHLC)", magnet, setMagnetOn],
-                      ["Guided mode", guided, setGuided],
-                    ] as const
-                  ).map(([label, val, set]) => (
-                    <button key={label} style={item(false)} onClick={() => set((v) => !v)}>
-                      <span style={{ width: 16, color: val ? th.line : th.text }}>{val ? "✓" : ""}</span> {label}
-                    </button>
-                  ))}
-                  <div style={{ height: 1, background: th.border, margin: "5px 0" }} />
-                  <button style={item(false)} onClick={() => { chartRef.current?.resetPanes(); setSettingsOpen(false); }}>
-                    <span style={{ width: 16 }} /> Reset pane heights
-                  </button>
-                  <button style={item(false)} onClick={() => { setShortcuts(true); setSettingsOpen(false); }}>
-                    <span style={{ width: 16 }} /> Keyboard shortcuts
-                  </button>
-                  <button style={item(false)} onClick={() => { saveImage(); setSettingsOpen(false); }}>
-                    <span style={{ width: 16 }} /> Save chart image (PNG)
-                  </button>
-                </div>
-              )}
-            </span>
-          </div>
           {/* Data window — every series' value at the crosshair, the way a desk terminal reads a bar.
               Values come straight from the engine's crosshair readout, so it can only ever show what
               is actually plotted. */}
@@ -2311,6 +2249,75 @@ export function TradingChart({
           )}
         </div>
       </div>
+      {/* SCALE + NAVIGATION BAR.
+          This was a cluster floating over the plot's bottom-right corner, which is where a
+          chart puts controls when it has nowhere else for them: translucent so as not to hide
+          the candles, and therefore sitting ON the data it is trying not to hide. Auto, Log, %
+          and the settings gear are chart-wide switches, not annotations on a price — they
+          belong in chrome. As a real bar they also stop colliding with the axis corner, the
+          countdown and anything the host draws in `overlay`. */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 3, flexWrap: "wrap", padding: "5px 8px", borderTop: `1px solid ${th.border}`, background: th.paneBackground }}>
+            {!view.atRealtime && (
+              <button style={clusterBtn(false)} title="Scroll to the latest bar" aria-label="Go to realtime" onClick={() => chartRef.current?.scrollToRealtime()}>»|</button>
+            )}
+            <button style={clusterBtn(vpvr)} title="Visible-range volume profile" aria-label="Visible-range volume profile" onClick={() => setVpvr((v) => !v)}>
+              <Icon name="vpvr" size={13} />
+            </button>
+            <button style={clusterBtn(dataWindow)} title="Data window — every value at the cursor" aria-label="Data window" onClick={() => setDataWindow((v) => !v)}>
+              <Icon name="datawindow" size={13} />
+            </button>
+            <button style={clusterBtn(!view.autoScale)} title="Reset price scale to auto" aria-label="Reset price scale" onClick={() => chartRef.current?.resetPriceScale()}>Auto</button>
+            <button style={clusterBtn(scaleMode === "log")} title="Logarithmic price scale" aria-label="Logarithmic scale" onClick={() => setScaleMode((m) => (m === "log" ? "normal" : "log"))}>Log</button>
+            <button style={clusterBtn(scaleMode === "percent")} title="Percent price scale" aria-label="Percent scale" onClick={() => setScaleMode((m) => (m === "percent" ? "normal" : "percent"))}>%</button>
+            <span style={{ position: "relative" }}>
+              <button style={clusterBtn(settingsOpen)} title="Chart settings" aria-label="Chart settings" onClick={() => setSettingsOpen((o) => !o)}>⚙</button>
+              {settingsOpen && (
+                <div style={{ position: "absolute", right: 0, bottom: 30, zIndex: 20, background: th.paneBackground, border: `1px solid ${th.border}`, borderRadius: 10, padding: 6, boxShadow: "0 12px 34px rgba(0,0,0,0.5)", minWidth: 226, maxHeight: 340, overflowY: "auto" }}>
+                  <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text, padding: "2px 8px 6px" }}>Appearance</div>
+                  {(
+                    [
+                      ["Grid lines", gridOn, setGridOn],
+                      ["Volume pane", showVol, setShowVol],
+                      ["Last-price line", priceLineOn, setPriceLineOn],
+                      ["Bar-close countdown", countdown, setCountdown],
+                      ["Symbol watermark", watermark, setWatermarkOn],
+                      ["Extended-hours shading", sessions, setSessions],
+                      ["Stop / target levels", levelsOn, setLevelsOn],
+                    ] as const
+                  ).map(([label, val, set]) => (
+                    <button key={label} style={item(false)} onClick={() => set((v) => !v)}>
+                      <span style={{ width: 16, color: val ? th.line : th.text }}>{val ? "✓" : ""}</span> {label}
+                    </button>
+                  ))}
+                  <div style={{ height: 1, background: th.border, margin: "5px 0" }} />
+                  <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text, padding: "2px 8px 6px" }}>Analysis</div>
+                  {(
+                    [
+                      ["Visible-range volume profile", vpvr, setVpvr],
+                      ["Data window", dataWindow, setDataWindow],
+                      ["Magnet (snap to OHLC)", magnet, setMagnetOn],
+                      ["Guided mode", guided, setGuided],
+                    ] as const
+                  ).map(([label, val, set]) => (
+                    <button key={label} style={item(false)} onClick={() => set((v) => !v)}>
+                      <span style={{ width: 16, color: val ? th.line : th.text }}>{val ? "✓" : ""}</span> {label}
+                    </button>
+                  ))}
+                  <div style={{ height: 1, background: th.border, margin: "5px 0" }} />
+                  <button style={item(false)} onClick={() => { chartRef.current?.resetPanes(); setSettingsOpen(false); }}>
+                    <span style={{ width: 16 }} /> Reset pane heights
+                  </button>
+                  <button style={item(false)} onClick={() => { setShortcuts(true); setSettingsOpen(false); }}>
+                    <span style={{ width: 16 }} /> Keyboard shortcuts
+                  </button>
+                  <button style={item(false)} onClick={() => { saveImage(); setSettingsOpen(false); }}>
+                    <span style={{ width: 16 }} /> Save chart image (PNG)
+                  </button>
+                </div>
+              )}
+            </span>
+      </div>
+
       {/* THE SCRIPT EDITOR IS A SIBLING OF THE PLOT, NOT A SHEET OVER IT.
           It used to sit absolutely inside the plot at 62% of its height, so writing a script
           meant covering the chart the script is written against — and the space it did get
