@@ -2019,7 +2019,11 @@ export function TradingChart({
               style={{
                 position: "absolute",
                 top: 8,
-                right: 8,
+                // LEFT, not right. The price axis is on the right and the newest bars sit against
+                // it, so a right-hand panel covered the one region a reader is almost certainly
+                // looking at — the live edge of the series — with a panel describing it. The left
+                // holds the oldest bars in view, which is the cheapest area on the plot to cover.
+                left: 8,
                 zIndex: 7,
                 width: 214,
                 background: `color-mix(in srgb, ${th.paneBackground} 92%, transparent)`,

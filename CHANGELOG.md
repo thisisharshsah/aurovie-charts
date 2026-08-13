@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.8] - 2026-08-13
+
+### Changed
+
+- **The data window moved to the left of the plot.** It sat top-right, which is where the price
+  axis is and where the newest bars sit against it — so a panel describing the series covered the
+  exact region a reader is most likely watching, its live edge. The left holds the oldest bars in
+  view and is the cheapest area of a chart to cover.
+
 ## [0.8.7] - 2026-08-13
 
 ### Added
