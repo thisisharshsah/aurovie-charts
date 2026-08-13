@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.6] - 2026-08-13
+
+### Changed
+
+- **The drawing rail now starts closed, and its state persists.** The rail is a fixed column
+  taken out of the PLOT, and most sessions never draw a single line — so the default was
+  spending chart width on tools the reader was not using. Its switch moved into the toolbar in
+  0.8.4, which made the rail reachable in one click, and that is what makes a closed default
+  reasonable rather than obstructive. It joins the persisted preference blob, so anyone who does
+  draw opens it once instead of closing it on every reload.
+
+  Hosts that want the old behaviour can seed the stored pref; the rail itself is still gated by
+  `drawingRail` as before.
+
 ## [0.8.5] - 2026-08-13
 
 ### Added

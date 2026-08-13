@@ -45,9 +45,15 @@ type Prefs = {
   /// are carrying is not decoration, and a chart that hides it is the one place it matters least
   /// to be tidy.
   levels: boolean;
+  /// Whether the drawing rail is expanded. OFF by default: the rail is a fixed column taken from
+  /// the PLOT, and most sessions never draw a single line — so the common case was paying width
+  /// for tools it did not use. Now that the switch lives in the toolbar the rail is one click
+  /// away, and once a user opens it the choice sticks, so anyone who does draw pays that click
+  /// once rather than closing the rail on every reload.
+  rail: boolean;
 };
 const PREFS_KEY = "aurovie-chart-prefs";
-const DEFAULT_PREFS: Prefs = { grid: true, vol: true, lastPrice: true, magnet: false, vpvr: false, sessions: true, countdown: true, watermark: true, dataWindow: false, levels: true };
+const DEFAULT_PREFS: Prefs = { grid: true, vol: true, lastPrice: true, magnet: false, vpvr: false, sessions: true, countdown: true, watermark: true, dataWindow: false, levels: true, rail: false };
 function loadPrefs(): Prefs {
   try {
     const raw = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}");
@@ -532,10 +538,6 @@ export function TradingChart({
   const [active, setActive] = useState<string[]>(indicators ?? ["ma50"]);
   const [indInputs, setIndInputs] = useState<Record<string, number[]>>({}); // per-indicator period overrides
   const [indHidden, setIndHidden] = useState<string[]>([]); // active-but-hidden indicators (eye toggled off)
-  // Whether the rail's TOOLS are showing. Collapsed leaves only the toggle, so the rail costs
-  // one icon's width instead of a column — and drops the active tool, because a "drawing off"
-  // that still draws on the next click is not off.
-  const [railOpen, setRailOpen] = useState(true);
   // Which preset is applied. The strip drew every button in the inactive style, so a reader
   // could pick a range and get no confirmation that anything had been selected — and coming
   // back to the chart later, no way to tell what window they were looking at.
@@ -573,6 +575,9 @@ export function TradingChart({
   const [gridOn, setGridOn] = useState(p0.grid);
   const [showVol, setShowVol] = useState(p0.vol);
   const [priceLineOn, setPriceLineOn] = useState(p0.lastPrice);
+  // Whether the rail's TOOLS are showing. Seeded from the same persisted blob as the switches
+  // above — it has to be declared after `p0`, not beside the other rail state.
+  const [railOpen, setRailOpen] = useState(p0.rail);
   const [magnet, setMagnetOn] = useState(p0.magnet);
   const [vpvr, setVpvr] = useState(p0.vpvr); // visible-range volume profile
   const [sessions, setSessions] = useState(p0.sessions); // extended-hours shading (intraday)
@@ -598,12 +603,12 @@ export function TradingChart({
   // one write per change, so the chart comes back exactly as the user left it
   useEffect(() => {
     try {
-      const p: Prefs = { grid: gridOn, vol: showVol, lastPrice: priceLineOn, magnet, vpvr, sessions, countdown, watermark, dataWindow, levels: levelsOn };
+      const p: Prefs = { grid: gridOn, vol: showVol, lastPrice: priceLineOn, magnet, vpvr, sessions, countdown, watermark, dataWindow, levels: levelsOn, rail: railOpen };
       localStorage.setItem(PREFS_KEY, JSON.stringify(p));
     } catch {
       /* storage blocked — the prefs just live for the session */
     }
-  }, [gridOn, showVol, priceLineOn, magnet, vpvr, sessions, countdown, watermark, dataWindow, levelsOn]);
+  }, [gridOn, showVol, priceLineOn, magnet, vpvr, sessions, countdown, watermark, dataWindow, levelsOn, railOpen]);
   const [favTf, setFavTf] = useState<string[]>(() => {
     try {
       const s = localStorage.getItem("aurovie-chart-fav-tf");
