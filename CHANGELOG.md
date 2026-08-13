@@ -38,6 +38,18 @@ All notable changes to this project are documented here. The format follows
   old dock unchanged. Narrow stays single-column: splitting a phone into two columns makes both
   unreadable, which is the problem, not the fix.
 
+- **`TradePlan` / `plan`** — a bracket drawn as a POSITION rather than three loose lines: a
+  reward zone from entry to target, a risk zone from entry to stop, shaded and stopping at the
+  entry from both sides so the boundary between them IS the entry. Whether a plan is worth
+  taking is mostly the ratio of those two areas, and the eye reads areas far faster than it
+  reads three labelled numbers and does the arithmetic.
+
+  Distinct from the `longpos` drawing TOOL, which the user places and owns: a plan comes from
+  the host, cannot be selected or dragged, never enters `getDrawings()`, and survives "clear all
+  drawings" — so it cannot be nudged out of agreement with the model that produced it. Drawn
+  under the series, because a translucent fill over the candles tints the very bars the reader
+  is judging the plan against.
+
 - **`onReady`** — hands the host the live `Chart` (and `null` on teardown). For chrome the
   widget cannot host: a range strip in the host's own header, a layout that needs `showSince`,
   a host keyboard shortcut. Everything the toolbar does is reachable through it, so hiding the

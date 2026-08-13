@@ -9,7 +9,7 @@ import { ScriptEditor, type ScriptError, type ScriptPreset, type ScriptScorecard
 import { parseScriptDraw, type ScriptRender } from "../src/script";
 import { DARK, LIGHT, THEMES, THEME_NAMES, SERIES_PALETTE as IND_PALETTE, SWATCHES, CMP_COLORS, CHIP_INK } from "../src/util";
 import type { Drawing } from "../src/drawings";
-import type { Bar, DataFeed, IndicatorInstance, LegendValue, PriceLine, Projection, ScaleMode, SeriesType, SessionSpec, Theme, ChartMarker } from "../src/types";
+import type { Bar, DataFeed, IndicatorInstance, LegendValue, PriceLine, Projection, ScaleMode, SeriesType, SessionSpec, Theme, ChartMarker, TradePlan } from "../src/types";
 
 // Drawings persist per symbol in localStorage, so they survive reloads + symbol switches.
 const drawKey = (s: string) => `aurovie-chart-drawings:${s.toUpperCase()}`;
@@ -191,6 +191,13 @@ export interface TradingChartProps {
    * what forced hosts to choose between a clean chart and a controllable one.
    */
   onReady?: (chart: Chart | null) => void;
+  /**
+   * A trade plan drawn as risk/reward zones beneath the series. `null` clears it.
+   *
+   * Prefer this over three `priceLines` for a bracket: the zones state the ratio the levels
+   * only imply, and a plan cannot be dragged out of agreement with the model that produced it.
+   */
+  plan?: TradePlan | null;
   /**
    * An instrument identity block above the toolbar — ticker, name, sector, and whatever reference
    * stats the host actually has. Omitted entirely when absent, so a chart embedded in a page that
@@ -464,6 +471,7 @@ export function TradingChart({
   projection,
   ranges,
   onReady,
+  plan = null,
   header,
 }: TradingChartProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -773,6 +781,10 @@ export function TradingChart({
   }, []);
 
   // Theme changes flow through.
+  useEffect(() => {
+    chartRef.current?.setPlan(plan);
+  }, [plan]);
+
   useEffect(() => {
     chartRef.current?.setTheme(th);
   }, [th]);

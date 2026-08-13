@@ -1,4 +1,4 @@
-import { US_EQUITIES_SESSION, type Bar, type ChartMarker, type ChartOptions, type IndicatorInstance, type LegendValue, type PriceLine, type Projection, type ScaleMode, type SeriesType, type SessionSpec, type Theme } from "./types";
+import { US_EQUITIES_SESSION, type Bar, type ChartMarker, type ChartOptions, type IndicatorInstance, type LegendValue, type PriceLine, type Projection, type ScaleMode, type SeriesType, type SessionSpec, type Theme, type TradePlan } from "./types";
 import { DRAW_SPECS, type Drawing, type DrawCtx, type Point } from "./drawings";
 import { autoBox, computeRenko, computePnf, computeKagi, type PnfCol, type KagiSeg } from "./resample";
 import { scriptColor, type ScriptRender } from "./script";
@@ -150,6 +150,7 @@ export class Chart {
   private lastAutoScale = true; // last-reported price-scale-auto state (to gate onViewChange)
   private magnet = false; // magnet mode: snap drawing anchors + the crosshair to the nearest OHLC
   private priceLines: PriceLine[] = []; // host-supplied horizontal lines (alerts/orders/targets)
+  private plan: TradePlan | null = null; // host-supplied trade plan, drawn as risk/reward zones
   private markers: ChartMarker[] = []; // host-supplied bar-anchored events (fills)
   // Right-axis pill slots claimed this frame, so opaque tags can't bury one another. Cleared per draw.
   private axisSlots: { y0: number; y1: number }[] = [];
@@ -527,6 +528,48 @@ export class Chart {
   // Serialize / restore drawings (the host persists them per symbol).
   getDrawings(): Drawing[] {
     return this.drawings.map((d) => ({ ...d, points: d.points.map((p) => ({ ...p })) }));
+  }
+  /** The trade plan drawn beneath the series. `null` clears it. */
+  setPlan(plan: TradePlan | null) {
+    this.plan = plan && [plan.entry, plan.target, plan.stop].every((v) => Number.isFinite(v) && v > 0) ? plan : null;
+    this.requestDraw();
+  }
+  /**
+   * The trade plan: reward and risk as areas, not arithmetic.
+   *
+   * Drawn UNDER the series — a translucent fill over the candles would tint the very bars the
+   * reader is judging the plan against. The zones stop at the entry from both sides, so the
+   * boundary between them IS the entry, and their relative heights are the reward:risk ratio at
+   * a glance. Percent mode is skipped: the plan is in absolute prices and a % window would place
+   * it somewhere meaningless.
+   */
+  private drawPlan(ctx: CanvasRenderingContext2D, p: Pane) {
+    const plan = this.plan;
+    if (!plan || this.comparing || this.scaleMode === "percent") return;
+    const yE = this.priceToY(p, plan.entry);
+    const yT = this.priceToY(p, plan.target);
+    const yS = this.priceToY(p, plan.stop);
+    const x0 = plan.from != null ? Math.max(0, this.xAtTime(plan.from)) : 0;
+    const x1 = this.plotW();
+    if (!(x1 > x0)) return;
+    const w = x1 - x0;
+    ctx.save();
+    ctx.fillStyle = alpha(this.theme.up, 0.1);
+    ctx.fillRect(x0, Math.min(yE, yT), w, Math.abs(yT - yE));
+    ctx.fillStyle = alpha(this.theme.down, 0.1);
+    ctx.fillRect(x0, Math.min(yE, yS), w, Math.abs(yS - yE));
+    // The two outer edges carry a hairline so the plan still reads where a zone is only a few
+    // pixels tall — a fill that thin is invisible, and a level that vanishes is worse than none.
+    ctx.setLineDash([]);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = alpha(this.theme.up, 0.75);
+    ctx.beginPath(); ctx.moveTo(x0, yT); ctx.lineTo(x1, yT); ctx.stroke();
+    ctx.strokeStyle = alpha(this.theme.down, 0.75);
+    ctx.beginPath(); ctx.moveTo(x0, yS); ctx.lineTo(x1, yS); ctx.stroke();
+    ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = alpha(this.theme.textStrong, 0.55);
+    ctx.beginPath(); ctx.moveTo(x0, yE); ctx.lineTo(x1, yE); ctx.stroke();
+    ctx.restore();
   }
   setDrawings(list: Drawing[]) {
     this.drawings = (list ?? []).map((d) => ({ ...d, points: d.points.map((p) => ({ ...p })) }));
@@ -1687,6 +1730,7 @@ export class Chart {
       // study panes below.
       this.clipPane(ctx, price, () => {
         // band fills go UNDER the candles (Ichimoku's cloud, Bollinger/Keltner envelopes)
+        this.drawPlan(ctx, price);
         for (const o of this.overlays) for (const fl of o.fills ?? []) this.drawBandFill(ctx, price, fl);
         this.drawSeries(ctx, price, f, l);
         for (const o of this.overlays) {
@@ -1705,6 +1749,8 @@ export class Chart {
     }
     // last-price line + drawings are in PRICE units, so they don't apply in % compare mode
     if (!this.comparing) {
+      // Zones sit UNDER everything the reader is judging. A translucent fill over the candles
+      // would tint the very bars they are reading the plan against.
       if (this.vpvrOn) this.drawVpvr(ctx, price, f, l);
       this.axisSlots = [];
       this.chipSlots = [];

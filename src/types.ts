@@ -49,6 +49,31 @@ export interface LegendValue {
 
 // A host-supplied horizontal line at a fixed price (alerts, orders, targets…). The engine draws it
 // across the plot with a left-edge chip + a right-axis tag, tracking the price scale on zoom/pan.
+/**
+ * A trade plan drawn as a POSITION rather than three loose lines.
+ *
+ * Three dashed rules and three chips make a reader do the work: pair each level with what it
+ * means, hold the entry in their head, and compute how much is at stake either way. A position
+ * renders the same numbers as two SHADED ZONES — reward above the entry, risk below it (or
+ * inverted on a short) — so the shape carries the answer. Whether a plan is worth taking is
+ * mostly the ratio of those two areas, and the eye reads areas far faster than it reads
+ * arithmetic.
+ *
+ * Distinct from a `longpos` DRAWING, which the user places and owns. A plan comes from the host,
+ * cannot be selected or dragged, and never enters `getDrawings()` — so it cannot be nudged out
+ * of agreement with the model that produced it, and clearing drawings does not clear it.
+ */
+export interface TradePlan {
+  side: "long" | "short";
+  entry: number;
+  target: number;
+  stop: number;
+  /** Bar time the plan starts at. Omitted spans the visible width. */
+  from?: number;
+  /** Names the plan's author on the entry chip — a model, a strategy. */
+  label?: string;
+}
+
 export interface PriceLine {
   id: string;
   price: number;
