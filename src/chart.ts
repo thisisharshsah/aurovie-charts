@@ -582,23 +582,34 @@ export class Chart {
       const x1 = plan.to != null ? Math.min(pw, this.xAtTime(plan.to)) : pw;
       if (!(x1 > x0)) continue;
       const w = x1 - x0;
-      // Closed plans are HISTORY and draw back. A season of past calls at the same weight as the
-      // one being carried buries the live plan in its own track record.
+      /**
+       * LIVE plans are FILLED, closed ones are OUTLINED. The difference is shape, not opacity.
+       *
+       * Fading closed plans was the obvious way to push them back and the wrong one: at the
+       * alpha needed to stop a season of trades burying the live call, green, red and the
+       * neutral entry rule all collapsed into the same grey wash, so a reader could no longer
+       * tell a target from an entry. Colour was carrying the meaning and opacity was destroying
+       * it. Dropping the fill instead pushes history back just as hard — a filled band reads as
+       * far heavier than two hairlines — while every line keeps the colour that says what it is.
+       */
       const closed = plan.to != null;
-      const fill = closed ? 0.055 : 0.1;
-      const edge = closed ? 0.4 : 0.75;
-      ctx.fillStyle = alpha(this.theme.up, fill);
-      ctx.fillRect(x0, Math.min(yE, yT), w, Math.abs(yT - yE));
-      ctx.fillStyle = alpha(this.theme.down, fill);
-      ctx.fillRect(x0, Math.min(yE, yS), w, Math.abs(yS - yE));
+      if (!closed) {
+        ctx.fillStyle = alpha(this.theme.up, 0.1);
+        ctx.fillRect(x0, Math.min(yE, yT), w, Math.abs(yT - yE));
+        ctx.fillStyle = alpha(this.theme.down, 0.1);
+        ctx.fillRect(x0, Math.min(yE, yS), w, Math.abs(yS - yE));
+      }
       ctx.setLineDash([]);
       ctx.lineWidth = 1;
-      ctx.strokeStyle = alpha(this.theme.up, edge);
+      ctx.strokeStyle = alpha(this.theme.up, closed ? 0.6 : 0.75);
       ctx.beginPath(); ctx.moveTo(x0, yT); ctx.lineTo(x1, yT); ctx.stroke();
-      ctx.strokeStyle = alpha(this.theme.down, edge);
+      ctx.strokeStyle = alpha(this.theme.down, closed ? 0.6 : 0.75);
       ctx.beginPath(); ctx.moveTo(x0, yS); ctx.lineTo(x1, yS); ctx.stroke();
+      // The entry is NEUTRAL and dashed in both states — it is the only one of the three that is
+      // not an outcome, and giving it a hue would put it in the same vocabulary as the two that
+      // are. Dashed so it stays distinct from the target even where they nearly coincide.
       ctx.setLineDash([4, 3]);
-      ctx.strokeStyle = alpha(this.theme.textStrong, closed ? 0.3 : 0.55);
+      ctx.strokeStyle = alpha(this.theme.textStrong, closed ? 0.5 : 0.6);
       ctx.beginPath(); ctx.moveTo(x0, yE); ctx.lineTo(x1, yE); ctx.stroke();
     }
     ctx.restore();

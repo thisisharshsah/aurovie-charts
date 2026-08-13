@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.14] - 2026-08-13
+
+### Fixed
+
+- **A closed plan's entry, target and stop all read as the same colour.** 0.8.13 pushed history
+  back by fading it, and at the alpha needed to stop a season of trades burying the live call,
+  green, red and the neutral entry rule collapsed into one grey wash — colour was carrying the
+  meaning and opacity was destroying it.
+
+  Live plans are now FILLED and closed ones OUTLINED: the difference is shape rather than
+  opacity. A filled band reads as far heavier than two hairlines, so history still recedes, while
+  every line keeps the colour that says what it is.
+
 ## [0.8.13] - 2026-08-13
 
 ### Added
