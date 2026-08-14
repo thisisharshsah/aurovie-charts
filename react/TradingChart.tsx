@@ -207,6 +207,15 @@ export interface TradingChartProps {
    */
   frame?: boolean;
   /**
+   * Host content for the LEFT of the bottom bar, beside the scale and navigation switches.
+   *
+   * For controls that belong to the chart but that the widget does not own — a host's range
+   * strip, a view toggle. Without it a host stacks its own row against this one, spending a
+   * border and a strip of height to insist the two groups are different kinds of thing when
+   * both are "settings for this chart".
+   */
+  footer?: ReactNode;
+  /**
    * Fired when a built-in range preset is picked, with the preset itself.
    *
    * The widget can only move the VIEWPORT — it calls `showSince` and stops there. It cannot know
@@ -526,6 +535,7 @@ export function TradingChart({
   volume,
   axes = true,
   frame = true,
+  footer,
   onRangeChange,
   header,
 }: TradingChartProps) {
@@ -2263,7 +2273,13 @@ export function TradingChart({
           and the settings gear are chart-wide switches, not annotations on a price — they
           belong in chrome. As a real bar they also stop colliding with the axis corner, the
           countdown and anything the host draws in `overlay`. */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 3, flexWrap: "wrap", padding: "5px 8px", borderTop: `1px solid ${th.border}`, background: th.paneBackground }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 3, flexWrap: "wrap", padding: "5px 8px", borderTop: `1px solid ${th.border}`, background: th.paneBackground }}>
+        {/* The host's own chart controls share this bar rather than stacking a second one above
+            it. A range strip, a mode switch and the scale switches are all "settings for this
+            chart" — putting them on two adjacent rows spends a second border and eight vertical
+            pixels saying they are different kinds of thing, which they are not. */}
+        {footer}
+        <span style={{ marginLeft: "auto" }} />
             {!view.atRealtime && (
               <button style={clusterBtn(false)} title="Scroll to the latest bar" aria-label="Go to realtime" onClick={() => chartRef.current?.scrollToRealtime()}>»|</button>
             )}

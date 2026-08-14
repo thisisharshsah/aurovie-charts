@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.16] - 2026-08-13
+
+### Added
+
+- **`footer`** — host content for the left of the bottom bar, beside the scale and navigation
+  switches. A range strip and a view toggle belong to the chart but are not the widget's to own,
+  and without a slot a host has to stack its own row directly against this one — spending a
+  border and a strip of height to insist the two groups are different kinds of thing when both
+  are just "settings for this chart".
+
 ## [0.8.15] - 2026-08-13
 
 ### Fixed
