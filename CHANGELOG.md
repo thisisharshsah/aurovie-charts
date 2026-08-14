@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.18] - 2026-08-14
+
+### Changed
+
+- Radii eased back a notch from 0.8.17: controls 12px → 10px, menus 14px → 12px, frame 16px →
+  14px. 0.8.17 corrected a real mismatch (8px widget buttons beside 12px host ones) by moving the
+  whole ramp up, and overshot — at 12px a 26px-tall button is most of the way to a capsule, which
+  reads as soft rather than precise on a control that sits beside a price.
+
 ## [0.8.17] - 2026-08-13
 
 ### Changed
