@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.17] - 2026-08-13
+
+### Changed
+
+- **Softer, and consistent, corner radii.** Controls went 8px → 12px, menus and popovers
+  10px → 14px, the widget frame 12px → 16px. The old ramp was terminal geometry — correct for a
+  tool, dated beside a product — and it also left a visible seam for any host whose own controls
+  sit next to the widget's: a 12px host button beside an 8px widget button reads as two
+  components sharing a row, which is exactly what a `footer` slot is meant to avoid.
+
 ## [0.8.16] - 2026-08-13
 
 ### Added

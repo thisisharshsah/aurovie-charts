@@ -1323,8 +1323,8 @@ export function TradingChart({
     fontFamily: th.font,
     flexWrap: "wrap",
   };
-  const btn = (on = false): CSSProperties => ({ display: "inline-flex", alignItems: "center", gap: 5, height: 29, padding: "0 10px", border: `1px solid ${on ? soft(th.line, 40) : soft(th.border, 65)}`, borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, background: on ? soft(th.line, 16) : soft(th.paneBackground, 88), color: on ? th.line : th.text, boxShadow: on ? `0 3px 10px ${soft(th.line, 20)}` : "0 1px 2px rgba(0,0,0,0.08)", transition: "background 140ms ease, color 140ms ease, border-color 140ms ease, box-shadow 140ms ease", whiteSpace: "nowrap" });
-  const railBtn = (on = false): CSSProperties => ({ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, border: `1px solid ${on ? soft(th.line, 40) : soft(th.border, 65)}`, borderRadius: 8, cursor: "pointer", fontSize: 14, background: on ? soft(th.line, 16) : soft(th.paneBackground, 88), color: on ? th.line : th.text, boxShadow: on ? `0 3px 10px ${soft(th.line, 20)}` : "0 1px 2px rgba(0,0,0,0.08)", transition: "background 140ms ease, color 140ms ease, border-color 140ms ease, box-shadow 140ms ease" });
+  const btn = (on = false): CSSProperties => ({ display: "inline-flex", alignItems: "center", gap: 5, height: 29, padding: "0 10px", border: `1px solid ${on ? soft(th.line, 40) : soft(th.border, 65)}`, borderRadius: 12, cursor: "pointer", fontSize: 12, fontWeight: 600, background: on ? soft(th.line, 16) : soft(th.paneBackground, 88), color: on ? th.line : th.text, boxShadow: on ? `0 3px 10px ${soft(th.line, 20)}` : "0 1px 2px rgba(0,0,0,0.08)", transition: "background 140ms ease, color 140ms ease, border-color 140ms ease, box-shadow 140ms ease", whiteSpace: "nowrap" });
+  const railBtn = (on = false): CSSProperties => ({ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, border: `1px solid ${on ? soft(th.line, 40) : soft(th.border, 65)}`, borderRadius: 12, cursor: "pointer", fontSize: 14, background: on ? soft(th.line, 16) : soft(th.paneBackground, 88), color: on ? th.line : th.text, boxShadow: on ? `0 3px 10px ${soft(th.line, 20)}` : "0 1px 2px rgba(0,0,0,0.08)", transition: "background 140ms ease, color 140ms ease, border-color 140ms ease, box-shadow 140ms ease" });
   const surface: CSSProperties = {
     background: `color-mix(in srgb, ${th.paneBackground} 94%, transparent)`,
     backdropFilter: "blur(10px)",
@@ -1332,14 +1332,14 @@ export function TradingChart({
     border: `1px solid ${th.border}`,
     boxShadow: `0 12px 34px rgba(0,0,0,0.45), 0 0 0 1px ${soft(th.textStrong, 4)}`,
   };
-  const menuBox: CSSProperties = { position: "absolute", top: 36, zIndex: 20, borderRadius: 10, padding: 6, minWidth: 158, ...surface };
+  const menuBox: CSSProperties = { position: "absolute", top: 36, zIndex: 20, borderRadius: 14, padding: 6, minWidth: 158, ...surface };
   const item = (on = false): CSSProperties => ({ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "6px 8px", border: "none", borderRadius: 6, cursor: "pointer", textAlign: "left", fontSize: 12.5, background: on ? soft(th.line, 10) : "transparent", color: on ? th.line : th.textStrong, fontFamily: th.font });
   // small pill for the bottom-right over-chart cluster (Auto / Log / % / go-to-realtime / settings)
   const legBtn: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 15, height: 15, padding: 0, border: "none", borderRadius: 4, cursor: "pointer", fontSize: 11, lineHeight: 1, background: soft(th.text, 22), color: th.textStrong, fontFamily: th.font };
   const clusterBtn = (on = false): CSSProperties => ({ height: 23, minWidth: 23, padding: "0 7px", border: `1px solid ${on ? soft(th.line, 45) : th.border}`, borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: th.font, background: on ? `color-mix(in srgb, ${th.line} 20%, ${th.paneBackground})` : `color-mix(in srgb, ${th.paneBackground} 88%, transparent)`, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", color: on ? th.line : th.text, display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.28)", transition: "background 140ms ease, color 140ms ease, border-color 140ms ease" });
 
   return (
-    <div ref={rootRef} data-aurovie-chart style={{ display: "flex", flexDirection: "column", height, background: th.background, border: frame ? `1px solid ${th.border}` : "none", borderRadius: frame ? 12 : 0, overflow: "hidden", boxShadow: frame ? "0 1px 2px rgba(0,0,0,0.2), 0 8px 28px rgba(0,0,0,0.16)" : "none", transition: "background 220ms ease, border-color 220ms ease" }}>
+    <div ref={rootRef} data-aurovie-chart style={{ display: "flex", flexDirection: "column", height, background: th.background, border: frame ? `1px solid ${th.border}` : "none", borderRadius: frame ? 16 : 0, overflow: "hidden", boxShadow: frame ? "0 1px 2px rgba(0,0,0,0.2), 0 8px 28px rgba(0,0,0,0.16)" : "none", transition: "background 220ms ease, border-color 220ms ease" }}>
       {/*
         Keyboard focus. This widget is built from inline styles, and inline styles cannot
         express a pseudo-class — so until now NOTHING in it had a focus ring: a keyboard user
@@ -1612,7 +1612,7 @@ export function TradingChart({
                     {multi && <span style={{ position: "absolute", right: 1.5, bottom: 1, fontSize: 7, lineHeight: 1, color: th.text }}>▸</span>}
                   </button>
                   {railMenu === g.id && (
-                    <div style={{ position: "absolute", left: 36, top: 0, zIndex: 25, borderRadius: 10, padding: 6, minWidth: 208, ...surface }}>
+                    <div style={{ position: "absolute", left: 36, top: 0, zIndex: 25, borderRadius: 14, padding: 6, minWidth: 208, ...surface }}>
                       <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text, padding: "2px 8px 6px" }}>{g.label}</div>
                       {g.tools.map((t) => (
                         <button
@@ -1650,7 +1650,7 @@ export function TradingChart({
                 {objects.length > 0 && <span style={{ position: "absolute", right: 0, top: 0, fontSize: 8, lineHeight: 1, fontWeight: 700, color: th.line }}>{objects.length}</span>}
               </button>
               {objectsOpen && (
-                <div style={{ position: "absolute", left: 36, bottom: 0, zIndex: 25, borderRadius: 10, padding: 6, minWidth: 218, maxHeight: 320, overflowY: "auto", ...surface }}>
+                <div style={{ position: "absolute", left: 36, bottom: 0, zIndex: 25, borderRadius: 14, padding: 6, minWidth: 218, maxHeight: 320, overflowY: "auto", ...surface }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "2px 4px 6px" }}>
                     <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text }}>Objects · {objects.length}</span>
                     {objects.length > 0 && (
@@ -1750,7 +1750,7 @@ export function TradingChart({
                     }
                   }}
                   placeholder="Run action… (type: replay, fit, compare, script). Use ↑/↓ + Enter."
-                  style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 8, border: `1px solid ${th.border}`, background: th.background, color: th.textStrong, fontSize: 13, fontFamily: th.font }}
+                  style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 12, border: `1px solid ${th.border}`, background: th.background, color: th.textStrong, fontSize: 13, fontFamily: th.font }}
                 />
                 <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
                   {([
@@ -1793,7 +1793,7 @@ export function TradingChart({
                   left: Math.min(ctxMenu.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 214),
                   top: Math.min(ctxMenu.y, (typeof window !== "undefined" ? window.innerHeight : 9999) - 320),
                   zIndex: 41,
-                  borderRadius: 10,
+                  borderRadius: 14,
                   padding: 5,
                   minWidth: 204,
                   fontFamily: th.font,
@@ -1832,7 +1832,7 @@ export function TradingChart({
                 flexWrap: "wrap",
                 pointerEvents: "none",
                 padding: legend.bar ? "3px 9px 3px 7px" : "2px 4px",
-                borderRadius: 8,
+                borderRadius: 12,
                 background: legend.bar ? `color-mix(in srgb, ${th.paneBackground} 78%, transparent)` : "transparent",
                 backdropFilter: legend.bar ? "blur(7px)" : undefined,
                 WebkitBackdropFilter: legend.bar ? "blur(7px)" : undefined,
@@ -1946,7 +1946,7 @@ export function TradingChart({
           <div ref={hostRef} style={{ position: "absolute", inset: 0 }} />
           {overlay}
           {guided && (
-            <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", left: 8, bottom: 28, zIndex: 7, display: "flex", alignItems: "center", gap: 5, padding: "5px 6px", borderRadius: 10, ...surface }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", left: 8, bottom: 28, zIndex: 7, display: "flex", alignItems: "center", gap: 5, padding: "5px 6px", borderRadius: 14, ...surface }}>
               {quickActions
                 .slice()
                 .sort((a, b) => (cmdUsage[b.id] ?? 0) - (cmdUsage[a.id] ?? 0))
@@ -1966,7 +1966,7 @@ export function TradingChart({
             </div>
           )}
           {guided && dockEditOpen && (
-            <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", left: 8, bottom: 68, zIndex: 21, width: 250, maxHeight: 280, overflowY: "auto", borderRadius: 10, padding: 6, ...surface }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", left: 8, bottom: 68, zIndex: 21, width: 250, maxHeight: 280, overflowY: "auto", borderRadius: 14, padding: 6, ...surface }}>
               <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text, padding: "2px 8px 6px" }}>Quick dock buttons</div>
               {GUIDED_PIN_CHOICES.map((id) => {
                 const a = quickById[id];
@@ -2006,7 +2006,7 @@ export function TradingChart({
                 backdropFilter: "blur(8px)",
                 WebkitBackdropFilter: "blur(8px)",
                 border: `1px solid ${th.border}`,
-                borderRadius: 10,
+                borderRadius: 14,
                 boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
                 fontFamily: th.monoFont,
                 fontSize: 11,
@@ -2109,7 +2109,7 @@ export function TradingChart({
                 alignItems: "center",
                 gap: 5,
                 padding: "5px 7px",
-                borderRadius: 10,
+                borderRadius: 14,
                 ...surface,
               }}
             >
@@ -2232,7 +2232,7 @@ export function TradingChart({
           )}
           {/* Bar-replay: a "click a bar" hint while arming, then a play/step control bar */}
           {replay?.arming && (
-            <div style={{ position: "absolute", top: 40, left: "50%", transform: "translateX(-50%)", zIndex: 9, padding: "6px 12px", background: th.line, color: CHIP_INK, borderRadius: 8, fontSize: 12.5, fontWeight: 700, boxShadow: "0 6px 18px rgba(0,0,0,0.4)" }}>
+            <div style={{ position: "absolute", top: 40, left: "50%", transform: "translateX(-50%)", zIndex: 9, padding: "6px 12px", background: th.line, color: CHIP_INK, borderRadius: 12, fontSize: 12.5, fontWeight: 700, boxShadow: "0 6px 18px rgba(0,0,0,0.4)" }}>
               Click a bar to start replay
             </div>
           )}
@@ -2295,7 +2295,7 @@ export function TradingChart({
             <span style={{ position: "relative" }}>
               <button style={clusterBtn(settingsOpen)} title="Chart settings" aria-label="Chart settings" onClick={() => setSettingsOpen((o) => !o)}>⚙</button>
               {settingsOpen && (
-                <div style={{ position: "absolute", right: 0, bottom: 30, zIndex: 20, background: th.paneBackground, border: `1px solid ${th.border}`, borderRadius: 10, padding: 6, boxShadow: "0 12px 34px rgba(0,0,0,0.5)", minWidth: 226, maxHeight: 340, overflowY: "auto" }}>
+                <div style={{ position: "absolute", right: 0, bottom: 30, zIndex: 20, background: th.paneBackground, border: `1px solid ${th.border}`, borderRadius: 14, padding: 6, boxShadow: "0 12px 34px rgba(0,0,0,0.5)", minWidth: 226, maxHeight: 340, overflowY: "auto" }}>
                   <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text, padding: "2px 8px 6px" }}>Appearance</div>
                   {(
                     [
