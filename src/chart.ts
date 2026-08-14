@@ -611,11 +611,12 @@ export class Chart {
       ctx.beginPath(); ctx.moveTo(x0, yT); ctx.lineTo(x1, yT); ctx.stroke();
       ctx.strokeStyle = alpha(this.theme.down, closed ? 0.6 : 0.75);
       ctx.beginPath(); ctx.moveTo(x0, yS); ctx.lineTo(x1, yS); ctx.stroke();
-      // The entry is NEUTRAL and dashed in both states — it is the only one of the three that is
-      // not an outcome, and giving it a hue would put it in the same vocabulary as the two that
-      // are. Dashed so it stays distinct from the target even where they nearly coincide.
+      // The entry is dashed in both states and drawn in `theme.entry` — not `up` or `down`,
+      // because it is the only one of the three that is not an outcome, and not `textStrong`
+      // either, which is the theme's heaviest ink and would make a reference level the loudest
+      // line on the chart. Dashed so it stays distinct from the target where they nearly meet.
       ctx.setLineDash([4, 3]);
-      ctx.strokeStyle = alpha(this.theme.textStrong, closed ? 0.5 : 0.6);
+      ctx.strokeStyle = alpha(this.theme.entry ?? this.theme.textStrong, closed ? 0.7 : 0.85);
       ctx.beginPath(); ctx.moveTo(x0, yE); ctx.lineTo(x1, yE); ctx.stroke();
     }
     ctx.restore();

@@ -30,6 +30,16 @@ export interface Theme {
   crosshairLabelText: string;
   up: string;
   down: string;
+  /**
+   * The ENTRY level of a `TradePlan`. Optional; falls back to `textStrong`.
+   *
+   * Entry is the one level on a plan that is not an outcome, so it must not borrow `up` or
+   * `down` — but `textStrong` is not right either: it is the theme's most emphatic ink, which
+   * makes a reference level the heaviest line on the chart, and it inverts between light and
+   * dark while the level it marks does not. A host that gives entry its own colour (gold is the
+   * convention for a resting order) can now have the plan agree with its own price rules.
+   */
+  entry?: string;
   upWick: string;
   downWick: string;
   volumeUp: string;

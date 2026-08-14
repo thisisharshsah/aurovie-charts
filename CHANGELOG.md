@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.19] - 2026-08-14
+
+### Added
+
+- **`Theme.entry`** — the colour of a `TradePlan`'s entry rule. Optional, falling back to
+  `textStrong` as before.
+
+  Entry is the one level on a plan that is not an outcome, so it must not borrow `up` or `down`.
+  But `textStrong` was not right either: it is the theme's most emphatic ink, so a *reference*
+  level drew as the heaviest line on the chart, and it inverts between light and dark while the
+  level it marks does not. A host that gives entry its own colour — gold is the convention for a
+  resting order — can now have the plan agree with its own price rules instead of drawing the
+  same level two different ways.
+
 ## [0.8.18] - 2026-08-14
 
 ### Changed
