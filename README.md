@@ -105,12 +105,15 @@ ma50 · ma200 · ema21 · vwap · boll · donch · rsi · macd · atr · stoch �
 - `Chart` — `new Chart(host, opts?)`; `setData`, `update`, `setIndicators`, `setScripts`, `setTool`, `setScaleMode`, `getDrawings`/`setDrawings`, …
 - Themes: `DARK`, `LIGHT`, `THEMES`, `THEME_NAMES`
 - Script overlays: `parseScriptDraw`, `parseScriptDrawJson`, `scriptColor`
-- Types: `Bar`, `SeriesType`, `Resolution`, `Theme`, `DataFeed`, `DataFeedResult`, `ChartOptions`, `IndicatorInstance`, `LegendValue`, `PriceLine`, `ChartMarker`, `ScaleMode`, `Tool`, `Drawing`, `ScriptDraw`, `ScriptPlot`, `ScriptRender`, `ScriptColor`, `ScriptPlotStyle`
+- Trade arithmetic: `deriveTicketRisk`, `bracketCoherent`, `EMPTY_ORDER` — React-free, so the ticket and the chart cannot disagree about one calculation
+- Types: `Bar`, `SeriesType`, `Resolution`, `Theme`, `DataFeed`, `DataFeedResult`, `ChartOptions`, `IndicatorInstance`, `LegendValue`, `PriceLine`, `ChartMarker`, `ScaleMode`, `Tool`, `Drawing`, `ScriptDraw`, `ScriptPlot`, `ScriptRender`, `ScriptColor`, `ScriptPlotStyle`, `TicketOrder`, `TicketRisk`
 
 ## API (`aurovie-charts/react`)
 
 - `TradingChart` — the full self-contained widget (toolbar + drawing rail + legend) wired to a `DataFeed`
-- Types: `TradingChartProps`, `TimeframeOption`
+- `TradeTicket` — a controlled order ticket in the chart's own theme (see below)
+- `ChartWorkspace` — the chart-and-panel layout, docked or stacked on container width
+- Types: `TradingChartProps`, `TimeframeOption`, `RangePreset`, `ChartSettingGroup`, `TradeTicketProps`, `TicketOrder`
 
 ### Driving host chrome from the widget
 
@@ -134,6 +137,81 @@ Three props open that up without giving up the batteries-included widget:
 `scripts` takes the same `ScriptRender` shape the script editor produces (`parseScriptDraw` builds
 one). Host series are the host's to invalidate — the widget clears the *editor's* scripts when the
 symbol or interval changes, but never yours, since only you know whether you have recomputed.
+
+### The bottom bar: ranges and host settings
+
+Range presets and the scale switches live together in the chart's **bottom bar** — they are the
+same kind of control (how this chart is drawn, not what is drawn on it). A host's own chart
+settings join them there as *declared* groups, so the widget draws them in its own button
+vocabulary rather than the host restating the chart's styling in its design system:
+
+```tsx
+<TradingChart
+  datafeed={feed}
+  symbol="CORBL"
+  ranges={[
+    { label: "1M", days: 30, note: "Daily bars" },
+    // a thunk for windows whose length changes daily — resolved on the CLICK
+    { label: "YTD", days: () => ytdDays(), title: "Year to date", note: "Daily bars" },
+    { label: "ALL", days: null, note: "Weekly bars" },
+  ]}
+  range={range}                       // controlled, so a persisted choice lights its own pill
+  onRangeChange={(r) => applyRange(r)} // the widget moves the VIEWPORT; only you know the resolution
+  settings={[
+    {
+      id: "prices",
+      label: "Prices",
+      value: prices,
+      onChange: setPrices,
+      options: [
+        { value: "market", label: "Market", title: "As traded — the archive, unmodified" },
+        { value: "adjusted", label: "Adjusted", title: "Back-adjusted for bonuses and splits", note: "1 event" },
+      ],
+    },
+  ]}
+/>
+```
+
+An option's `note` prints only while that option is *active*, so it can never describe a basis the
+chart is not drawing. Past four options a group collapses to a menu (`as` forces either). `footer`
+still takes arbitrary nodes, for anything that is not a choice between options.
+
+### Trading beside the chart
+
+`TradeTicket` is a controlled, purely presentational order ticket wearing the same theme as the
+plot. It holds no state, makes no request, and knows nothing about your broker — you own the
+state, the pre-trade gate and the submit:
+
+```tsx
+import { ChartWorkspace, TradeTicket } from "aurovie-charts/react";
+import { deriveTicketRisk, EMPTY_ORDER } from "aurovie-charts";
+
+const [order, setOrder] = useState({ ...EMPTY_ORDER, qty: 100 });
+const risk = deriveTicketRisk(order, { quote, account });
+
+<ChartWorkspace
+  aside={
+    <TradeTicket
+      order={order}
+      onChange={(patch) => setOrder((o) => ({ ...o, ...patch }))}
+      symbol="AAPL"
+      quote={{ last: 305.13, bid: 305.11, ask: 305.15, changePct: -0.15 }}
+      account={{ equity: 984_786, buyingPower: 3_933_909 }}
+      checks={gate.map((c) => ({ label: c.name, ok: c.passed, detail: c.detail }))}
+      onSubmit={place}
+      currency="USD"
+    />
+  }
+>
+  <TradingChart datafeed={feed} symbol="AAPL" plan={{ side: "long", ...risk }} />
+</ChartWorkspace>
+```
+
+Every figure whose inputs are missing is **omitted**, not printed as a zero — risk computed
+against an absent stop is a fabricated number, and it would look like the most confident one on
+the ticket. `deriveTicketRisk` and `bracketCoherent` are exported from the React-free core, so the
+same arithmetic can gate your submit and draw your plan without two implementations drifting
+apart.
 
 ### Instrument header, ranges, and sessions
 

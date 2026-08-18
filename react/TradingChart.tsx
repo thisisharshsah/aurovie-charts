@@ -183,11 +183,34 @@ export interface TradingChartProps {
    */
   projection?: Projection | null;
   /**
-   * Visible-window presets ("1M · 6M · 1Y · All"), shown as a strip in the toolbar. Pass `false` to
-   * hide it, or your own list to match the history you actually serve — offering 5Y for an
-   * instrument with six months of bars is a dead button.
+   * Visible-window presets ("1M · 6M · 1Y · All"), shown as a strip in the BOTTOM bar. Pass
+   * `false` to hide it, or your own list to match the history you actually serve — offering 5Y
+   * for an instrument with six months of bars is a dead button.
+   *
+   * They used to sit in the toolbar, among the interval tabs and the chart-type menu. That put
+   * two rows of time controls a few centimetres apart meaning different things — up there the
+   * width of a BAR, in the range strip the width of the WINDOW — with "1D" and "1W" appearing
+   * in both, in the same shape, one lit in each. The bottom bar already holds the scale switches,
+   * which is the same kind of control: how this chart is drawn, not what is drawn on it.
    */
   ranges?: RangePreset[] | false;
+  /**
+   * The active range, by label — for a host that persists the choice or drives it from elsewhere.
+   *
+   * Uncontrolled (omitted) the widget tracks the last preset the user picked, which is right for
+   * a chart that owns its own window. Pass a value and the strip follows the host instead, so a
+   * range restored from storage lights the pill it came from.
+   */
+  range?: string | null;
+  /**
+   * Host-owned settings drawn in the chart's own bottom bar — a price basis, a data mode, an
+   * interval the host owns. See `ChartSettingGroup`.
+   *
+   * Prefer this over building the same buttons in `footer`: the widget draws these in the same
+   * vocabulary as the scale switches sitting beside them, so the bar reads as one bar rather
+   * than as the host's controls parked next to the chart's.
+   */
+  settings?: ChartSettingGroup[];
   /**
    * Handed the live `Chart` once it exists, and `null` when it goes away.
    *
@@ -298,8 +321,69 @@ export interface InstrumentHeader {
 
 export interface RangePreset {
   label: string;
-  /** Days back from the newest bar; `null` fits the whole history. */
-  days: number | null;
+  /**
+   * Days back from the newest bar; `null` fits the whole history.
+   *
+   * A THUNK for windows that are a different length every day — year-to-date, a fiscal year,
+   * "since earnings". It is resolved at click time, so a page left open overnight does not keep
+   * measuring YTD from yesterday's boundary.
+   */
+  days: number | null | (() => number | null);
+  /** Spelled-out label for the tooltip — "Year to date" against a pill that says "YTD". */
+  title?: string;
+  /**
+   * What this range COSTS to draw, in the host's own words — "Daily bars", "Weekly bars".
+   *
+   * Picking a range usually changes the resolution too (that is what `onRangeChange` is for),
+   * and a pill has room for a label and nothing else, so without this the series silently
+   * changes under the reader. Shown in the tooltip beside the title.
+   */
+  note?: string;
+}
+
+/**
+ * One choice in a `ChartSettingGroup`.
+ */
+export interface ChartSettingOption {
+  value: string;
+  label: string;
+  /** Tooltip — what picking this actually does. */
+  title?: string;
+  /**
+   * A muted caption printed after the group WHILE this option is active — "1 event",
+   * "adjusted through 3 ex-dates". For a fact about the current selection that the label
+   * itself cannot carry.
+   */
+  note?: string;
+}
+
+/**
+ * A host-owned setting rendered in the chart's OWN bottom bar, in the chart's own button
+ * vocabulary.
+ *
+ * The `footer` slot has always accepted arbitrary nodes, and every host filled it with buttons
+ * styled from its own design system — so the bar ended up carrying two vocabularies on one line,
+ * and the controls that belong to the chart most obviously (a price basis, a data mode) were the
+ * ones that looked least like part of it. A declared group is drawn by the widget, so it matches
+ * the scale switches beside it without the host restating the chart's styling.
+ *
+ * `footer` remains for content that genuinely is not a choice between options.
+ */
+export interface ChartSettingGroup {
+  id: string;
+  /** Small uppercase caption before the buttons — "Prices", "Session". Omitted renders none. */
+  label?: string;
+  value: string;
+  options: ChartSettingOption[];
+  onChange: (value: string) => void;
+  /**
+   * `"segmented"` lays the options out as a row of buttons; `"menu"` collapses them behind one.
+   * Defaults to a menu past four options, which is where a row starts wrapping the bar.
+   */
+  as?: "segmented" | "menu";
+  /** Tooltip for the group as a whole. */
+  title?: string;
+  disabled?: boolean;
 }
 
 const DEFAULT_RANGES: RangePreset[] = [
@@ -528,6 +612,8 @@ export function TradingChart({
   utc,
   projection,
   ranges,
+  range: rangeProp,
+  settings,
   onReady,
   plan = null,
   volumeEmphasis = false,
@@ -562,7 +648,12 @@ export function TradingChart({
   // Which preset is applied. The strip drew every button in the inactive style, so a reader
   // could pick a range and get no confirmation that anything had been selected — and coming
   // back to the chart later, no way to tell what window they were looking at.
-  const [activeRange, setActiveRange] = useState<string | null>(null);
+  // Uncontrolled by default; `range` takes over when the host passes one, so a persisted choice
+  // lights its own pill on mount instead of opening with nothing selected.
+  const [ownRange, setOwnRange] = useState<string | null>(null);
+  const activeRange = rangeProp !== undefined ? rangeProp : ownRange;
+  // Which bottom-bar setting group has its menu open (one at a time), by group id.
+  const [barMenu, setBarMenu] = useState<string | null>(null);
   const [hoverInd, setHoverInd] = useState<string | null>(null); // legend chip under the cursor
   const colorAssign = useRef<Record<string, string>>({}); // stable per-indicator colour (kept across add/remove)
   const [scaleMode, setScaleMode] = useState<ScaleMode>("normal");
@@ -829,7 +920,7 @@ export function TradingChart({
         case "?": setShortcuts((s) => !s); break;
         case "d": case "D": setDataWindow((d) => !d); break;
         case "g": case "G": setGuided((v) => !v); break;
-        case "Escape": setShortcuts(false); setIndModal(false); break;
+        case "Escape": setShortcuts(false); setIndModal(false); setBarMenu(null); break;
         default: return;
       }
       e.preventDefault();
@@ -1160,11 +1251,18 @@ export function TradingChart({
   // Visible-window presets. Measured back from the newest BAR, not from today: a symbol that
   // stopped trading a month ago would otherwise get an empty window for "1M".
   const rangeList = ranges === false ? [] : (ranges ?? DEFAULT_RANGES);
-  const applyRange = (days: number | null) => {
+  const pickRange = (r: RangePreset) => {
+    // Resolved HERE, not when the list was built: a `days` thunk exists precisely because the
+    // answer changes with the clock, and a page left open overnight would otherwise keep
+    // measuring "year to date" from yesterday's boundary.
+    const days = typeof r.days === "function" ? r.days() : r.days;
     const c = chartRef.current;
-    if (!c) return;
-    if (days == null) c.fit();
-    else c.showSince((latest?.time ?? Math.floor(Date.now() / 1000)) - days * 86400);
+    if (c) {
+      if (days == null) c.fit();
+      else c.showSince((latest?.time ?? Math.floor(Date.now() / 1000)) - days * 86400);
+    }
+    setOwnRange(r.label);
+    onRangeChange?.(r);
   };
 
   // Compare-box suggestions. The DATAFEED owns symbol lookup — the widget still never fetches — so a
@@ -1337,6 +1435,22 @@ export function TradingChart({
   // small pill for the bottom-right over-chart cluster (Auto / Log / % / go-to-realtime / settings)
   const legBtn: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 15, height: 15, padding: 0, border: "none", borderRadius: 4, cursor: "pointer", fontSize: 11, lineHeight: 1, background: soft(th.text, 22), color: th.textStrong, fontFamily: th.font };
   const clusterBtn = (on = false): CSSProperties => ({ height: 23, minWidth: 23, padding: "0 7px", border: `1px solid ${on ? soft(th.line, 45) : th.border}`, borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: th.font, background: on ? `color-mix(in srgb, ${th.line} 20%, ${th.paneBackground})` : `color-mix(in srgb, ${th.paneBackground} 88%, transparent)`, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", color: on ? th.line : th.text, display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.28)", transition: "background 140ms ease, color 140ms ease, border-color 140ms ease" });
+  /**
+   * A bottom-bar control. The RANGE strip and every host `settings` group wear this, which is
+   * the whole point of declaring them: beside the scale switches they are the same object, so
+   * the bar reads as one row of chart settings instead of the host's buttons parked next to the
+   * chart's. Slightly wider minimum than `clusterBtn` so "YTD" and "Market" do not sit in a
+   * ragged row where the longest label reads as the most important.
+   */
+  const barBtn = (on = false): CSSProperties => ({ ...clusterBtn(on), minWidth: 34, height: 23, padding: "0 8px", fontFamily: th.monoFont, letterSpacing: "0.01em" });
+  /** The small uppercase caption that NAMES a bottom-bar group ("Range", "Prices"). */
+  const barCap: CSSProperties = { fontSize: 9.5, fontFamily: th.monoFont, textTransform: "uppercase", letterSpacing: "0.09em", color: th.text, padding: "0 2px 0 0", whiteSpace: "nowrap" };
+  /** A muted fact printed after a group — an option's `note`. */
+  const barNote: CSSProperties = { fontSize: 10.5, fontFamily: th.monoFont, color: th.text, whiteSpace: "nowrap", opacity: 0.85 };
+  /** A bottom-bar menu. Opens UPWARD: this bar is the last row of the widget, and a menu
+      dropping below it lands outside a host that clips its own corners. */
+  const barMenuBox: CSSProperties = { position: "absolute", bottom: 28, left: 0, zIndex: 24, borderRadius: 10, padding: 5, minWidth: 178, ...surface };
+  const barDivider = <span style={{ width: 1, height: 15, background: th.border, margin: "0 4px", flexShrink: 0 }} />;
 
   return (
     <div ref={rootRef} data-aurovie-chart style={{ display: "flex", flexDirection: "column", height, background: th.background, border: frame ? `1px solid ${th.border}` : "none", borderRadius: frame ? 14 : 0, overflow: "hidden", boxShadow: frame ? "0 1px 2px rgba(0,0,0,0.2), 0 8px 28px rgba(0,0,0,0.16)" : "none", transition: "background 220ms ease, border-color 220ms ease" }}>
@@ -1477,24 +1591,7 @@ export function TradingChart({
               </div>
             )}
           </span>
-          {rangeList.length > 0 && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 1 }} title="Visible range">
-              {rangeList.map((r) => (
-                <button
-                  key={r.label}
-                  aria-pressed={activeRange === r.label}
-                  style={{ ...btn(activeRange === r.label), padding: "0 7px" }}
-                  onClick={() => {
-                    applyRange(r.days);
-                    setActiveRange(r.label);
-                    onRangeChange?.(r);
-                  }}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </span>
-          )}
+          {/* The range strip lives in the BOTTOM bar — see the scale + navigation row. */}
           {RESAMPLED.includes(type) && (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 1 }} title="Box / reversal size">
               <button style={{ ...btn(false), padding: "0 7px", fontSize: 15 }} onClick={() => stepBox(-1)} aria-label="Finer box">−</button>
@@ -1685,6 +1782,7 @@ export function TradingChart({
             setSettingsOpen(false);
             setCmdOpen(false);
             setDockEditOpen(false);
+            setBarMenu(null);
             setCtxMenu({ x: e.clientX, y: e.clientY, price });
           }}
           onClick={() => {
@@ -1693,6 +1791,7 @@ export function TradingChart({
             if (settingsOpen) setSettingsOpen(false);
             if (cmdOpen) setCmdOpen(false);
             if (dockEditOpen) setDockEditOpen(false);
+            if (barMenu) setBarMenu(null);
             if (ctxMenu) setCtxMenu(null);
           }}
         >
@@ -2274,10 +2373,101 @@ export function TradingChart({
           belong in chrome. As a real bar they also stop colliding with the axis corner, the
           countdown and anything the host draws in `overlay`. */}
       <div style={{ display: "flex", alignItems: "center", gap: 3, flexWrap: "wrap", padding: "5px 8px", borderTop: `1px solid ${th.border}`, background: th.paneBackground }}>
+        {/* RANGE — the visible WINDOW, beside the scale switches that draw it.
+            Not in the toolbar, where it sat among the interval tabs: those pick the width of a
+            BAR and these pick the width of the WINDOW, and with "1D" and "1W" printed in both
+            rows, in the same pill, one lit in each, a reader has no way to tell which governs
+            what they are looking at. */}
+        {rangeList.length > 0 && (
+          <>
+            <span style={barCap} aria-hidden>Range</span>
+            <span role="group" aria-label="Visible range" style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+              {rangeList.map((r) => (
+                <button
+                  key={r.label}
+                  aria-pressed={activeRange === r.label}
+                  title={[r.title ?? r.label, r.note].filter(Boolean).join(" · ")}
+                  style={barBtn(activeRange === r.label)}
+                  onClick={() => pickRange(r)}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </span>
+          </>
+        )}
+
+        {/* HOST SETTINGS — declared, so the widget draws them. See `ChartSettingGroup`. */}
+        {(settings ?? []).map((g) => {
+          const cur = g.options.find((o) => o.value === g.value);
+          const asMenu = (g.as ?? (g.options.length > 4 ? "menu" : "segmented")) === "menu";
+          return (
+            <span key={g.id} style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+              {rangeList.length > 0 || (settings ?? [])[0] !== g ? barDivider : null}
+              {g.label && <span style={barCap} aria-hidden>{g.label}</span>}
+              {asMenu ? (
+                <span style={{ position: "relative", display: "inline-flex" }}>
+                  <button
+                    style={{ ...barBtn(barMenu === g.id), gap: 4 }}
+                    title={g.title ?? g.label}
+                    aria-label={g.label ?? g.id}
+                    aria-expanded={barMenu === g.id}
+                    disabled={g.disabled}
+                    onClick={() => setBarMenu((m) => (m === g.id ? null : g.id))}
+                  >
+                    {cur?.label ?? g.value} ▾
+                  </button>
+                  {barMenu === g.id && (
+                    <div style={barMenuBox} role="listbox" aria-label={g.label ?? g.id}>
+                      {g.options.map((o) => (
+                        <button
+                          key={o.value}
+                          role="option"
+                          aria-selected={o.value === g.value}
+                          title={o.title}
+                          style={{ ...item(o.value === g.value), justifyContent: "space-between", gap: 12 }}
+                          onClick={() => {
+                            g.onChange(o.value);
+                            setBarMenu(null);
+                          }}
+                        >
+                          <span style={{ fontFamily: th.monoFont, fontWeight: 600 }}>{o.label}</span>
+                          {o.title && <span style={{ fontSize: 11, color: th.text }}>{o.title}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </span>
+              ) : (
+                <span role="group" aria-label={g.label ?? g.id} title={g.title} style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+                  {g.options.map((o) => (
+                    <button
+                      key={o.value}
+                      aria-pressed={o.value === g.value}
+                      title={o.title}
+                      disabled={g.disabled}
+                      style={barBtn(o.value === g.value)}
+                      onClick={() => g.onChange(o.value)}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </span>
+              )}
+              {/* A fact about what is CURRENTLY selected — "1 event", "adjusted through 3
+                  ex-dates". Only ever the active option's, so it can never describe a basis
+                  the chart is not drawing. */}
+              {cur?.note && <span style={barNote}>{cur.note}</span>}
+            </span>
+          );
+        })}
+
         {/* The host's own chart controls share this bar rather than stacking a second one above
             it. A range strip, a mode switch and the scale switches are all "settings for this
             chart" — putting them on two adjacent rows spends a second border and eight vertical
-            pixels saying they are different kinds of thing, which they are not. */}
+            pixels saying they are different kinds of thing, which they are not.
+            `settings` covers the common case (a choice between options) in the widget's own
+            vocabulary; this slot stays for everything that is not one. */}
         {footer}
         <span style={{ marginLeft: "auto" }} />
             {!view.atRealtime && (

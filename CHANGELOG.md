@@ -4,6 +4,81 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] - 2026-08-18
+
+### Added
+
+- **`settings` — host chart controls the WIDGET draws.** The bottom bar has always taken a
+  `footer` slot, and every host filled it with buttons styled from its own design system. So the
+  one row that is most obviously part of the chart ended up carrying two vocabularies: a range
+  strip in the host's pill shape, a price-basis toggle in the host's colours, and the widget's own
+  scale switches beside them, all claiming to be settings for the same chart. The host controls
+  looked like they had been parked next to the chart rather than belonging to it.
+
+  A `ChartSettingGroup` is declared, not drawn: a label, a value, a list of options and a change
+  handler. The widget renders it in the same button as `Auto` / `Log` / `%`, laid out as a
+  segmented row or collapsed behind a menu past four options, with the menu opening UPWARD
+  because this is the last row of the widget and a menu dropping below it lands outside any host
+  that clips its own corners. An option can carry a `note` — a fact about the CURRENT selection
+  ("1 event"), which is printed only while that option is active, so it can never describe a
+  basis the chart is not drawing.
+
+  `footer` is unchanged and still right for anything that is not a choice between options.
+
+- **`range`** — the active range preset, by label, for a host that persists the choice. Left
+  uncontrolled the widget tracks the last preset picked, as before; passed a value the strip
+  follows the host, so a window restored from storage lights the pill it came from instead of
+  opening with nothing selected.
+
+- **`RangePreset.days` accepts a thunk**, and gains `title` and `note`. A year-to-date or
+  fiscal-year window is a different number of days every day, so hosts were computing it at click
+  time in their own strip rather than using the widget's — the thunk is resolved on the click,
+  not when the list was built, so a page left open overnight does not keep measuring YTD from
+  yesterday's boundary. `note` says what the range COSTS to draw ("Daily bars"): picking a range
+  usually changes the resolution too, a pill has room for a label and nothing else, and without
+  it the series silently changed under the reader.
+
+- **`TradeTicket`** (`aurovie-charts/react`) — an order ticket in the chart's own vocabulary:
+  the same theme, the same button shapes, the same tabular numerals as the plot beside it. Fully
+  controlled and purely presentational — it holds no order state, makes no request, and knows
+  nothing about a broker. Side, order type, time-in-force, size by shares / cash / percent of
+  equity risked, limit and trigger prices with bid·mid·ask snapping off the real top of book, a
+  bracket, an estimated cost against buying power, and a risk readout.
+
+  Three things it does that a hand-rolled ticket usually does not. The SIDE is stated by the
+  whole card — a hairline in the side's colour down the leading edge — not only by a toggle the
+  size of the venue picker, because mistaking a sell ticket for a buy one is the expensive
+  mistake. Sizing by cash or by risk shows the share count it RESOLVED to, rather than leaving
+  the reader to discover the rounding on the fill. And every figure whose inputs are missing is
+  omitted rather than printed as a zero: risk computed against an absent stop is not a
+  conservative estimate, it is a fabricated one, and it would render as the most confident
+  number on the ticket.
+
+  `submitSlot` replaces the action for a hold-to-confirm or two-step arm; `checks` renders a
+  host's pre-trade gate as a checklist and blocks the action while any of it fails.
+
+- **`deriveTicketRisk` / `bracketCoherent` / `EMPTY_ORDER`** — the ticket's arithmetic, exported
+  from the React-FREE core. A host almost always needs the same figures outside the ticket (to
+  gate a submit, to draw the plan on the chart, to log what was risked), and two implementations
+  of one calculation is exactly how a ticket ends up disagreeing with the chart next to it.
+  `bracketCoherent` catches the failure the ratio cannot show: both legs are measured absolute,
+  so a long whose stop sits above its entry produces a perfectly healthy-looking 1:2.
+
+- **`ChartWorkspace`** — the chart-and-panel layout, measured on the CONTAINER rather than the
+  viewport, because a workspace inside a split pane is narrow no matter how wide the window is.
+  Below the breakpoint the panel stacks under the chart instead of squeezing the plot past the
+  width where a candle stops being legible.
+
+### Changed
+
+- **The range strip moved from the toolbar to the bottom bar.** In the toolbar it sat among the
+  interval tabs — and those pick the width of a BAR while these pick the width of the WINDOW,
+  with "1D" and "1W" printed in both rows, in the same pill, one lit in each. A reader has no way
+  to tell which governs what they are looking at, and clicking the wrong one does something they
+  did not ask for. The bottom bar already holds the scale switches, which are the same kind of
+  control: how this chart is drawn, not what is drawn on it. The strip is now captioned `RANGE`,
+  which ends the collision outright.
+
 ## [0.8.19] - 2026-08-14
 
 ### Added
