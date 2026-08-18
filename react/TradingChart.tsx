@@ -280,6 +280,21 @@ export interface TradingChartProps {
    */
   axes?: boolean | { price?: boolean; time?: boolean };
   /**
+   * The COMPACT layout — one scrolling row of controls instead of a wrapping toolbar, touch-sized
+   * targets, and everything else behind a bottom sheet.
+   *
+   * `"auto"` (default) turns it on when the widget MEASURES under 560px, so it follows the box the
+   * chart is actually in rather than the viewport — a chart in a phone-width column on a desktop
+   * gets it too, and a tablet in landscape does not. Pass `true`/`false` to decide yourself (an
+   * app shell that already knows it is a phone; a kiosk that never is).
+   *
+   * Nothing is REMOVED in compact. The toolbar wrapped to three rows on a 360px screen and the
+   * bottom bar to two — roughly 150px of chrome above and below a plot that had about 300px to
+   * work with, which is the chart losing an argument with its own controls. The same actions are
+   * all still there; they are reached by scrolling one row or opening one sheet.
+   */
+  compact?: boolean | "auto";
+  /**
    * An instrument identity block above the toolbar — ticker, name, sector, and whatever reference
    * stats the host actually has. Omitted entirely when absent, so a chart embedded in a page that
    * already names the instrument doesn't say it twice.
@@ -399,6 +414,7 @@ const DEFAULT_TF: TimeframeOption[] = [
   { label: "1m", value: "1m" },
   { label: "5m", value: "5m" },
   { label: "15m", value: "15m" },
+  { label: "30m", value: "30m" },
   { label: "1H", value: "1h" },
   { label: "4H", value: "4h" },
   { label: "1D", value: "1d" },
@@ -611,6 +627,7 @@ export function TradingChart({
   session,
   utc,
   projection,
+  compact: compactProp = "auto",
   ranges,
   range: rangeProp,
   settings,
@@ -634,7 +651,19 @@ export function TradingChart({
   onReadyRef.current = onReady;
   const hoveredRef = useRef(false); // pointer is over the plot → chart keyboard shortcuts are live
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; price: number } | null>(null); // right-click menu
-  const [narrow, setNarrow] = useState(false); // compact layout on small screens (phones)
+  const [narrow, setNarrow] = useState(false); // measured: the widget's own box is phone-width
+  // The bottom sheet that carries everything the compact row does not: drawing tools, chart type,
+  // compare, replay, the scale switches and every display toggle. One surface, two entry points
+  // (the toolbar's ⋯ and the bottom bar's ⚙) — so a host that hides the toolbar entirely, as a
+  // glance view does, still leaves every control reachable.
+  // `"menu"` is the catch-all sheet; the others are single-purpose pickers. They are sheets and
+  // not dropdowns in compact for a mechanical reason as well as a design one: the compact bars
+  // SCROLL horizontally, and an absolutely-positioned menu inside a scrolling box is clipped by
+  // it. Rendering at the root, over everything, is the only place a menu can actually be seen.
+  const [sheet, setSheet] = useState<null | "menu" | "interval" | "type" | "compare" | { setting: string }>(null);
+  const sheetIs = (k: string) => (typeof sheet === "string" ? sheet === k : false);
+  /** The host `settings` group whose options are open in the sheet, if any. */
+  const sheetSetting = sheet !== null && typeof sheet === "object" ? sheet.setting : null;
   const [resolution, setResolution] = useState(initialRes ?? "1d");
   const [type, setType] = useState<SeriesType>(chartType ?? "candles");
   const [tool, setTool] = useState<Tool>("cross");
@@ -645,6 +674,10 @@ export function TradingChart({
   const [active, setActive] = useState<string[]>(indicators ?? ["ma50"]);
   const [indInputs, setIndInputs] = useState<Record<string, number[]>>({}); // per-indicator period overrides
   const [indHidden, setIndHidden] = useState<string[]>([]); // active-but-hidden indicators (eye toggled off)
+  // `"auto"` follows the MEASURED width, not the viewport — a chart in a phone-width column on a
+  // desktop is just as cramped as one on a phone, and a tablet in landscape is not cramped at all.
+  const compact = compactProp === "auto" ? narrow : compactProp;
+
   // Which preset is applied. The strip drew every button in the inactive style, so a reader
   // could pick a range and get no confirmation that anything had been selected — and coming
   // back to the chart later, no way to tell what window they were looking at.
@@ -920,7 +953,7 @@ export function TradingChart({
         case "?": setShortcuts((s) => !s); break;
         case "d": case "D": setDataWindow((d) => !d); break;
         case "g": case "G": setGuided((v) => !v); break;
-        case "Escape": setShortcuts(false); setIndModal(false); setBarMenu(null); break;
+        case "Escape": setShortcuts(false); setIndModal(false); setBarMenu(null); setSheet(null); break;
         default: return;
       }
       e.preventDefault();
@@ -1248,6 +1281,27 @@ export function TradingChart({
   };
   const removeCompare = (s: string) => setCompares((cs) => cs.filter((c) => c.symbol !== s));
 
+  /**
+   * The intervals actually on offer.
+   *
+   * `timeframes` was destructured and then never read: the interval tabs came from `TF_ORDER`
+   * and the ▾ menu from `INTERVAL_GROUPS`, both hard-coded — so a host that carefully declared
+   * the four resolutions its backend serves still got a menu offering nine, five of which
+   * return nothing. That is the same dead-button problem `ranges` documents, and it is worse in
+   * compact, where this sheet is the ONLY interval control on the screen.
+   *
+   * A host value the widget has no group for is still offered, under "Other" — the host serves
+   * it, so refusing to list it would be the widget overruling the feed about its own data.
+   */
+  const tfSet = useMemo(() => new Set(timeframes.map((t) => t.value)), [timeframes]);
+  const tfLabel = (v: string) => timeframes.find((t) => t.value === v)?.label ?? TF_SHORT[v] ?? v;
+  const intervalGroups = useMemo(() => {
+    const known = new Set(INTERVAL_GROUPS.flatMap((g) => g.items.map((i) => i.v)));
+    const groups = INTERVAL_GROUPS.map((g) => ({ label: g.label, items: g.items.filter((i) => tfSet.has(i.v)) })).filter((g) => g.items.length > 0);
+    const extra = timeframes.filter((t) => !known.has(t.value));
+    return extra.length ? [...groups, { label: "Other", items: extra.map((t) => ({ v: t.value, l: t.label })) }] : groups;
+  }, [tfSet, timeframes]);
+
   // Visible-window presets. Measured back from the newest BAR, not from today: a symbol that
   // stopped trading a month ago would otherwise get an empty window for "1M".
   const rangeList = ranges === false ? [] : (ranges ?? DEFAULT_RANGES);
@@ -1421,7 +1475,9 @@ export function TradingChart({
     fontFamily: th.font,
     flexWrap: "wrap",
   };
-  const btn = (on = false): CSSProperties => ({ display: "inline-flex", alignItems: "center", gap: 5, height: 29, padding: "0 10px", border: `1px solid ${on ? soft(th.line, 40) : soft(th.border, 65)}`, borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 600, background: on ? soft(th.line, 16) : soft(th.paneBackground, 88), color: on ? th.line : th.text, boxShadow: on ? `0 3px 10px ${soft(th.line, 20)}` : "0 1px 2px rgba(0,0,0,0.08)", transition: "background 140ms ease, color 140ms ease, border-color 140ms ease, box-shadow 140ms ease", whiteSpace: "nowrap" });
+  // 32px in compact — the minimum a thumb can hit reliably. A 29px control is fine under a
+  // cursor and a coin-toss under a finger, and a mis-tap on a chart toolbar changes the chart.
+  const btn = (on = false): CSSProperties => ({ display: "inline-flex", alignItems: "center", gap: 5, height: compact ? 32 : 29, padding: compact ? "0 9px" : "0 10px", border: `1px solid ${on ? soft(th.line, 40) : soft(th.border, 65)}`, borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 600, background: on ? soft(th.line, 16) : soft(th.paneBackground, 88), color: on ? th.line : th.text, boxShadow: on ? `0 3px 10px ${soft(th.line, 20)}` : "0 1px 2px rgba(0,0,0,0.08)", transition: "background 140ms ease, color 140ms ease, border-color 140ms ease, box-shadow 140ms ease", whiteSpace: "nowrap" });
   const railBtn = (on = false): CSSProperties => ({ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, border: `1px solid ${on ? soft(th.line, 40) : soft(th.border, 65)}`, borderRadius: 10, cursor: "pointer", fontSize: 14, background: on ? soft(th.line, 16) : soft(th.paneBackground, 88), color: on ? th.line : th.text, boxShadow: on ? `0 3px 10px ${soft(th.line, 20)}` : "0 1px 2px rgba(0,0,0,0.08)", transition: "background 140ms ease, color 140ms ease, border-color 140ms ease, box-shadow 140ms ease" });
   const surface: CSSProperties = {
     background: `color-mix(in srgb, ${th.paneBackground} 94%, transparent)`,
@@ -1442,18 +1498,35 @@ export function TradingChart({
    * chart's. Slightly wider minimum than `clusterBtn` so "YTD" and "Market" do not sit in a
    * ragged row where the longest label reads as the most important.
    */
-  const barBtn = (on = false): CSSProperties => ({ ...clusterBtn(on), minWidth: 34, height: 23, padding: "0 8px", fontFamily: th.monoFont, letterSpacing: "0.01em" });
+  const barBtn = (on = false): CSSProperties => ({ ...clusterBtn(on), minWidth: compact ? 38 : 34, height: compact ? 28 : 23, padding: "0 8px", fontFamily: th.monoFont, letterSpacing: "0.01em", flexShrink: 0 });
   /** The small uppercase caption that NAMES a bottom-bar group ("Range", "Prices"). */
-  const barCap: CSSProperties = { fontSize: 9.5, fontFamily: th.monoFont, textTransform: "uppercase", letterSpacing: "0.09em", color: th.text, padding: "0 2px 0 0", whiteSpace: "nowrap" };
+  const barCap: CSSProperties = { fontSize: 9.5, fontFamily: th.monoFont, textTransform: "uppercase", letterSpacing: "0.09em", color: th.text, padding: "0 2px 0 0", whiteSpace: "nowrap", flexShrink: 0 };
   /** A muted fact printed after a group — an option's `note`. */
-  const barNote: CSSProperties = { fontSize: 10.5, fontFamily: th.monoFont, color: th.text, whiteSpace: "nowrap", opacity: 0.85 };
+  const barNote: CSSProperties = { fontSize: 10.5, fontFamily: th.monoFont, color: th.text, whiteSpace: "nowrap", opacity: 0.85, flexShrink: 0 };
   /** A bottom-bar menu. Opens UPWARD: this bar is the last row of the widget, and a menu
       dropping below it lands outside a host that clips its own corners. */
   const barMenuBox: CSSProperties = { position: "absolute", bottom: 28, left: 0, zIndex: 24, borderRadius: 10, padding: 5, minWidth: 178, ...surface };
   const barDivider = <span style={{ width: 1, height: 15, background: th.border, margin: "0 4px", flexShrink: 0 }} />;
 
+  /**
+   * A row that SCROLLS rather than wraps.
+   *
+   * Wrapping is the wrong failure mode for chart chrome: every row it adds is a row the plot
+   * loses, silently, and the reader cannot get it back. Scrolling costs nothing vertically and
+   * a phone user already knows how to swipe a strip of chips. The scrollbar itself is hidden
+   * (see the scoped style block) — on a touch screen it is decoration.
+   */
+  const scrollRow: CSSProperties = compact
+    ? { display: "flex", alignItems: "center", flexWrap: "nowrap", overflowX: "auto", overflowY: "hidden", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }
+    : { display: "flex", alignItems: "center", flexWrap: "wrap" };
+  /** A square, touch-sized toolbar button — the compact row is icons, not words. */
+  const iconBtn = (on = false): CSSProperties => ({ ...btn(on), width: 34, padding: 0, justifyContent: "center", flexShrink: 0, gap: 3 });
+  const sheetSection: CSSProperties = { fontSize: 10, textTransform: "uppercase", letterSpacing: "0.07em", color: th.text, padding: "10px 10px 5px" };
+  /** A sheet row. Taller than a desktop menu item for the same reason `btn` is. */
+  const sheetItem = (on = false): CSSProperties => ({ ...item(on), minHeight: 40, padding: "8px 10px", fontSize: 13.5, borderRadius: 9 });
+
   return (
-    <div ref={rootRef} data-aurovie-chart style={{ display: "flex", flexDirection: "column", height, background: th.background, border: frame ? `1px solid ${th.border}` : "none", borderRadius: frame ? 14 : 0, overflow: "hidden", boxShadow: frame ? "0 1px 2px rgba(0,0,0,0.2), 0 8px 28px rgba(0,0,0,0.16)" : "none", transition: "background 220ms ease, border-color 220ms ease" }}>
+    <div ref={rootRef} data-aurovie-chart style={{ position: "relative", display: "flex", flexDirection: "column", height, background: th.background, border: frame ? `1px solid ${th.border}` : "none", borderRadius: frame ? 14 : 0, overflow: "hidden", boxShadow: frame ? "0 1px 2px rgba(0,0,0,0.2), 0 8px 28px rgba(0,0,0,0.16)" : "none", transition: "background 220ms ease, border-color 220ms ease" }}>
       {/*
         Keyboard focus. This widget is built from inline styles, and inline styles cannot
         express a pseudo-class — so until now NOTHING in it had a focus ring: a keyboard user
@@ -1472,24 +1545,30 @@ export function TradingChart({
           border-radius: 4px;
         }
         [data-aurovie-chart] canvas:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+        [data-aurovie-chart] ::-webkit-scrollbar { width: 0; height: 0; }
         @media (prefers-reduced-motion: reduce) {
           [data-aurovie-chart] * { transition-duration: 1ms !important; animation-duration: 1ms !important; }
         }
       `}</style>
       {header && (
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 14, padding: "11px 13px", borderBottom: `1px solid ${th.border}`, fontFamily: th.font }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: compact ? 8 : 14, padding: compact ? "8px 10px" : "11px 13px", borderBottom: `1px solid ${th.border}`, fontFamily: th.font }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.01em", color: th.textStrong }}>{header.ticker ?? symbol}</span>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 7, flexWrap: "wrap" }}>
+              <span style={{ fontSize: compact ? 13 : 14, fontWeight: 700, letterSpacing: "0.01em", color: th.textStrong }}>{header.ticker ?? symbol}</span>
               {header.sector && <span style={{ fontSize: 11.5, color: th.line }}>{header.sector}</span>}
             </div>
-            {header.name && (
+            {/* The full name is the first thing to go on a phone: it is the one line the reader
+                already knows (they navigated here by it), and it costs a whole row beside a
+                price they came to read. Still rendered wide, where the row is free. */}
+            {header.name && !compact && (
               <div style={{ marginTop: 2, fontSize: 12, color: th.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{header.name}</div>
             )}
+            {/* Reference stats SCROLL rather than wrap in compact — four of them wrap to two
+                rows on a 360px screen, and every wrapped row comes out of the plot. */}
             {header.stats && header.stats.length > 0 && (
-              <div style={{ marginTop: 3, display: "flex", flexWrap: "wrap", gap: "2px 10px", fontFamily: th.monoFont, fontSize: 10.5, color: th.text }}>
+              <div style={{ marginTop: 3, ...scrollRow, gap: compact ? 10 : undefined, columnGap: 10, rowGap: 2, fontFamily: th.monoFont, fontSize: 10.5, color: th.text }}>
                 {header.stats.map((s, i) => (
-                  <span key={`${s.label ?? ""}${i}`}>
+                  <span key={`${s.label ?? ""}${i}`} style={{ flexShrink: 0 }}>
                     {s.label ? `${s.label} ` : ""}
                     {s.value}
                   </span>
@@ -1501,7 +1580,7 @@ export function TradingChart({
             <div style={{ textAlign: "right" }}>
               {header.priceSlot ?? (
                 <>
-                  <div style={{ fontFamily: th.monoFont, fontSize: 21, fontWeight: 600, lineHeight: 1.15, color: th.textStrong }}>{header.price!.value}</div>
+                  <div style={{ fontFamily: th.monoFont, fontSize: compact ? 18 : 21, fontWeight: 600, lineHeight: 1.15, color: th.textStrong }}>{header.price!.value}</div>
                   {header.price!.change && (
                     <div style={{ fontFamily: th.monoFont, fontSize: 12.5, color: header.price!.direction === "down" ? th.down : th.up }}>{header.price!.change}</div>
                   )}
@@ -1512,17 +1591,61 @@ export function TradingChart({
           {header.metrics && <div style={{ flexBasis: "100%", minWidth: 0 }}>{header.metrics}</div>}
         </div>
       )}
-      {toolbar && (
+      {/* THE COMPACT TOOLBAR — one row, five controls, never wrapping.
+          The full bar carries fourteen controls with words on them; on a 360px screen that is
+          three wrapped rows before the chart gets a pixel. Here the four decisions a reader
+          actually makes on a phone stay on the surface — interval, series, studies, draw — and
+          the ⋯ opens the sheet that holds literally everything else. Nothing is lost; it is one
+          tap further away, which is the trade a phone is asking for. */}
+      {toolbar && compact && (
+        <div style={{ ...bar, display: "flex", flexWrap: "nowrap", alignItems: "center", gap: 5, padding: "6px 8px" }}>
+          {/* The controls scroll; the ⋯ does NOT. A "more" button that can itself be scrolled
+              out of sight is the one control that must never move — on a chart type with the
+              box-size stepper the row does overflow, and that is exactly when a reader needs
+              the way into everything else. */}
+          <div style={{ ...scrollRow, flex: "1 1 auto", minWidth: 0, gap: 5 }}>
+          <button style={{ ...btn(sheetIs("interval")), gap: 3, flexShrink: 0 }} aria-haspopup="dialog" aria-expanded={sheetIs("interval")} title="Bar interval" onClick={() => setSheet(sheetIs("interval") ? null : "interval")}>
+            {tfLabel(resolution)} ▾
+          </button>
+          <button style={iconBtn(sheetIs("type"))} aria-haspopup="dialog" aria-expanded={sheetIs("type")} title={`Series — ${TYPES.find((x) => x.t === type)?.label}`} aria-label="Chart type" onClick={() => setSheet(sheetIs("type") ? null : "type")}>
+            <Icon name={type} size={16} />
+          </button>
+          <button style={{ ...iconBtn(active.length > 0), width: active.length ? 44 : 34 }} title="Indicators" aria-label="Indicators" onClick={() => setIndModal(true)}>
+            <Icon name="indicators" size={15} />
+            {active.length > 0 && <span style={{ fontSize: 11, fontWeight: 700 }}>{active.length}</span>}
+          </button>
+          {/* The drawing RAIL is a fixed column taken from the plot — on a phone that is a
+              third of the width for a tool most sessions never touch. The tools live in the
+              sheet instead; this button goes straight to them. */}
+          {drawingRail && (
+            <button style={iconBtn(tool !== "cross")} title="Drawing tools" aria-label="Drawing tools" onClick={() => setSheet(sheetIs("menu") ? null : "menu")}>
+              <Icon name="brush" size={15} />
+            </button>
+          )}
+          {RESAMPLED.includes(type) && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 2, flexShrink: 0 }} title="Box / reversal size">
+              <button style={{ ...iconBtn(false), width: 30, fontSize: 16 }} onClick={() => stepBox(-1)} aria-label="Finer box">−</button>
+              <button style={{ ...btn(box > 0), gap: 4 }} onClick={() => setBox(0)}>{box > 0 ? "Box" : "Auto"} {fmtBox(boxEff)}</button>
+              <button style={{ ...iconBtn(false), width: 30, fontSize: 16 }} onClick={() => stepBox(1)} aria-label="Coarser box">+</button>
+            </span>
+          )}
+          </div>
+          <button style={{ ...iconBtn(sheetIs("menu")), marginLeft: 4 }} title="More — tools, scale, display" aria-label="More controls" aria-expanded={sheetIs("menu")} onClick={() => setSheet(sheetIs("menu") ? null : "menu")}>
+            ⋯
+          </button>
+        </div>
+      )}
+      {toolbar && !compact && (
         <div style={bar}>
           {/* The header already names the instrument; repeating it here (and again in the
               on-canvas legend) prints the same ticker three times in one screenful. */}
-          {!narrow && !header && <span style={{ fontSize: 13, fontWeight: 700, color: th.textStrong, marginRight: 4 }}>{symbol}</span>}
+          {!compact && !header && <span style={{ fontSize: 13, fontWeight: 700, color: th.textStrong, marginRight: 4 }}>{symbol}</span>}
           {/* The drawing switch belongs in the HORIZONTAL bar, not inside the rail it controls.
               A switch that lives in the thing it hides cannot turn that thing back on, so the
               collapsed rail had to keep rendering just to hold its own button — which meant a
               column of empty gutter down the left of every chart whose owner was not drawing.
               Out here the rail can disappear completely, and the plot gets the width back. */}
-          {drawingRail && !narrow && !guided && (
+          {drawingRail && !compact && !guided && (
             <button
               title={railOpen ? "Hide drawing tools" : "Drawing tools"}
               aria-label={railOpen ? "Hide drawing tools" : "Show drawing tools"}
@@ -1540,16 +1663,16 @@ export function TradingChart({
             </button>
           )}
           <span style={{ display: "inline-flex", gap: 1, alignItems: "center" }}>
-            {(narrow ? [resolution] : TF_ORDER.filter((v) => favTf.includes(v) || v === resolution)).map((v) => (
+            {TF_ORDER.filter((v) => tfSet.has(v) && (favTf.includes(v) || v === resolution)).map((v) => (
               <button key={v} style={btn(v === resolution)} onClick={() => pickRes(v)}>
-                {TF_SHORT[v] ?? v}
+                {tfLabel(v)}
               </button>
             ))}
             <span style={{ position: "relative" }}>
               <button style={{ ...btn(menu === "interval"), padding: "0 6px" }} title="Intervals" aria-label="Intervals" onClick={() => setMenu(menu === "interval" ? null : "interval")}>▾</button>
               {menu === "interval" && (
                 <div style={menuBox}>
-                  {INTERVAL_GROUPS.map((g, gi) => (
+                  {intervalGroups.map((g, gi) => (
                     <div key={g.label}>
                       {gi > 0 && <div style={{ height: 1, background: th.border, margin: "4px 0" }} />}
                       <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text, padding: "2px 8px 4px" }}>{g.label}</div>
@@ -1696,7 +1819,7 @@ export function TradingChart({
         </div>
       )}
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-        {drawingRail && railOpen && !narrow && !guided && (
+        {drawingRail && railOpen && !compact && !guided && (
           <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "5px 4px", background: th.paneBackground, borderRight: `1px solid ${th.border}` }}>
             {RAIL_GROUPS.map((g) => {
               const cur = groupTool[g.id] ?? g.tools[0].t;
@@ -1792,6 +1915,7 @@ export function TradingChart({
             if (cmdOpen) setCmdOpen(false);
             if (dockEditOpen) setDockEditOpen(false);
             if (barMenu) setBarMenu(null);
+            if (sheet) setSheet(null);
             if (ctxMenu) setCtxMenu(null);
           }}
         >
@@ -2044,7 +2168,22 @@ export function TradingChart({
           )}
           <div ref={hostRef} style={{ position: "absolute", inset: 0 }} />
           {overlay}
-          {guided && (
+          {/* WHICH TOOL IS ARMED, and the way out of it.
+              On a desktop the rail answers both: the active tool is lit in a column that is
+              always on screen. Compact has no rail, so an armed trend line was invisible state
+              — every subsequent tap on the plot drew a line the reader did not ask for, with no
+              affordance anywhere saying why. This is that affordance, and tapping it disarms. */}
+          {compact && tool !== "cross" && (
+            <button
+              onClick={(e) => { e.stopPropagation(); applyTool("cross"); }}
+              title="Back to the crosshair"
+              style={{ position: "absolute", left: 8, top: 8, zIndex: 8, display: "inline-flex", alignItems: "center", gap: 6, height: 28, padding: "0 10px", borderRadius: 999, border: `1px solid ${soft(th.line, 45)}`, background: `color-mix(in srgb, ${th.line} 18%, ${th.paneBackground})`, color: th.line, fontFamily: th.font, fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}
+            >
+              {hasIcon(tool) && <Icon name={tool} size={13} />}
+              {TOOL_LABEL[tool] ?? tool} ✕
+            </button>
+          )}
+          {guided && !compact && (
             <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", left: 8, bottom: 28, zIndex: 7, display: "flex", alignItems: "center", gap: 5, padding: "5px 6px", borderRadius: 12, ...surface }}>
               {quickActions
                 .slice()
@@ -2269,7 +2408,11 @@ export function TradingChart({
           {indModal && (
             <>
               <div onClick={() => setIndModal(false)} style={{ position: "absolute", inset: 0, zIndex: 30, background: "rgba(0,0,0,0.4)" }} />
-              <div style={{ position: "absolute", zIndex: 31, top: 12, right: 12, width: 326, maxHeight: "82%", display: "flex", flexDirection: "column", borderRadius: 10, overflow: "hidden", ...surface }}>
+              {/* COMPACT: a bottom sheet, like every other secondary surface here, rather than a
+                  326px panel pinned to a 360px screen's top-right corner with 12px of margin —
+                  which reads as a window that failed to fit rather than a designed one, and puts
+                  a scrolling list under the reader's reach instead of over their thumb. */}
+              <div style={{ position: "absolute", zIndex: 31, ...(compact ? { left: 0, right: 0, bottom: 0, maxHeight: "76%", borderRadius: "16px 16px 0 0" } : { top: 12, right: 12, width: 326, maxHeight: "82%", borderRadius: 10 }), display: "flex", flexDirection: "column", overflow: "hidden", ...surface }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderBottom: `1px solid ${th.border}` }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: th.textStrong, fontFamily: th.font }}>Indicators</span>
                   <button onClick={() => setIndModal(false)} style={{ border: "none", background: "transparent", color: th.text, cursor: "pointer", fontSize: 16, lineHeight: 1 }}>
@@ -2372,7 +2515,11 @@ export function TradingChart({
           and the settings gear are chart-wide switches, not annotations on a price — they
           belong in chrome. As a real bar they also stop colliding with the axis corner, the
           countdown and anything the host draws in `overlay`. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 3, flexWrap: "wrap", padding: "5px 8px", borderTop: `1px solid ${th.border}`, background: th.paneBackground }}>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: compact ? "nowrap" : "wrap", gap: 3, padding: compact ? "6px 8px" : "5px 8px", borderTop: `1px solid ${th.border}`, background: th.paneBackground }}>
+        {/* Compact scrolls the range strip and the host's settings and keeps the right-hand
+            cluster pinned; `display: contents` leaves the wide bar exactly as it was, with its
+            children wrapping in the parent. */}
+        <div style={compact ? { ...scrollRow, flex: "1 1 auto", minWidth: 0, gap: 3 } : { display: "contents" }}>
         {/* RANGE — the visible WINDOW, beside the scale switches that draw it.
             Not in the toolbar, where it sat among the interval tabs: those pick the width of a
             BAR and these pick the width of the WINDOW, and with "1D" and "1W" printed in both
@@ -2381,7 +2528,7 @@ export function TradingChart({
         {rangeList.length > 0 && (
           <>
             <span style={barCap} aria-hidden>Range</span>
-            <span role="group" aria-label="Visible range" style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+            <span role="group" aria-label="Visible range" style={{ display: "inline-flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
               {rangeList.map((r) => (
                 <button
                   key={r.label}
@@ -2402,22 +2549,25 @@ export function TradingChart({
           const cur = g.options.find((o) => o.value === g.value);
           const asMenu = (g.as ?? (g.options.length > 4 ? "menu" : "segmented")) === "menu";
           return (
-            <span key={g.id} style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+            <span key={g.id} style={{ display: "inline-flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
               {rangeList.length > 0 || (settings ?? [])[0] !== g ? barDivider : null}
               {g.label && <span style={barCap} aria-hidden>{g.label}</span>}
               {asMenu ? (
                 <span style={{ position: "relative", display: "inline-flex" }}>
                   <button
-                    style={{ ...barBtn(barMenu === g.id), gap: 4 }}
+                    style={{ ...barBtn(barMenu === g.id || sheetSetting === g.id), gap: 4 }}
                     title={g.title ?? g.label}
                     aria-label={g.label ?? g.id}
-                    aria-expanded={barMenu === g.id}
+                    aria-expanded={compact ? sheetSetting === g.id : barMenu === g.id}
                     disabled={g.disabled}
-                    onClick={() => setBarMenu((m) => (m === g.id ? null : g.id))}
+                    // Compact opens the SHEET: this bar scrolls horizontally, and a menu
+                    // absolutely positioned inside a scrolling box is clipped by it — the
+                    // options would render, unreachably, exactly out of sight.
+                    onClick={() => (compact ? setSheet(sheetSetting === g.id ? null : { setting: g.id }) : setBarMenu((m) => (m === g.id ? null : g.id)))}
                   >
                     {cur?.label ?? g.value} ▾
                   </button>
-                  {barMenu === g.id && (
+                  {!compact && barMenu === g.id && (
                     <div style={barMenuBox} role="listbox" aria-label={g.label ?? g.id}>
                       {g.options.map((o) => (
                         <button
@@ -2439,7 +2589,7 @@ export function TradingChart({
                   )}
                 </span>
               ) : (
-                <span role="group" aria-label={g.label ?? g.id} title={g.title} style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+                <span role="group" aria-label={g.label ?? g.id} title={g.title} style={{ display: "inline-flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
                   {g.options.map((o) => (
                     <button
                       key={o.value}
@@ -2469,10 +2619,18 @@ export function TradingChart({
             `settings` covers the common case (a choice between options) in the widget's own
             vocabulary; this slot stays for everything that is not one. */}
         {footer}
-        <span style={{ marginLeft: "auto" }} />
+        </div>
+        <span style={{ marginLeft: "auto", flexShrink: 0 }} />
             {!view.atRealtime && (
-              <button style={clusterBtn(false)} title="Scroll to the latest bar" aria-label="Go to realtime" onClick={() => chartRef.current?.scrollToRealtime()}>»|</button>
+              <button style={{ ...clusterBtn(false), height: compact ? 28 : 23, flexShrink: 0 }} title="Scroll to the latest bar" aria-label="Go to realtime" onClick={() => chartRef.current?.scrollToRealtime()}>»|</button>
             )}
+            {/* COMPACT: six switches become one. The scale modes, the profile, the data window
+                and every display toggle live in the sheet, and this is the way in — which also
+                means a host that hides the toolbar still leaves all of them reachable. */}
+            {compact ? (
+              <button style={{ ...clusterBtn(sheetIs("menu")), height: 28, minWidth: 30, flexShrink: 0 }} title="Chart settings" aria-label="Chart settings" aria-expanded={sheetIs("menu")} onClick={() => setSheet(sheetIs("menu") ? null : "menu")}>⚙</button>
+            ) : (
+              <>
             <button style={clusterBtn(vpvr)} title="Visible-range volume profile" aria-label="Visible-range volume profile" onClick={() => setVpvr((v) => !v)}>
               <Icon name="vpvr" size={13} />
             </button>
@@ -2529,6 +2687,8 @@ export function TradingChart({
                 </div>
               )}
             </span>
+              </>
+            )}
       </div>
 
       {/* THE SCRIPT EDITOR IS A SIBLING OF THE PLOT, NOT A SHEET OVER IT.
@@ -2624,6 +2784,229 @@ export function TradingChart({
               dirty={loadedSaved ? scriptSrc !== loadedSaved.source : undefined}
             />
           )}
+
+      {/* ——— THE COMPACT SHEET ———
+          Everything the one-row toolbar does not carry, on one surface: the drawing tools, the
+          rest of the chart controls, the scale switches and every display toggle.
+
+          It is a SHEET rather than a set of dropdowns because a phone has no room for a menu
+          that opens beside its button, and because the alternative — a ⚙ popover for display, a
+          ⋯ popover for actions, a rail for tools — is three surfaces a reader has to learn the
+          locations of. Here there is one place where "the rest of it" lives, reachable from the
+          toolbar's ⋯ and from the bottom bar's ⚙ alike, so hiding the toolbar (as a glance view
+          does) costs nothing. */}
+      {compact && sheet && (
+        <>
+          <div onClick={() => setSheet(null)} style={{ position: "absolute", inset: 0, zIndex: 30, background: "rgba(0,0,0,0.45)" }} />
+          <div
+            role="dialog"
+            aria-label={sheetIs("interval") ? "Bar interval" : sheetIs("type") ? "Chart type" : sheetIs("compare") ? "Compare" : "Chart controls"}
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 31,
+              // Capped so the sheet can never swallow the chart it is configuring — a reader
+              // toggling the grid or picking a tool wants to see what it did.
+              maxHeight: "72%",
+              overflowY: "auto",
+              borderTopLeftRadius: 16,
+              borderTopRightRadius: 16,
+              padding: "6px 6px 10px",
+              ...surface,
+            }}
+          >
+            {/* The grab handle. It does not drag — it says "this came up from the bottom and
+                goes back down", which is the whole grammar of a sheet. */}
+            <div style={{ display: "flex", alignItems: "center", padding: "6px 4px 2px" }}>
+              <span style={{ width: 34, height: 4, borderRadius: 999, background: soft(th.text, 40), margin: "0 auto" }} />
+              <button onClick={() => setSheet(null)} aria-label="Close" style={{ position: "absolute", right: 10, top: 8, width: 30, height: 30, border: "none", borderRadius: 8, background: soft(th.text, 12), color: th.textStrong, cursor: "pointer", fontSize: 14 }}>✕</button>
+            </div>
+
+            {/* INTERVAL — the width of a BAR. */}
+            {sheetIs("interval") &&
+              intervalGroups.map((g) => (
+                <div key={g.label}>
+                  <div style={sheetSection}>{g.label}</div>
+                  {g.items.map((it) => (
+                    <button key={it.v} style={sheetItem(it.v === resolution)} onClick={() => { pickRes(it.v); setSheet(null); }}>
+                      <span style={{ width: 16, color: it.v === resolution ? th.line : th.text }}>{it.v === resolution ? "✓" : ""}</span> {it.l}
+                    </button>
+                  ))}
+                </div>
+              ))}
+
+            {/* SERIES */}
+            {sheetIs("type") &&
+              TYPE_GROUPS.map((g) => (
+                <div key={g.label}>
+                  <div style={sheetSection}>{g.label}</div>
+                  {g.ts.map((tt) => (
+                    <button key={tt} style={sheetItem(tt === type)} onClick={() => { setType(tt); setSheet(null); }}>
+                      <Icon name={tt} size={17} /> {TYPES.find((y) => y.t === tt)!.label}
+                    </button>
+                  ))}
+                </div>
+              ))}
+
+            {/* COMPARE — the same control the wide toolbar carries in a dropdown. The lookup is
+                still the DATAFEED's; a feed without `searchSymbols` gets a plain box where
+                typing a ticker works, exactly as on a desktop. */}
+            {sheetIs("compare") && (
+              <>
+                <div style={sheetSection}>Compare</div>
+                <div style={{ display: "flex", gap: 5, padding: "0 6px 6px" }}>
+                  <input
+                    value={cmpInput}
+                    onChange={(e) => setCmpInput(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => { if (e.key === "Enter") addCompare(); }}
+                    placeholder="Symbol…"
+                    autoFocus
+                    style={{ flex: 1, minWidth: 0, fontFamily: th.font, fontSize: 15, height: 38, padding: "0 10px", borderRadius: 9, border: `1px solid ${th.border}`, background: th.background, color: th.textStrong }}
+                  />
+                  <button onClick={() => addCompare()} style={{ ...btn(true), height: 38, padding: "0 14px" }}>Add</button>
+                </div>
+                {cmpHits.map((h) => (
+                  <button key={h.symbol} style={sheetItem(false)} onClick={() => addCompare(h.symbol)}>
+                    <span style={{ fontWeight: 700, minWidth: 54 }}>{h.symbol}</span>
+                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, color: th.text }}>{h.description}</span>
+                  </button>
+                ))}
+                {compares.map((c) => (
+                  <div key={c.symbol} style={{ ...sheetItem(false), justifyContent: "space-between" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ width: 10, height: 10, borderRadius: 2, background: c.color }} />
+                      {c.symbol}
+                    </span>
+                    <button onClick={() => removeCompare(c.symbol)} aria-label={`Remove ${c.symbol}`} style={{ border: "none", background: "transparent", color: th.text, cursor: "pointer", fontSize: 16, padding: "0 6px" }}>✕</button>
+                  </div>
+                ))}
+              </>
+            )}
+
+            {/* A HOST `settings` GROUP whose options did not fit the bottom bar as a row. */}
+            {typeof sheet === "object" &&
+              (settings ?? [])
+                .filter((g) => g.id === sheet.setting)
+                .map((g) => (
+                  <div key={g.id}>
+                    <div style={sheetSection}>{g.label ?? g.id}</div>
+                    {g.options.map((o) => (
+                      <button key={o.value} style={sheetItem(o.value === g.value)} onClick={() => { g.onChange(o.value); setSheet(null); }}>
+                        <span style={{ width: 16, color: o.value === g.value ? th.line : th.text }}>{o.value === g.value ? "✓" : ""}</span>
+                        <span style={{ fontFamily: th.monoFont, fontWeight: 600, minWidth: 44 }}>{o.label}</span>
+                        {o.title && <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, color: th.text }}>{o.title}</span>}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+
+            {/* TOOLS — the drawing rail, flattened. The rail is a fixed COLUMN taken from the
+                plot, which is the wrong shape for a phone; the tools themselves are fine. */}
+            {sheetIs("menu") && drawingRail && (
+              <>
+                <div style={sheetSection}>Tools</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))", gap: 5, padding: "0 6px" }}>
+                  {RAIL_GROUPS.flatMap((g) => g.tools).map((t) => (
+                    <button
+                      key={t.t}
+                      aria-pressed={tool === t.t}
+                      title={t.label}
+                      style={{ ...btn(tool === t.t), height: 52, flexDirection: "column", gap: 3, padding: "0 4px", fontSize: 9.5, lineHeight: 1.15, textAlign: "center", whiteSpace: "normal" }}
+                      onClick={() => { applyTool(t.t); setSheet(null); }}
+                    >
+                      {hasIcon(t.t) ? <Icon name={t.t} size={17} /> : <span style={{ fontSize: 15 }} aria-hidden>{t.glyph}</span>}
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 5, padding: "6px 6px 0" }}>
+                  <button style={{ ...btn(magnet), flex: 1 }} onClick={() => setMagnetOn((v) => !v)}>Magnet {magnet ? "on" : "off"}</button>
+                  <button style={{ ...btn(false), flex: 1 }} onClick={() => { applyTool("clear"); setSheet(null); }}>Clear drawings</button>
+                </div>
+              </>
+            )}
+
+            {sheetIs("menu") && (
+              <>
+            {/* CHART — the toolbar actions that did not fit the row. */}
+            <div style={sheetSection}>Chart</div>
+            <button style={sheetItem(active.length > 0)} onClick={() => { setIndModal(true); setSheet(null); }}>
+              <Icon name="indicators" size={16} /> Indicators{active.length ? ` (${active.length})` : ""}
+            </button>
+            <button style={sheetItem(compares.length > 0)} onClick={() => setSheet("compare")}>
+              <Icon name="compare" size={16} /> Compare{compares.length ? ` (${compares.length})` : ""}
+            </button>
+            {onRunScript && (
+              <button style={sheetItem(scriptOpen || scripts.length > 0)} onClick={() => { setScriptOpen((o) => !o); setSheet(null); }}>
+                <Icon name="script" size={16} /> Script editor
+              </button>
+            )}
+            <button style={sheetItem(!!replay)} onClick={() => { replay ? chartRef.current?.exitReplay() : chartRef.current?.armReplay(); setSheet(null); }}>
+              <Icon name="replay" size={14} /> {replay ? "Exit replay" : "Bar replay"}
+            </button>
+            <button style={sheetItem(false)} onClick={() => { saveImage(); setSheet(null); }}>
+              <Icon name="save" size={15} /> Save chart image
+            </button>
+            <button style={sheetItem(cmdOpen)} onClick={() => { setCmdOpen(true); setCmdQuery(""); setSheet(null); }}>
+              <span style={{ width: 16 }} /> Command launcher — search every action
+            </button>
+            <button style={sheetItem(false)} onClick={() => { setGuided((v) => !v); setSheet(null); }}>
+              <span style={{ width: 16 }} /> {guided ? "Switch to Pro mode" : "Switch to Guided mode"}
+            </button>
+
+            {/* SCALE — Auto / Log / % are chart-wide switches; on a wide bar they are three
+                pills, here they are a segmented row that fits one thumb. */}
+            <div style={sheetSection}>Price scale</div>
+            <div style={{ display: "flex", gap: 5, padding: "0 6px" }}>
+              <button style={{ ...btn(scaleMode === "normal"), flex: 1, justifyContent: "center" }} onClick={() => setScaleMode("normal")}>Linear</button>
+              <button style={{ ...btn(scaleMode === "log"), flex: 1, justifyContent: "center" }} onClick={() => setScaleMode("log")}>Log</button>
+              <button style={{ ...btn(scaleMode === "percent"), flex: 1, justifyContent: "center" }} onClick={() => setScaleMode("percent")}>Percent</button>
+            </div>
+            <div style={{ display: "flex", gap: 5, padding: "6px 6px 0" }}>
+              <button style={{ ...btn(false), flex: 1, justifyContent: "center" }} onClick={() => { chartRef.current?.resetPriceScale(); setSheet(null); }}>Auto-scale</button>
+              <button style={{ ...btn(false), flex: 1, justifyContent: "center" }} onClick={() => { chartRef.current?.fit(); setSheet(null); }}>Fit all</button>
+              <button style={{ ...btn(false), flex: 1, justifyContent: "center" }} onClick={() => { chartRef.current?.scrollToRealtime(); setSheet(null); }}>Latest</button>
+            </div>
+
+            {/* DISPLAY — the same toggles the ⚙ popover carries on a desktop, at thumb size. */}
+            <div style={sheetSection}>Display</div>
+            {(
+              [
+                ["Grid lines", gridOn, setGridOn],
+                ["Volume pane", showVol, setShowVol],
+                ["Last-price line", priceLineOn, setPriceLineOn],
+                ["Bar-close countdown", countdown, setCountdown],
+                ["Symbol watermark", watermark, setWatermarkOn],
+                ["Extended-hours shading", sessions, setSessions],
+                ["Stop / target levels", levelsOn, setLevelsOn],
+                ["Volume profile", vpvr, setVpvr],
+                ["Data window", dataWindow, setDataWindow],
+              ] as const
+            ).map(([label, val, set]) => (
+              <button key={label} style={sheetItem(false)} onClick={() => set((v) => !v)} aria-pressed={val}>
+                <span style={{ width: 16, color: val ? th.line : th.text }}>{val ? "✓" : ""}</span> {label}
+              </button>
+            ))}
+            <button style={sheetItem(false)} onClick={() => { chartRef.current?.resetPanes(); setSheet(null); }}>
+              <span style={{ width: 16 }} /> Reset pane heights
+            </button>
+
+            {/* THEME last: it is the one setting a reader changes once and never again. */}
+            <div style={sheetSection}>Theme</div>
+            <div style={{ ...scrollRow, gap: 5, padding: "0 6px 4px" }}>
+              {["Auto", ...THEME_NAMES].map((n) => (
+                <button key={n} style={{ ...btn(n === themeName), flexShrink: 0 }} onClick={() => setThemeName(n)}>
+                  {n === "Auto" ? "Auto (app)" : n}
+                </button>
+              ))}
+            </div>
+              </>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

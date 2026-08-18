@@ -4,7 +4,7 @@
 // no order state, talks to no network, and knows nothing about a broker. The host owns the state,
 // the pre-trade gate and the submit; this owns the layout, the arithmetic that is pure derivation
 // from the numbers on screen, and the job of never showing a figure it cannot stand behind.
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { DARK, LIGHT } from "../src/util";
 import type { Theme } from "../src/types";
 import { HAS_LIMIT, HAS_TIF, HAS_TRIGGER, bracketCoherent, deriveTicketRisk } from "../src/ticket";
@@ -90,8 +90,12 @@ export interface TradeTicketProps {
   themeOverride?: Partial<Theme>;
   /** Draw the card border and radius. `false` renders flush, for a ticket docked into host chrome. */
   frame?: boolean;
-  /** Tighter spacing, for a ticket squeezed beside a chart rather than given its own column. */
-  compact?: boolean;
+  /**
+   * Tighter spacing, for a ticket squeezed beside a chart rather than given its own column.
+   * `"auto"` measures the ticket's own box and compacts under 380px — the width it gets when a
+   * `ChartWorkspace` stacks it under the chart on a phone.
+   */
+  compact?: boolean | "auto";
   /** ISO currency for money figures. Omitted, figures are printed as plain numbers. */
   currency?: string;
   locale?: string;
@@ -145,12 +149,23 @@ export function TradeTicket({
   theme = "dark",
   themeOverride,
   frame = true,
-  compact = false,
+  compact: compactProp = false,
   currency,
   locale,
   width,
 }: TradeTicketProps) {
   const th: Theme = useMemo(() => ({ ...(theme === "light" ? LIGHT : DARK), ...(themeOverride ?? {}) }), [theme, themeOverride]);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [tight, setTight] = useState(false);
+  useEffect(() => {
+    if (compactProp !== "auto") return;
+    const el = rootRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([e]) => setTight(e.contentRect.width > 0 && e.contentRect.width < 380));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [compactProp]);
+  const compact = compactProp === "auto" ? tight : compactProp;
   const soft = (c: string, pct: number) => `color-mix(in srgb, ${c} ${pct}%, transparent)`;
   const buying = order.side === "buy";
   const sideColor = buying ? th.up : th.down;
@@ -210,6 +225,7 @@ export function TradeTicket({
 
   return (
     <div
+      ref={rootRef}
       data-aurovie-ticket
       style={{
         display: "flex",

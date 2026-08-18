@@ -138,6 +138,28 @@ Three props open that up without giving up the batteries-included widget:
 one). Host series are the host's to invalidate — the widget clears the *editor's* scripts when the
 symbol or interval changes, but never yours, since only you know whether you have recomputed.
 
+### On a phone
+
+The widget measures its own box and switches to a **compact layout** under 560px — one scrolling
+row of controls instead of a wrapping toolbar, 32px touch targets, and everything else on one
+bottom sheet reached from the toolbar's `⋯` or the bottom bar's `⚙`:
+
+```tsx
+<TradingChart
+  datafeed={feed}
+  symbol="AAPL"
+  // "auto" (default) measures the CONTAINER, not the viewport. Force it either way if you know
+  // better than the measurement — an app shell that is always a phone, a kiosk that never is.
+  compact="auto"
+  // Give it real height: the reclaimed chrome goes to the plot, which is a flex child.
+  height="100dvh"
+/>
+```
+
+Nothing is removed in compact — the drawing tools, compare, replay, the script editor, the scale
+switches and every display toggle all live in the sheet. Because the sheet is reachable from the
+bottom bar too, `toolbar={false}` still leaves every control available.
+
 ### The bottom bar: ranges and host settings
 
 Range presets and the scale switches live together in the chart's **bottom bar** — they are the

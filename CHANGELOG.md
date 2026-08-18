@@ -4,6 +4,47 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] - 2026-08-18
+
+### Added
+
+- **A real compact layout for phones — `compact`.** `"auto"` (the default) turns it on when the
+  widget MEASURES under 560px, so it follows the box the chart is actually in rather than the
+  viewport: a chart in a phone-width column on a desktop gets it, a tablet in landscape does not.
+  `true`/`false` decide it yourself.
+
+  The old narrow handling hid the ticker and collapsed the interval tabs and stopped there. That
+  left thirteen labelled controls in a wrapping toolbar — three rows on a 360px screen — over a
+  bottom bar that wrapped to two, which is roughly 140px of chrome around a plot that had about
+  300px to work with. The chart was losing an argument with its own controls.
+
+  Compact is **one row that scrolls instead of wrapping**, because wrapping is the wrong failure
+  mode for chart chrome: every row it adds comes out of the plot, silently, and the reader cannot
+  get it back. On the surface stay the four decisions a phone user actually makes — interval,
+  series, indicators, draw. Everything else moves into **one bottom sheet**, reachable from the
+  toolbar's `⋯` and from the bottom bar's `⚙` alike, so a host that hides the toolbar entirely
+  (a glance view) still leaves every control reachable. Nothing is removed; the reclaimed height
+  goes straight to the plot, which is a flex child.
+
+  Also in compact: 32px touch targets (a 29px control is fine under a cursor and a coin-toss
+  under a finger, and a mis-tap on a chart toolbar changes the chart); the drawing rail's tools
+  in the sheet rather than a fixed column taken from a 360px plot; the indicator picker as a
+  sheet instead of a 326px panel pinned to a 360px screen's corner; and an **armed-tool chip**
+  over the plot — without a rail, an armed trend line was invisible state, and every subsequent
+  tap drew a line the reader did not ask for with nothing on screen saying why.
+
+  `TradeTicket` takes `compact: "auto"` on the same terms, measured at 380px.
+
+### Fixed
+
+- **`timeframes` was accepted and then ignored.** The interval tabs came from a hard-coded
+  `TF_ORDER` and the ▾ menu from a hard-coded `INTERVAL_GROUPS`, so a host that carefully
+  declared the four resolutions its backend serves still got a menu offering nine — five of them
+  returning nothing. Same dead-button problem `ranges` documents, and worse in compact, where
+  that list is the only interval control on the screen. A host value the widget has no group for
+  is now listed under "Other" rather than dropped: the host serves it, so hiding it would be the
+  widget overruling the feed about its own data.
+
 ## [0.9.0] - 2026-08-18
 
 ### Added
