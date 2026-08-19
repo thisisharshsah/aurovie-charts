@@ -3,7 +3,7 @@
 // definitions: NaN padding, the exact formulas, and the invariants each family must hold.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange, fitBarCount, visibleIndexRange } from "./util.ts";
+import { ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange, fitBarCount, visibleIndexRange, THEMES } from "./util.ts";
 import type { AxisSlot } from "./util.ts";
 import type { Bar } from "./types.ts";
 
@@ -272,4 +272,37 @@ test("visibleIndexRange clamps both ends into the series", () => {
   assert.deepEqual(visibleIndexRange(10, -4, 99), [0, 9]);
   assert.deepEqual(visibleIndexRange(10, 2, 7), [2, 7]);
   assert.deepEqual(visibleIndexRange(1, 0, 0), [0, 0]);
+});
+
+// ---- theme legibility ------------------------------------------------------
+// A CONTRAST FLOOR, not a taste check.
+//
+// Every preset shipped a grid between 1.13:1 and 1.28:1 against its own background, and a
+// hairline under about 1.35:1 is not a faint line — it is no line at all. The plot read as a
+// void: nothing to place a candle against and no sense of where the chart surface even was. The
+// failure is invisible to the person editing the palette, because they are picking colours next
+// to each other rather than measuring one on the other, which is why it survived nine themes.
+const srgb = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+function luminance(hex: string): number {
+  const h = hex.replace("#", "");
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+  return 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
+}
+function contrast(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+test("every theme's grid and border are actually visible on their own background", () => {
+  for (const [name, t] of Object.entries(THEMES)) {
+    // Only the hex presets are measurable here; a host override may legitimately use any syntax.
+    if (!/^#[0-9a-f]{6}$/i.test(t.background)) continue;
+    const grid = contrast(t.grid, t.background);
+    const border = contrast(t.border, t.background);
+    assert.ok(grid >= 1.4, `${name}: grid is ${grid.toFixed(2)}:1 against its background — below the 1.4 floor`);
+    assert.ok(border >= 1.65, `${name}: border is ${border.toFixed(2)}:1 against its background — below the 1.65 floor`);
+    // …and still SECONDARY to the series. A grid that competes with the candles is its own bug.
+    assert.ok(grid <= 2.2, `${name}: grid is ${grid.toFixed(2)}:1 — loud enough to compete with the bars`);
+    assert.ok(border >= grid, `${name}: chrome hairlines must not be fainter than the grid`);
+  }
 });

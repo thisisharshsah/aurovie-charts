@@ -224,16 +224,37 @@ function drawPosition(dc: DrawCtx, d: Drawing, sel: boolean, side: "LONG" | "SHO
   const tPct = pct(target.price);
   const sPct = pct(stop.price);
   const cx = lo + w / 2;
-  chip(dc, cx, yT, `+${rewardDist.toFixed(dec)} (${tPct >= 0 ? "+" : "−"}${Math.abs(tPct).toFixed(2)}%) · ${money(rewardAmt)}`, green);
-  chip(dc, cx, yS, `−${riskDist.toFixed(dec)} (${sPct >= 0 ? "+" : "−"}${Math.abs(sPct).toFixed(2)}%) · ${money(DEFAULT_RISK)}`, red);
+  // SIGNED FROM THE GEOMETRY, and NAMED.
+  //
+  // The Δ used to be a hard-coded `+` on the target and `−` on the stop — the signs a canonical
+  // plan happens to have — while the % beside it was computed from where the levels actually
+  // sit. Drag them the other way and the chip contradicted itself in the same breath:
+  // "+535.6 (−40.89%)". Both halves now come from the same subtraction, so they cannot disagree.
+  //
+  // And each carries its noun. "−731.2 (+55.82%) · $1,000" does not say what it is a distance
+  // TO; the reader was left to infer target from stop by colour alone, which is exactly the
+  // inference that goes wrong on a plan drawn the unusual way round.
+  const signed = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(dec)}`;
+  const signedPct = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2)}%`;
+  chip(dc, cx, yT, `Target ${signed(target.price - entry.price)} (${signedPct(tPct)}) · ${money(rewardAmt)}`, green);
+  chip(dc, cx, yS, `Stop ${signed(stop.price - entry.price)} (${signedPct(sPct)}) · ${money(DEFAULT_RISK)}`, red);
   const qtyStr = qty >= 10 ? String(Math.round(qty)) : qty.toFixed(2);
   const last = dc.lastPrice;
   if (last > 0) {
     const pnl = (side === "LONG" ? last - entry.price : entry.price - last) * qty;
     const bg = pnl >= 0 ? green : red;
-    chip2(dc, cx, yE, `Open PnL: ${pnl >= 0 ? "+" : "−"}$${Math.abs(pnl).toFixed(2)} · Qty: ${qtyStr}`, `${side} · Risk/reward: ${rr.toFixed(2)}`, bg);
+    chip2(dc, cx, yE, `${side} · Entry ${entry.price.toFixed(dec)} · Qty ${qtyStr}`, `Open P&L ${pnl >= 0 ? "+" : "−"}$${Math.abs(pnl).toFixed(2)} · R/R ${rr.toFixed(2)}`, bg);
   } else {
-    chip(dc, cx, yE, `${side} · R/R ${rr.toFixed(2)} · Qty ${qtyStr} (risk ${money(DEFAULT_RISK)})`, theme.textStrong);
+    chip(dc, cx, yE, `${side} · Entry ${entry.price.toFixed(dec)} · Qty ${qtyStr} · R/R ${rr.toFixed(2)}`, theme.textStrong);
+  }
+  // A PLAN DRAWN THE WRONG WAY ROUND says nothing about itself otherwise. Both legs are measured
+  // as distances, so a long taking profit BELOW its entry still produces a perfectly healthy
+  // R/R and two confident chips — the one failure the numbers cannot show. Colour cannot carry
+  // it either: the zones are painted by role, so the green sits under the target wherever the
+  // target is. It has to be said in words.
+  const inverted = side === "LONG" ? target.price < entry.price || stop.price > entry.price : target.price > entry.price || stop.price < entry.price;
+  if (inverted) {
+    chip(dc, cx, yE + 26, `⚠ Inverted for a ${side.toLowerCase()} — target and stop are on the wrong sides`, red);
   }
   if (sel) drawHandles(dc, [[x1, yE], [x2, yT], [dc.xOfTime(stop.time), yS]]);
 }

@@ -4,6 +4,55 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.10.1] - 2026-08-18
+
+### Fixed
+
+- **A lit range pill did not mean the chart was showing that range.** The strip moved the
+  viewport on a CLICK and nowhere else — so a host that persists the choice (which is exactly
+  what `range` is for) opened with "YTD" lit over whatever the engine's initial fit produced: at
+  most 160 bars, about eight months of daily data. On an instrument with seven years of history
+  every bar was loaded and pannable, and the chart still was not showing the window it claimed
+  to be. A control that reports a state it is not in is worse than no control, because nothing
+  invites the reader to doubt it.
+
+  The active preset is now re-asserted after each series load (`setData` refits, which would
+  otherwise discard it) and whenever a controlled `range` changes. Not on every tick: a poll that
+  appends a bar must not yank a viewport the reader has since panned. Uncontrolled charts are
+  unchanged — the click stays the only trigger, and a chart that has never had a preset picked
+  still opens on the engine's fit.
+
+- **Every theme drew a grid nobody could see.** Measured against its own background, each preset
+  sat between 1.13:1 and 1.28:1 — and a hairline under about 1.35:1 is not a faint line, it is no
+  line at all. The plot read as a void: nothing to place a candle against, no sense of where the
+  chart surface even was. Grid is now ~1.45:1 and border ~1.70:1 in all nine presets, light ones
+  included, and a test holds the floor — the failure is invisible to whoever edits the palette,
+  because they are picking colours beside each other rather than measuring one on the other, which
+  is how it survived nine themes.
+
+- **The long/short position tool contradicted itself.** The Δ carried a hard-coded `+` on the
+  target and `−` on the stop — the signs a canonical plan happens to have — while the percentage
+  beside it was computed from where the levels actually sit. Drag them the other way and one chip
+  read `+535.6 (−40.89%)`: plus points, minus percent, in the same breath. Both halves now come
+  from the same subtraction.
+
+  Each chip also names itself (`Target …`, `Stop …`). `−731.2 (+55.82%) · $1,000` never said what
+  it was a distance *to*, leaving target and stop to be told apart by colour — exactly the
+  inference that fails on a plan drawn the unusual way round. And a plan that IS drawn the wrong
+  way round now says so: both legs are measured as distances, so a long taking profit below its
+  entry still produces a healthy-looking R/R and two confident chips, and the zones are painted by
+  role so the green sits under the target wherever the target is. Nothing in the geometry could
+  report it; it had to be words.
+
+### Changed
+
+- **The bottom bar drops its `RANGE` and `PRICES` captions.** A row reading
+  `RANGE 1D 1W 1M … PRICES Market Adjusted` spends two words telling a reader what a lit pill
+  already tells them — the selected option *is* the label. `ChartSettingGroup.label` is unchanged
+  and still does real work where it is not redundant: the group's accessible name, the compact
+  sheet's title, the tooltip. The buttons also take the toolbar's shape and lit state rather than
+  a smaller cousin's, since matching that selected-option look is the whole mechanism.
+
 ## [0.10.0] - 2026-08-18
 
 ### Added

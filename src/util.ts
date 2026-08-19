@@ -3,11 +3,20 @@ import type { Bar, Theme } from "./types";
 // ---- themes ---------------------------------------------------------------
 // Sensible built-in dark/light themes. A host can override any field (e.g. map to design
 // tokens) via ChartOptions.theme.
+//
+// GRID AND BORDER CARRY A CONTRAST FLOOR. Every preset used to draw its grid between
+// 1.13:1 and 1.28:1 against its own background — the light ones included — and a hairline under about 1.35:1 is not a
+// faint line, it is no line at all. The plot read as a black void: no structure to place a
+// candle against, no sense of where the chart surface even was. Grid now sits at ~1.45:1 and
+// border at ~1.70:1 in every dark preset, so the grid is visible but still clearly secondary
+// to the series, and chrome hairlines stay a step stronger than the grid, which is the
+// ordering a reader expects. Change these and re-check the ratio; do not eyeball them on a
+// bright monitor.
 export const DARK: Theme = {
   background: "#0e0e10",
   paneBackground: "#0e0e10",
-  grid: "#1c1c20",
-  border: "#2a2a30",
+  grid: "#303033",
+  border: "#3a3a3f",
   text: "#8a8a92",
   textStrong: "#e8e8ea",
   crosshair: "#6b6b74",
@@ -27,8 +36,8 @@ export const LIGHT: Theme = {
   ...DARK,
   background: "#ffffff",
   paneBackground: "#ffffff",
-  grid: "#eceef1",
-  border: "#d7dae0",
+  grid: "#d4d6d9",
+  border: "#c4c6cc",
   text: "#6b7280",
   textStrong: "#111318",
   crosshair: "#9aa0aa",
@@ -52,8 +61,8 @@ export const THEMES: Record<string, Theme> = {
     ...DARK,
     background: "#0b1020",
     paneBackground: "#0b1020",
-    grid: "#161d33",
-    border: "#26314f",
+    grid: "#2a3045",
+    border: "#303b57",
     text: "#7d89b0",
     textStrong: "#e6ebff",
     crosshair: "#5a6890",
@@ -71,7 +80,7 @@ export const THEMES: Record<string, Theme> = {
     ...DARK,
     background: "#06171c",
     paneBackground: "#06171c",
-    grid: "#0f2e35",
+    grid: "#1a383e",
     border: "#1b4e58",
     text: "#6fa3ab",
     textStrong: "#e6fbff",
@@ -90,8 +99,8 @@ export const THEMES: Record<string, Theme> = {
     ...DARK,
     background: "#131315",
     paneBackground: "#131315",
-    grid: "#232327",
-    border: "#33333a",
+    grid: "#323236",
+    border: "#3c3c43",
     text: "#8a8a92",
     textStrong: "#f2f2f4",
     crosshair: "#5f5f68",
@@ -109,8 +118,8 @@ export const THEMES: Record<string, Theme> = {
     ...DARK,
     background: "#000000",
     paneBackground: "#000000",
-    grid: "#0e1a0e",
-    border: "#173417",
+    grid: "#212c21",
+    border: "#1f3b1f",
     text: "#4f9f57",
     textStrong: "#c6ffc6",
     crosshair: "#2f7f37",
@@ -128,8 +137,8 @@ export const THEMES: Record<string, Theme> = {
     ...DARK,
     background: "#f6f0e2",
     paneBackground: "#f6f0e2",
-    grid: "#e7ddc7",
-    border: "#d6cab0",
+    grid: "#d2c9b5",
+    border: "#c4b9a2",
     text: "#8a7d63",
     textStrong: "#3a3327",
     crosshair: "#a99a7d",
@@ -147,8 +156,8 @@ export const THEMES: Record<string, Theme> = {
     ...DARK,
     background: "#282a36",
     paneBackground: "#282a36",
-    grid: "#373844",
-    border: "#44475a",
+    grid: "#42434e",
+    border: "#4a4d5f",
     text: "#6272a4",
     textStrong: "#f8f8f2",
     crosshair: "#6272a4",
@@ -166,7 +175,7 @@ export const THEMES: Record<string, Theme> = {
     ...DARK,
     background: "#002b36",
     paneBackground: "#002b36",
-    grid: "#073642",
+    grid: "#1a4651",
     border: "#586e75",
     text: "#657b83",
     textStrong: "#839496",

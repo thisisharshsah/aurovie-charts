@@ -386,7 +386,14 @@ export interface ChartSettingOption {
  */
 export interface ChartSettingGroup {
   id: string;
-  /** Small uppercase caption before the buttons — "Prices", "Session". Omitted renders none. */
+  /**
+   * The group's NAME — its accessible label, the sheet's title in compact, and the tooltip.
+   *
+   * Not painted as a caption in the bar. A row reading `RANGE 1D 1W 1M … PRICES Market Adjusted`
+   * spends two words telling a reader what a lit pill already tells them: the selected option IS
+   * the label. The words survive where they still do work — for a screen reader, which cannot
+   * see the highlight, and at the top of the compact sheet, which has no row context at all.
+   */
   label?: string;
   value: string;
   options: ChartSettingOption[];
@@ -1002,9 +1009,13 @@ export function TradingChart({
         if (!alive) return;
         setLoading(false);
         chart.setData(res.bars, res.dataVersion);
-        setLatest(res.bars[res.bars.length - 1] ?? null);
+        const newest = res.bars[res.bars.length - 1] ?? null;
+        setLatest(newest);
         setBoxEff(chart.getBrickSize()); // auto box depends on the freshly loaded data
         chart.setDrawings(loadDrawings(symbol)); // restore this symbol's saved drawings
+        // `setData` fits the series afresh, which would silently discard the range the strip is
+        // still showing as selected — so the active preset is re-asserted over the new bars.
+        rangeApplyRef.current(activeRangeRef.current, newest?.time);
       })
       .catch(() => {
         if (!alive) return;
@@ -1305,19 +1316,59 @@ export function TradingChart({
   // Visible-window presets. Measured back from the newest BAR, not from today: a symbol that
   // stopped trading a month ago would otherwise get an empty window for "1M".
   const rangeList = ranges === false ? [] : (ranges ?? DEFAULT_RANGES);
-  const pickRange = (r: RangePreset) => {
+  /**
+   * Put a range preset on the viewport.
+   *
+   * `newest` is passed explicitly by the loader, which knows the last bar before `latest` state
+   * has caught up — measuring back from `Date.now()` for an instrument that stopped trading a
+   * month ago would open on an empty window.
+   */
+  const applyRangeWindow = (label: string | null | undefined, newest?: number) => {
+    if (!label) return;
+    const r = rangeList.find((x) => x.label === label);
+    const c = chartRef.current;
+    if (!r || !c) return;
     // Resolved HERE, not when the list was built: a `days` thunk exists precisely because the
     // answer changes with the clock, and a page left open overnight would otherwise keep
     // measuring "year to date" from yesterday's boundary.
     const days = typeof r.days === "function" ? r.days() : r.days;
-    const c = chartRef.current;
-    if (c) {
-      if (days == null) c.fit();
-      else c.showSince((latest?.time ?? Math.floor(Date.now() / 1000)) - days * 86400);
-    }
+    if (days == null) c.fit();
+    else c.showSince((newest ?? latest?.time ?? Math.floor(Date.now() / 1000)) - days * 86400);
+  };
+  const pickRange = (r: RangePreset) => {
+    applyRangeWindow(r.label);
     setOwnRange(r.label);
     onRangeChange?.(r);
   };
+  /**
+   * Read by the LOADER, which must not take this as a dependency — the applier closes over fresh
+   * props every render, and putting it in the load effect's deps would refetch the series on
+   * every render instead of on a symbol or interval change.
+   */
+  const rangeApplyRef = useRef(applyRangeWindow);
+  rangeApplyRef.current = applyRangeWindow;
+  /** Same reason: the loader needs the CURRENT selection without depending on it. */
+  const activeRangeRef = useRef(activeRange);
+  activeRangeRef.current = activeRange;
+
+  /**
+   * A LIT PILL MUST BE TRUE.
+   *
+   * The strip only ever moved the viewport on a CLICK, so a host that persists the choice —
+   * which is exactly what the `range` prop is for — opened with "YTD" lit over whatever window
+   * the engine's initial fit happened to produce (at most 160 bars, about eight months of daily
+   * data). Seven years of history were loaded and reachable; the chart simply was not showing
+   * the window it claimed to be. A control that reports a state it is not in is worse than no
+   * control, because the reader has no reason to doubt it.
+   *
+   * Applied on a controlled change and after each series load. NOT on every tick: a poll that
+   * appends a bar must not yank a viewport the reader has since panned.
+   */
+  useEffect(() => {
+    if (rangeProp === undefined) return; // uncontrolled: the click is the only trigger, as before
+    applyRangeWindow(rangeProp);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the applier is intentionally not a dep
+  }, [rangeProp]);
 
   // Compare-box suggestions. The DATAFEED owns symbol lookup — the widget still never fetches — so a
   // feed that implements `searchSymbols` gets a picker and one that doesn't gets a plain input where
@@ -1492,15 +1543,13 @@ export function TradingChart({
   const legBtn: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 15, height: 15, padding: 0, border: "none", borderRadius: 4, cursor: "pointer", fontSize: 11, lineHeight: 1, background: soft(th.text, 22), color: th.textStrong, fontFamily: th.font };
   const clusterBtn = (on = false): CSSProperties => ({ height: 23, minWidth: 23, padding: "0 7px", border: `1px solid ${on ? soft(th.line, 45) : th.border}`, borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: th.font, background: on ? `color-mix(in srgb, ${th.line} 20%, ${th.paneBackground})` : `color-mix(in srgb, ${th.paneBackground} 88%, transparent)`, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", color: on ? th.line : th.text, display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.28)", transition: "background 140ms ease, color 140ms ease, border-color 140ms ease" });
   /**
-   * A bottom-bar control. The RANGE strip and every host `settings` group wear this, which is
-   * the whole point of declaring them: beside the scale switches they are the same object, so
-   * the bar reads as one row of chart settings instead of the host's buttons parked next to the
-   * chart's. Slightly wider minimum than `clusterBtn` so "YTD" and "Market" do not sit in a
+   * A bottom-bar control. The range strip and every host `settings` group wear this — and it is
+   * deliberately the TOOLBAR's shape and lit state, not a smaller cousin: the selected option is
+   * what tells a reader what the group is, so it has to look like every other selected option on
+   * the chart. Slightly wider minimum than `clusterBtn` so "YTD" and "Market" do not sit in a
    * ragged row where the longest label reads as the most important.
    */
-  const barBtn = (on = false): CSSProperties => ({ ...clusterBtn(on), minWidth: compact ? 38 : 34, height: compact ? 28 : 23, padding: "0 8px", fontFamily: th.monoFont, letterSpacing: "0.01em", flexShrink: 0 });
-  /** The small uppercase caption that NAMES a bottom-bar group ("Range", "Prices"). */
-  const barCap: CSSProperties = { fontSize: 9.5, fontFamily: th.monoFont, textTransform: "uppercase", letterSpacing: "0.09em", color: th.text, padding: "0 2px 0 0", whiteSpace: "nowrap", flexShrink: 0 };
+  const barBtn = (on = false): CSSProperties => ({ ...clusterBtn(on), minWidth: compact ? 38 : 34, height: compact ? 28 : 24, padding: "0 9px", borderRadius: 8, fontFamily: th.monoFont, letterSpacing: "0.01em", flexShrink: 0, background: on ? soft(th.line, 16) : "transparent", borderColor: on ? soft(th.line, 40) : soft(th.border, 65), boxShadow: "none" });
   /** A muted fact printed after a group — an option's `note`. */
   const barNote: CSSProperties = { fontSize: 10.5, fontFamily: th.monoFont, color: th.text, whiteSpace: "nowrap", opacity: 0.85, flexShrink: 0 };
   /** A bottom-bar menu. Opens UPWARD: this bar is the last row of the widget, and a menu
@@ -2526,8 +2575,6 @@ export function TradingChart({
             rows, in the same pill, one lit in each, a reader has no way to tell which governs
             what they are looking at. */}
         {rangeList.length > 0 && (
-          <>
-            <span style={barCap} aria-hidden>Range</span>
             <span role="group" aria-label="Visible range" style={{ display: "inline-flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
               {rangeList.map((r) => (
                 <button
@@ -2541,7 +2588,6 @@ export function TradingChart({
                 </button>
               ))}
             </span>
-          </>
         )}
 
         {/* HOST SETTINGS — declared, so the widget draws them. See `ChartSettingGroup`. */}
@@ -2551,7 +2597,6 @@ export function TradingChart({
           return (
             <span key={g.id} style={{ display: "inline-flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
               {rangeList.length > 0 || (settings ?? [])[0] !== g ? barDivider : null}
-              {g.label && <span style={barCap} aria-hidden>{g.label}</span>}
               {asMenu ? (
                 <span style={{ position: "relative", display: "inline-flex" }}>
                   <button
