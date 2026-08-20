@@ -8,6 +8,7 @@ import { Icon, hasIcon } from "./icons";
 import { ScriptEditor, type ScriptError, type ScriptPreset, type ScriptScorecard, type ScriptSweep, type SavedStrategy } from "./ScriptEditor";
 import { parseScriptDraw, type ScriptRender } from "../src/script";
 import { DARK, LIGHT, THEMES, THEME_NAMES, SERIES_PALETTE as IND_PALETTE, SWATCHES, CMP_COLORS, CHIP_INK } from "../src/util";
+import { CONTROL, ELEV, RADIUS, SHEET, SPACE, TYPE, WEIGHT, Z, cx, themeVars } from "./ui";
 import type { Drawing } from "../src/drawings";
 import type { Bar, DataFeed, IndicatorInstance, LegendValue, PriceLine, Projection, ScaleMode, SeriesType, SessionSpec, Theme, ChartMarker, TradePlan } from "../src/types";
 
@@ -1509,53 +1510,52 @@ export function TradingChart({
   // is what is on screen, so switching candles→line under "auto" has to follow.
   const legendShows = legendMode === "auto" ? (OHLC_SERIES.includes(type) ? "ohlc" : "price") : legendMode;
   const up = legendBar ? legendBar.close >= legendBar.open : true;
-  const barCol = up ? th.up : th.down;
+  const barCol = up ? "var(--ac-up-ink)" : "var(--ac-down-ink)";
 
   // ---- styles (theme-driven so the whole widget is self-consistent + reusable) ----
-  // The chrome is built from three ideas: a hairline that is never pure border colour (it fades),
-  // control surfaces that only appear on state (transparent at rest → tinted when active), and one
-  // shared elevation ramp for every floating surface.
+  // ---- CHROME ----
+  // Every control below returns PROPS, not a style object: a className that carries colour, state
+  // and elevation from the stylesheet, plus an optional inline style for LAYOUT ONLY. That split
+  // is what finally gives the widget hover and press states — an inline `background` outranks a
+  // class's `:hover`, so as long as a control painted itself inline it could never light up under
+  // the pointer, no matter what CSS was added alongside. See `react/ui.ts`.
+  type P = { className: string; style?: CSSProperties };
   const soft = (c: string, pct: number) => `color-mix(in srgb, ${c} ${pct}%, transparent)`;
   const bar: CSSProperties = {
     display: "flex",
     alignItems: "center",
-    gap: 6,
-    padding: "7px 10px",
-    background: `radial-gradient(120% 90% at 50% -20%, ${soft(th.line, 8)}, transparent), linear-gradient(${soft(th.textStrong, 3)}, transparent), ${th.paneBackground}`,
-    borderBottom: `1px solid ${soft(th.border, 75)}`,
-    fontFamily: th.font,
+    gap: SPACE[2],
+    padding: `${SPACE[2]}px ${SPACE[3]}px`,
+    borderBottom: `1px solid var(--ac-line-soft)`,
+    background: "var(--ac-pane)",
     flexWrap: "wrap",
   };
-  // 32px in compact — the minimum a thumb can hit reliably. A 29px control is fine under a
-  // cursor and a coin-toss under a finger, and a mis-tap on a chart toolbar changes the chart.
-  const btn = (on = false): CSSProperties => ({ display: "inline-flex", alignItems: "center", gap: 5, height: compact ? 32 : 29, padding: compact ? "0 9px" : "0 10px", border: `1px solid ${on ? soft(th.line, 40) : soft(th.border, 65)}`, borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 600, background: on ? soft(th.line, 16) : soft(th.paneBackground, 88), color: on ? th.line : th.text, boxShadow: on ? `0 3px 10px ${soft(th.line, 20)}` : "0 1px 2px rgba(0,0,0,0.08)", transition: "background 140ms ease, color 140ms ease, border-color 140ms ease, box-shadow 140ms ease", whiteSpace: "nowrap" });
-  const railBtn = (on = false): CSSProperties => ({ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, border: `1px solid ${on ? soft(th.line, 40) : soft(th.border, 65)}`, borderRadius: 10, cursor: "pointer", fontSize: 14, background: on ? soft(th.line, 16) : soft(th.paneBackground, 88), color: on ? th.line : th.text, boxShadow: on ? `0 3px 10px ${soft(th.line, 20)}` : "0 1px 2px rgba(0,0,0,0.08)", transition: "background 140ms ease, color 140ms ease, border-color 140ms ease, box-shadow 140ms ease" });
-  const surface: CSSProperties = {
-    background: `color-mix(in srgb, ${th.paneBackground} 94%, transparent)`,
-    backdropFilter: "blur(10px)",
-    WebkitBackdropFilter: "blur(10px)",
-    border: `1px solid ${th.border}`,
-    boxShadow: `0 12px 34px rgba(0,0,0,0.45), 0 0 0 1px ${soft(th.textStrong, 4)}`,
-  };
-  const menuBox: CSSProperties = { position: "absolute", top: 36, zIndex: 20, borderRadius: 12, padding: 6, minWidth: 158, ...surface };
-  const item = (on = false): CSSProperties => ({ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "6px 8px", border: "none", borderRadius: 6, cursor: "pointer", textAlign: "left", fontSize: 12.5, background: on ? soft(th.line, 10) : "transparent", color: on ? th.line : th.textStrong, fontFamily: th.font });
-  // small pill for the bottom-right over-chart cluster (Auto / Log / % / go-to-realtime / settings)
-  const legBtn: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 15, height: 15, padding: 0, border: "none", borderRadius: 4, cursor: "pointer", fontSize: 11, lineHeight: 1, background: soft(th.text, 22), color: th.textStrong, fontFamily: th.font };
-  const clusterBtn = (on = false): CSSProperties => ({ height: 23, minWidth: 23, padding: "0 7px", border: `1px solid ${on ? soft(th.line, 45) : th.border}`, borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: th.font, background: on ? `color-mix(in srgb, ${th.line} 20%, ${th.paneBackground})` : `color-mix(in srgb, ${th.paneBackground} 88%, transparent)`, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", color: on ? th.line : th.text, display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.28)", transition: "background 140ms ease, color 140ms ease, border-color 140ms ease" });
+  /** The toolbar control. `--sm` in compact is 28px; the compact row overrides to 32 for thumbs. */
+  const btn = (on = false, style?: CSSProperties): P => ({ className: cx("ac-btn", "ac-btn--outline", on && "is-on"), style });
+  const railBtn = (on = false, style?: CSSProperties): P => ({ className: cx("ac-btn", "ac-btn--outline", "ac-btn--icon", on && "is-on"), style });
+  const surface: CSSProperties = {}; // colour + elevation now live on the `ac-surface` class
+  const menuBox: CSSProperties = { position: "absolute", top: CONTROL.lg + SPACE[1], zIndex: Z.menu, minWidth: 160 };
+  const item = (on = false, style?: CSSProperties): P => ({ className: cx("ac-item", on && "is-on"), style });
+  /** The 15px square on a legend chip (hide / remove an indicator). */
+  const legBtn: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, padding: 0, border: "none", borderRadius: RADIUS.xs, cursor: "pointer", fontSize: TYPE.xs, lineHeight: 1, background: "var(--ac-press)", color: "var(--ac-ink)", fontFamily: "var(--ac-font)" };
+  /** The bottom bar's small switches (Auto / Log / % / realtime / settings). */
+  const clusterBtn = (on = false, style?: CSSProperties): P => ({ className: cx("ac-btn", "ac-btn--xs", "ac-btn--outline", on && "is-on"), style });
   /**
    * A bottom-bar control. The range strip and every host `settings` group wear this — and it is
    * deliberately the TOOLBAR's shape and lit state, not a smaller cousin: the selected option is
    * what tells a reader what the group is, so it has to look like every other selected option on
-   * the chart. Slightly wider minimum than `clusterBtn` so "YTD" and "Market" do not sit in a
-   * ragged row where the longest label reads as the most important.
+   * the chart.
    */
-  const barBtn = (on = false): CSSProperties => ({ ...clusterBtn(on), minWidth: compact ? 38 : 34, height: compact ? 28 : 24, padding: "0 9px", borderRadius: 8, fontFamily: th.monoFont, letterSpacing: "0.01em", flexShrink: 0, background: on ? soft(th.line, 16) : "transparent", borderColor: on ? soft(th.line, 40) : soft(th.border, 65), boxShadow: "none" });
+  const barBtn = (on = false, style?: CSSProperties): P => ({
+    className: cx("ac-btn", "ac-btn--xs", "ac-btn--outline", "ac-num", on && "is-on"),
+    style: { minWidth: compact ? 40 : 36, height: compact ? CONTROL.md : CONTROL.sm, ...style },
+  });
   /** A muted fact printed after a group — an option's `note`. */
-  const barNote: CSSProperties = { fontSize: 10.5, fontFamily: th.monoFont, color: th.text, whiteSpace: "nowrap", opacity: 0.85, flexShrink: 0 };
+  const barNote: CSSProperties = { fontSize: TYPE.micro, fontFamily: "var(--ac-mono)", color: "var(--ac-text)", whiteSpace: "nowrap", flexShrink: 0 };
   /** A bottom-bar menu. Opens UPWARD: this bar is the last row of the widget, and a menu
       dropping below it lands outside a host that clips its own corners. */
-  const barMenuBox: CSSProperties = { position: "absolute", bottom: 28, left: 0, zIndex: 24, borderRadius: 10, padding: 5, minWidth: 178, ...surface };
-  const barDivider = <span style={{ width: 1, height: 15, background: th.border, margin: "0 4px", flexShrink: 0 }} />;
+  const barMenuBox: CSSProperties = { position: "absolute", bottom: CONTROL.md + SPACE[1], left: 0, zIndex: Z.menu + 4, minWidth: 180 };
+  const barDivider = <span style={{ width: 1, height: SPACE[4], background: "var(--ac-line)", margin: `0 ${SPACE[1]}px`, flexShrink: 0 }} />;
 
   /**
    * A row that SCROLLS rather than wraps.
@@ -1563,59 +1563,62 @@ export function TradingChart({
    * Wrapping is the wrong failure mode for chart chrome: every row it adds is a row the plot
    * loses, silently, and the reader cannot get it back. Scrolling costs nothing vertically and
    * a phone user already knows how to swipe a strip of chips. The scrollbar itself is hidden
-   * (see the scoped style block) — on a touch screen it is decoration.
+   * (`.ac-scroll` in the stylesheet) — on a touch screen it is decoration.
    */
   const scrollRow: CSSProperties = compact
     ? { display: "flex", alignItems: "center", flexWrap: "nowrap", overflowX: "auto", overflowY: "hidden", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }
     : { display: "flex", alignItems: "center", flexWrap: "wrap" };
   /** A square, touch-sized toolbar button — the compact row is icons, not words. */
-  const iconBtn = (on = false): CSSProperties => ({ ...btn(on), width: 34, padding: 0, justifyContent: "center", flexShrink: 0, gap: 3 });
-  const sheetSection: CSSProperties = { fontSize: 10, textTransform: "uppercase", letterSpacing: "0.07em", color: th.text, padding: "10px 10px 5px" };
+  const iconBtn = (on = false, style?: CSSProperties): P => ({ className: cx("ac-btn", "ac-btn--outline", "ac-btn--icon", on && "is-on"), style });
+  const sheetSection: CSSProperties = { padding: `${SPACE[3]}px ${SPACE[3]}px ${SPACE[1]}px` };
   /** A sheet row. Taller than a desktop menu item for the same reason `btn` is. */
-  const sheetItem = (on = false): CSSProperties => ({ ...item(on), minHeight: 40, padding: "8px 10px", fontSize: 13.5, borderRadius: 9 });
+  const sheetItem = (on = false, style?: CSSProperties): P => ({ className: cx("ac-item", "ac-item--lg", on && "is-on"), style });
 
   return (
-    <div ref={rootRef} data-aurovie-chart style={{ position: "relative", display: "flex", flexDirection: "column", height, background: th.background, border: frame ? `1px solid ${th.border}` : "none", borderRadius: frame ? 14 : 0, overflow: "hidden", boxShadow: frame ? "0 1px 2px rgba(0,0,0,0.2), 0 8px 28px rgba(0,0,0,0.16)" : "none", transition: "background 220ms ease, border-color 220ms ease" }}>
+    <div
+      ref={rootRef}
+      data-aurovie-chart
+      style={{
+        // The ONE inline colour left in the widget: the theme, as custom properties. Everything
+        // else resolves from here through the stylesheet, so a theme change is one attribute
+        // rather than several hundred re-rendered style objects.
+        ...themeVars(th),
+        position: "relative",
+        display: "flex",
+        flexDirection: "column",
+        height,
+        background: "var(--ac-bg)",
+        border: frame ? "1px solid var(--ac-line)" : "none",
+        borderRadius: frame ? RADIUS.xl : 0,
+        overflow: "hidden",
+        boxShadow: frame ? "0 1px 2px rgba(0,0,0,0.16), 0 8px 28px rgba(0,0,0,0.12)" : "none",
+        transition: "background 220ms ease, border-color 220ms ease",
+      }}
+    >
       {/*
-        Keyboard focus. This widget is built from inline styles, and inline styles cannot
-        express a pseudo-class — so until now NOTHING in it had a focus ring: a keyboard user
-        tabbing through the toolbar, the drawing rail and every menu got no indication of
-        where they were, across the whole component.
-
-        One scoped block, keyed on the root's data attribute so it cannot leak into the host
-        page. `:focus-visible` (not `:focus`) keeps the ring off mouse clicks. `currentColor`
-        rather than a theme value: every control already carries a themed colour, so the ring
-        follows the theme for free and stays visible on the light presets too.
+        ONE STYLESHEET, scoped to this root's data attribute so it cannot leak into the host page.
+        It carries every interactive state in the widget — hover, press, focus-visible, disabled —
+        none of which an inline style can express, which is why until now nothing here responded to
+        being touched. See `react/ui.ts` for the scales and the reasoning.
       */}
-      <style>{`
-        [data-aurovie-chart] :is(button,summary,input,textarea,select,[tabindex]):focus-visible {
-          outline: 2px solid currentColor;
-          outline-offset: 1px;
-          border-radius: 4px;
-        }
-        [data-aurovie-chart] canvas:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
-        [data-aurovie-chart] ::-webkit-scrollbar { width: 0; height: 0; }
-        @media (prefers-reduced-motion: reduce) {
-          [data-aurovie-chart] * { transition-duration: 1ms !important; animation-duration: 1ms !important; }
-        }
-      `}</style>
+      <style>{SHEET}</style>
       {header && (
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: compact ? 8 : 14, padding: compact ? "8px 10px" : "11px 13px", borderBottom: `1px solid ${th.border}`, fontFamily: th.font }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: compact ? 8 : 14, padding: compact ? "8px 10px" : "11px 13px", borderBottom: "1px solid var(--ac-line)", fontFamily: "var(--ac-font)" }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 7, flexWrap: "wrap" }}>
-              <span style={{ fontSize: compact ? 13 : 14, fontWeight: 700, letterSpacing: "0.01em", color: th.textStrong }}>{header.ticker ?? symbol}</span>
-              {header.sector && <span style={{ fontSize: 11.5, color: th.line }}>{header.sector}</span>}
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: compact ? 13 : 14, fontWeight: 700, letterSpacing: "0.01em", color: "var(--ac-ink)" }}>{header.ticker ?? symbol}</span>
+              {header.sector && <span style={{ fontSize: 11, color: "var(--ac-accent-ink)" }}>{header.sector}</span>}
             </div>
             {/* The full name is the first thing to go on a phone: it is the one line the reader
                 already knows (they navigated here by it), and it costs a whole row beside a
                 price they came to read. Still rendered wide, where the row is free. */}
             {header.name && !compact && (
-              <div style={{ marginTop: 2, fontSize: 12, color: th.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{header.name}</div>
+              <div style={{ marginTop: 2, fontSize: 12, color: "var(--ac-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{header.name}</div>
             )}
             {/* Reference stats SCROLL rather than wrap in compact — four of them wrap to two
                 rows on a 360px screen, and every wrapped row comes out of the plot. */}
             {header.stats && header.stats.length > 0 && (
-              <div style={{ marginTop: 3, ...scrollRow, gap: compact ? 10 : undefined, columnGap: 10, rowGap: 2, fontFamily: th.monoFont, fontSize: 10.5, color: th.text }}>
+              <div style={{ marginTop: 3, ...scrollRow, gap: compact ? 10 : undefined, columnGap: 10, rowGap: 2, fontFamily: "var(--ac-mono)", fontSize: 10, color: "var(--ac-text)" }}>
                 {header.stats.map((s, i) => (
                   <span key={`${s.label ?? ""}${i}`} style={{ flexShrink: 0 }}>
                     {s.label ? `${s.label} ` : ""}
@@ -1629,9 +1632,9 @@ export function TradingChart({
             <div style={{ textAlign: "right" }}>
               {header.priceSlot ?? (
                 <>
-                  <div style={{ fontFamily: th.monoFont, fontSize: compact ? 18 : 21, fontWeight: 600, lineHeight: 1.15, color: th.textStrong }}>{header.price!.value}</div>
+                  <div style={{ fontFamily: "var(--ac-mono)", fontSize: compact ? 18 : 21, fontWeight: 600, lineHeight: 1.15, color: "var(--ac-ink)" }}>{header.price!.value}</div>
                   {header.price!.change && (
-                    <div style={{ fontFamily: th.monoFont, fontSize: 12.5, color: header.price!.direction === "down" ? th.down : th.up }}>{header.price!.change}</div>
+                    <div style={{ fontFamily: "var(--ac-mono)", fontSize: 12, color: header.price!.direction === "down" ? "var(--ac-down-ink)" : "var(--ac-up-ink)" }}>{header.price!.change}</div>
                   )}
                 </>
               )}
@@ -1647,19 +1650,19 @@ export function TradingChart({
           the ⋯ opens the sheet that holds literally everything else. Nothing is lost; it is one
           tap further away, which is the trade a phone is asking for. */}
       {toolbar && compact && (
-        <div style={{ ...bar, display: "flex", flexWrap: "nowrap", alignItems: "center", gap: 5, padding: "6px 8px" }}>
+        <div style={{ ...bar, display: "flex", flexWrap: "nowrap", alignItems: "center", gap: 4, padding: "6px 8px" }}>
           {/* The controls scroll; the ⋯ does NOT. A "more" button that can itself be scrolled
               out of sight is the one control that must never move — on a chart type with the
               box-size stepper the row does overflow, and that is exactly when a reader needs
               the way into everything else. */}
-          <div style={{ ...scrollRow, flex: "1 1 auto", minWidth: 0, gap: 5 }}>
-          <button style={{ ...btn(sheetIs("interval")), gap: 3, flexShrink: 0 }} aria-haspopup="dialog" aria-expanded={sheetIs("interval")} title="Bar interval" onClick={() => setSheet(sheetIs("interval") ? null : "interval")}>
+          <div style={{ ...scrollRow, flex: "1 1 auto", minWidth: 0, gap: 4 }}>
+          <button {...btn(sheetIs("interval"), { gap: 4, flexShrink: 0 })} aria-haspopup="dialog" aria-expanded={sheetIs("interval")} title="Bar interval" onClick={() => setSheet(sheetIs("interval") ? null : "interval")}>
             {tfLabel(resolution)} ▾
           </button>
-          <button style={iconBtn(sheetIs("type"))} aria-haspopup="dialog" aria-expanded={sheetIs("type")} title={`Series — ${TYPES.find((x) => x.t === type)?.label}`} aria-label="Chart type" onClick={() => setSheet(sheetIs("type") ? null : "type")}>
+          <button {...iconBtn(sheetIs("type"))} aria-haspopup="dialog" aria-expanded={sheetIs("type")} title={`Series — ${TYPES.find((x) => x.t === type)?.label}`} aria-label="Chart type" onClick={() => setSheet(sheetIs("type") ? null : "type")}>
             <Icon name={type} size={16} />
           </button>
-          <button style={{ ...iconBtn(active.length > 0), width: active.length ? 44 : 34 }} title="Indicators" aria-label="Indicators" onClick={() => setIndModal(true)}>
+          <button {...iconBtn(active.length > 0, { width: active.length ? 44 : 34 })} title="Indicators" aria-label="Indicators" onClick={() => setIndModal(true)}>
             <Icon name="indicators" size={15} />
             {active.length > 0 && <span style={{ fontSize: 11, fontWeight: 700 }}>{active.length}</span>}
           </button>
@@ -1667,19 +1670,19 @@ export function TradingChart({
               third of the width for a tool most sessions never touch. The tools live in the
               sheet instead; this button goes straight to them. */}
           {drawingRail && (
-            <button style={iconBtn(tool !== "cross")} title="Drawing tools" aria-label="Drawing tools" onClick={() => setSheet(sheetIs("menu") ? null : "menu")}>
+            <button {...iconBtn(tool !== "cross")} title="Drawing tools" aria-label="Drawing tools" onClick={() => setSheet(sheetIs("menu") ? null : "menu")}>
               <Icon name="brush" size={15} />
             </button>
           )}
           {RESAMPLED.includes(type) && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 2, flexShrink: 0 }} title="Box / reversal size">
-              <button style={{ ...iconBtn(false), width: 30, fontSize: 16 }} onClick={() => stepBox(-1)} aria-label="Finer box">−</button>
-              <button style={{ ...btn(box > 0), gap: 4 }} onClick={() => setBox(0)}>{box > 0 ? "Box" : "Auto"} {fmtBox(boxEff)}</button>
-              <button style={{ ...iconBtn(false), width: 30, fontSize: 16 }} onClick={() => stepBox(1)} aria-label="Coarser box">+</button>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }} title="Box / reversal size">
+              <button {...iconBtn(false, { width: 30, fontSize: 17 })} onClick={() => stepBox(-1)} aria-label="Finer box">−</button>
+              <button {...btn(box > 0, { gap: 4 })} onClick={() => setBox(0)}>{box > 0 ? "Box" : "Auto"} {fmtBox(boxEff)}</button>
+              <button {...iconBtn(false, { width: 30, fontSize: 17 })} onClick={() => stepBox(1)} aria-label="Coarser box">+</button>
             </span>
           )}
           </div>
-          <button style={{ ...iconBtn(sheetIs("menu")), marginLeft: 4 }} title="More — tools, scale, display" aria-label="More controls" aria-expanded={sheetIs("menu")} onClick={() => setSheet(sheetIs("menu") ? null : "menu")}>
+          <button {...iconBtn(sheetIs("menu"), { marginLeft: 4 })} title="More — tools, scale, display" aria-label="More controls" aria-expanded={sheetIs("menu")} onClick={() => setSheet(sheetIs("menu") ? null : "menu")}>
             ⋯
           </button>
         </div>
@@ -1688,7 +1691,7 @@ export function TradingChart({
         <div style={bar}>
           {/* The header already names the instrument; repeating it here (and again in the
               on-canvas legend) prints the same ticker three times in one screenful. */}
-          {!compact && !header && <span style={{ fontSize: 13, fontWeight: 700, color: th.textStrong, marginRight: 4 }}>{symbol}</span>}
+          {!compact && !header && <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ac-ink)", marginRight: 4 }}>{symbol}</span>}
           {/* The drawing switch belongs in the HORIZONTAL bar, not inside the rail it controls.
               A switch that lives in the thing it hides cannot turn that thing back on, so the
               collapsed rail had to keep rendering just to hold its own button — which meant a
@@ -1699,36 +1702,36 @@ export function TradingChart({
               title={railOpen ? "Hide drawing tools" : "Drawing tools"}
               aria-label={railOpen ? "Hide drawing tools" : "Show drawing tools"}
               aria-pressed={railOpen}
-              style={{ ...btn(railOpen), padding: "0 8px" }}
+              {...btn(railOpen, { padding: "0 8px" })}
               onClick={() => {
                 setRailOpen((o) => {
                   if (o) applyTool("cross"); // an "off" that still draws on the next click is not off
                   return !o;
                 });
                 setRailMenu(null);
-              }}
+            }}
             >
               <Icon name="brush" size={15} />
             </button>
           )}
-          <span style={{ display: "inline-flex", gap: 1, alignItems: "center" }}>
+          <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
             {TF_ORDER.filter((v) => tfSet.has(v) && (favTf.includes(v) || v === resolution)).map((v) => (
-              <button key={v} style={btn(v === resolution)} onClick={() => pickRes(v)}>
+              <button key={v} {...btn(v === resolution)} onClick={() => pickRes(v)}>
                 {tfLabel(v)}
               </button>
             ))}
             <span style={{ position: "relative" }}>
-              <button style={{ ...btn(menu === "interval"), padding: "0 6px" }} title="Intervals" aria-label="Intervals" onClick={() => setMenu(menu === "interval" ? null : "interval")}>▾</button>
+              <button {...btn(menu === "interval", { padding: "0 6px" })} title="Intervals" aria-label="Intervals" onClick={() => setMenu(menu === "interval" ? null : "interval")}>▾</button>
               {menu === "interval" && (
-                <div style={menuBox}>
+                <div className="ac-surface ac-menu" style={menuBox}>
                   {intervalGroups.map((g, gi) => (
                     <div key={g.label}>
-                      {gi > 0 && <div style={{ height: 1, background: th.border, margin: "4px 0" }} />}
-                      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text, padding: "2px 8px 4px" }}>{g.label}</div>
+                      {gi > 0 && <div style={{ height: 1, background: "var(--ac-line)", margin: "4px 0" }} />}
+                      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ac-text)", padding: "2px 8px 4px" }}>{g.label}</div>
                       {g.items.map((it) => (
                         <div key={it.v} style={{ display: "flex", alignItems: "center" }}>
-                          <button style={{ ...item(it.v === resolution), flex: 1 }} onClick={() => { pickRes(it.v); setMenu(null); }}>{it.l}</button>
-                          <button title={favTf.includes(it.v) ? "Remove from favourites" : "Add to favourites"} onClick={() => toggleFav(it.v)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 13, padding: "2px 6px", color: favTf.includes(it.v) ? th.line : th.text }}>
+                          <button {...item(it.v === resolution, { flex: 1 })} onClick={() => { pickRes(it.v); setMenu(null); }}>{it.l}</button>
+                          <button title={favTf.includes(it.v) ? "Remove from favourites" : "Add to favourites"} onClick={() => toggleFav(it.v)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 13, padding: "2px 6px", color: favTf.includes(it.v) ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>
                             {favTf.includes(it.v) ? "★" : "☆"}
                           </button>
                         </div>
@@ -1739,21 +1742,21 @@ export function TradingChart({
               )}
             </span>
           </span>
-          <span style={{ width: 1, height: 18, background: th.border, margin: "0 4px" }} />
+          <span style={{ width: 1, height: 18, background: "var(--ac-line)", margin: "0 4px" }} />
           <span style={{ position: "relative" }}>
-            <button style={btn(menu === "type")} onClick={() => setMenu(menu === "type" ? null : "type")}>
+            <button {...btn(menu === "type")} onClick={() => setMenu(menu === "type" ? null : "type")}>
               <Icon name={type} size={16} /> {TYPES.find((x) => x.t === type)?.label} ▾
             </button>
             {menu === "type" && (
-              <div style={menuBox}>
+              <div className="ac-surface ac-menu" style={menuBox}>
                 {TYPE_GROUPS.map((g, gi) => (
                   <div key={g.label}>
-                    {gi > 0 && <div style={{ height: 1, background: th.border, margin: "4px 0" }} />}
-                    <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text, padding: "2px 8px 4px" }}>{g.label}</div>
+                    {gi > 0 && <div style={{ height: 1, background: "var(--ac-line)", margin: "4px 0" }} />}
+                    <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ac-text)", padding: "2px 8px 4px" }}>{g.label}</div>
                     {g.ts.map((tt) => {
                       const x = TYPES.find((y) => y.t === tt)!;
                       return (
-                        <button key={tt} style={item(tt === type)} onClick={() => { setType(tt); setMenu(null); }}>
+                        <button key={tt} {...item(tt === type)} onClick={() => { setType(tt); setMenu(null); }}>
                           <Icon name={tt} size={16} /> {x.label}
                         </button>
                       );
@@ -1765,34 +1768,34 @@ export function TradingChart({
           </span>
           {/* The range strip lives in the BOTTOM bar — see the scale + navigation row. */}
           {RESAMPLED.includes(type) && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 1 }} title="Box / reversal size">
-              <button style={{ ...btn(false), padding: "0 7px", fontSize: 15 }} onClick={() => stepBox(-1)} aria-label="Finer box">−</button>
-              <button style={{ ...btn(box > 0), gap: 4 }} onClick={() => setBox(0)}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }} title="Box / reversal size">
+              <button {...btn(false, { padding: "0 7px", fontSize: 14 })} onClick={() => stepBox(-1)} aria-label="Finer box">−</button>
+              <button {...btn(box > 0, { gap: 4 })} onClick={() => setBox(0)}>
                 {box > 0 ? "Box" : "Auto"} {fmtBox(boxEff)}
               </button>
-              <button style={{ ...btn(false), padding: "0 7px", fontSize: 15 }} onClick={() => stepBox(1)} aria-label="Coarser box">+</button>
+              <button {...btn(false, { padding: "0 7px", fontSize: 14 })} onClick={() => stepBox(1)} aria-label="Coarser box">+</button>
             </span>
           )}
-          <button style={btn(active.length > 0)} title="Indicators" onClick={() => setIndModal(true)}>
+          <button {...btn(active.length > 0)} title="Indicators" onClick={() => setIndModal(true)}>
             <Icon name="indicators" size={15} /> Indicators{active.length ? ` (${active.length})` : ""}
           </button>
-          <button style={btn(cmdOpen)} title="Command launcher (K)" onClick={() => { setCmdOpen((v) => !v); setCmdQuery(""); }}>
+          <button {...btn(cmdOpen)} title="Command launcher (K)" onClick={() => { setCmdOpen((v) => !v); setCmdQuery(""); }}>
             K Launch
           </button>
-          <button style={btn(guided)} title="Guided mode (decluttered controls)" onClick={() => setGuided((v) => !v)}>
+          <button {...btn(guided)} title="Guided mode (decluttered controls)" onClick={() => setGuided((v) => !v)}>
             {guided ? "Guided" : "Pro"}
           </button>
           {!guided && onRunScript && (
-            <button style={btn(scriptOpen || scripts.length > 0)} title="Write a script" onClick={() => setScriptOpen((o) => !o)}>
+            <button {...btn(scriptOpen || scripts.length > 0)} title="Write a script" onClick={() => setScriptOpen((o) => !o)}>
               <Icon name="script" size={15} /> Script{scripts.length ? " ●" : ""}
             </button>
           )}
           {!guided && <span style={{ position: "relative" }}>
-            <button style={btn(menu === "compare" || compares.length > 0)} onClick={() => setMenu(menu === "compare" ? null : "compare")}>
+            <button {...btn(menu === "compare" || compares.length > 0)} onClick={() => setMenu(menu === "compare" ? null : "compare")}>
               <Icon name="compare" size={15} /> Compare{compares.length ? ` (${compares.length})` : ""} ▾
             </button>
             {menu === "compare" && (
-              <div style={menuBox}>
+              <div className="ac-surface ac-menu" style={menuBox}>
                 <div style={{ display: "flex", gap: 4, marginBottom: compares.length ? 6 : 0 }}>
                   <input
                     value={cmpInput}
@@ -1802,22 +1805,22 @@ export function TradingChart({
                     }}
                     placeholder="Symbol…"
                     autoFocus
-                    style={{ flex: 1, minWidth: 0, fontFamily: th.font, fontSize: 12, padding: "4px 6px", borderRadius: 5, border: `1px solid ${th.border}`, background: th.background, color: th.textStrong }}
+                    style={{ flex: 1, minWidth: 0, fontFamily: "var(--ac-font)", fontSize: 12, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--ac-line)", background: "var(--ac-bg)", color: "var(--ac-ink)" }}
                   />
-                  <button onClick={() => addCompare()} style={{ ...btn(false), background: `color-mix(in srgb, ${th.line} 18%, transparent)`, color: th.line }}>
+                  <button onClick={() => addCompare()} {...btn(false, { background: `color-mix(in srgb, var(--ac-accent) 18%, transparent)`, color: "var(--ac-accent-ink)" })}>
                     Add
                   </button>
                 </div>
                 {cmpHits.length > 0 && (
-                  <div style={{ marginBottom: 6, borderBottom: `1px solid ${th.border}`, paddingBottom: 4 }}>
+                  <div style={{ marginBottom: 6, borderBottom: "1px solid var(--ac-line)", paddingBottom: 4 }}>
                     {cmpHits.map((h) => (
                       <button
                         key={h.symbol}
                         onClick={() => addCompare(h.symbol)}
-                        style={{ display: "flex", alignItems: "baseline", gap: 8, width: "100%", padding: "4px 6px", border: "none", borderRadius: 5, cursor: "pointer", textAlign: "left", background: "transparent", fontFamily: th.font, fontSize: 12.5, color: th.textStrong }}
+                        style={{ display: "flex", alignItems: "baseline", gap: 8, width: "100%", padding: "4px 6px", border: "none", borderRadius: 6, cursor: "pointer", textAlign: "left", background: "transparent", fontFamily: "var(--ac-font)", fontSize: 12, color: "var(--ac-ink)" }}
                       >
                         <span style={{ fontWeight: 700 }}>{h.symbol}</span>
-                        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11.5, color: th.text }}>
+                        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: "var(--ac-text)" }}>
                           {h.description}
                         </span>
                       </button>
@@ -1825,10 +1828,10 @@ export function TradingChart({
                   </div>
                 )}
                 {compares.map((c) => (
-                  <div key={c.symbol} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 2px", fontSize: 12.5, color: th.textStrong }}>
+                  <div key={c.symbol} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 2px", fontSize: 12, color: "var(--ac-ink)" }}>
                     <span style={{ width: 10, height: 10, borderRadius: 2, background: c.color }} />
                     <span style={{ flex: 1 }}>{c.symbol}</span>
-                    <button onClick={() => removeCompare(c.symbol)} title="Remove" style={{ border: "none", background: "transparent", color: th.text, cursor: "pointer", fontSize: 13 }}>
+                    <button onClick={() => removeCompare(c.symbol)} title="Remove" style={{ border: "none", background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 13 }}>
                       ✕
                     </button>
                   </div>
@@ -1836,8 +1839,8 @@ export function TradingChart({
               </div>
             )}
           </span>}
-          <span style={{ width: 1, height: 18, background: th.border, margin: "0 4px" }} />
-          {!guided && <button style={btn(!!replay)} title="Bar replay — step through history" onClick={() => (replay ? chartRef.current?.exitReplay() : chartRef.current?.armReplay())}>
+          <span style={{ width: 1, height: 18, background: "var(--ac-line)", margin: "0 4px" }} />
+          {!guided && <button {...btn(!!replay)} title="Bar replay — step through history" onClick={() => (replay ? chartRef.current?.exitReplay() : chartRef.current?.armReplay())}>
             <Icon name="replay" size={13} /> Replay
           </button>}
           <span style={{ position: "relative", marginLeft: "auto" }}>
@@ -1846,7 +1849,7 @@ export function TradingChart({
                 vocabulary is a picture. The label was the widest thing in a crowded bar and told
                 a reader nothing the mark does not; the accessible name carries it instead. */}
             <button
-              style={{ ...btn(menu === "theme"), padding: "0 8px" }}
+              {...btn(menu === "theme", { padding: "0 8px" })}
               title="Chart theme"
               aria-label="Chart theme"
               aria-haspopup="menu"
@@ -1856,9 +1859,9 @@ export function TradingChart({
               <Icon name="theme" size={15} />
             </button>
             {menu === "theme" && (
-              <div style={{ ...menuBox, right: 0 }}>
+              <div className="ac-surface ac-menu" style={{ ...menuBox, right: 0 }}>
                 {["Auto", ...THEME_NAMES].map((n) => (
-                  <button key={n} style={item(n === themeName)} onClick={() => { setThemeName(n); setMenu(null); }}>
+                  <button key={n} {...item(n === themeName)} onClick={() => { setThemeName(n); setMenu(null); }}>
                     <span style={{ width: 16 }}>{n === themeName ? "✓" : ""}</span> {n === "Auto" ? "Auto (app)" : n}
                   </button>
                 ))}
@@ -1869,29 +1872,29 @@ export function TradingChart({
       )}
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
         {drawingRail && railOpen && !compact && !guided && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "5px 4px", background: th.paneBackground, borderRight: `1px solid ${th.border}` }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: "5px 4px", background: "var(--ac-pane)", borderRight: "1px solid var(--ac-line)" }}>
             {RAIL_GROUPS.map((g) => {
               const cur = groupTool[g.id] ?? g.tools[0].t;
               const isActive = g.tools.some((t) => t.t === tool);
               const multi = g.tools.length > 1;
               return (
                 <span key={g.id} style={{ position: "relative" }}>
-                  <button title={g.label} style={railBtn(isActive)} onClick={() => (multi ? setRailMenu(railMenu === g.id ? null : g.id) : applyTool(g.tools[0].t))}>
+                  <button title={g.label} {...railBtn(isActive)} onClick={() => (multi ? setRailMenu(railMenu === g.id ? null : g.id) : applyTool(g.tools[0].t))}>
                     <Icon name={cur} size={17} />
-                    {multi && <span style={{ position: "absolute", right: 1.5, bottom: 1, fontSize: 7, lineHeight: 1, color: th.text }}>▸</span>}
+                    {multi && <span style={{ position: "absolute", right: 2, bottom: 2, fontSize: 8, lineHeight: 1, color: "var(--ac-text)" }}>▸</span>}
                   </button>
                   {railMenu === g.id && (
-                    <div style={{ position: "absolute", left: 36, top: 0, zIndex: 25, borderRadius: 12, padding: 6, minWidth: 208, ...surface }}>
-                      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text, padding: "2px 8px 6px" }}>{g.label}</div>
+                    <div className="ac-surface" style={{ position: "absolute", left: 36, top: 0, zIndex: 25, borderRadius: 14, padding: 6, minWidth: 208 }} >
+                      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ac-text)", padding: "2px 8px 6px" }}>{g.label}</div>
                       {g.tools.map((t) => (
                         <button
                           key={t.t}
-                          style={item(tool === t.t)}
+                          {...item(tool === t.t)}
                           onClick={() => {
                             applyTool(t.t);
                             setGroupTool((gt) => ({ ...gt, [g.id]: t.t }));
                             setRailMenu(null);
-                          }}
+                        }}
                         >
                           <Icon name={t.t} size={16} />
                           {t.label}
@@ -1902,37 +1905,37 @@ export function TradingChart({
                 </span>
               );
             })}
-            <span style={{ height: 1, background: th.border, margin: "3px 5px" }} />
-            <button title="Delete selected" style={railBtn(false)} onClick={() => applyTool("delete")}>
+            <span style={{ height: 1, background: "var(--ac-line)", margin: "3px 5px" }} />
+            <button title="Delete selected" {...railBtn(false)} onClick={() => applyTool("delete")}>
               <Icon name="delete" size={17} />
             </button>
-            <button title="Clear all drawings" style={railBtn(false)} onClick={() => applyTool("clear")}>
+            <button title="Clear all drawings" {...railBtn(false)} onClick={() => applyTool("clear")}>
               <Icon name="trash" size={17} />
             </button>
             <span style={{ position: "relative" }}>
               <button
                 title="Objects — manage drawings"
-                style={railBtn(objectsOpen)}
+                {...railBtn(objectsOpen)}
                 onClick={() => { setObjects(chartRef.current?.getDrawings() ?? []); setObjectsOpen((o) => !o); }}
               >
                 <Icon name="objects" size={17} />
-                {objects.length > 0 && <span style={{ position: "absolute", right: 0, top: 0, fontSize: 8, lineHeight: 1, fontWeight: 700, color: th.line }}>{objects.length}</span>}
+                {objects.length > 0 && <span style={{ position: "absolute", right: 2, top: 2, fontSize: TYPE.micro, lineHeight: 1, fontWeight: WEIGHT.bold, color: "var(--ac-accent-ink)" }}>{objects.length}</span>}
               </button>
               {objectsOpen && (
-                <div style={{ position: "absolute", left: 36, bottom: 0, zIndex: 25, borderRadius: 12, padding: 6, minWidth: 218, maxHeight: 320, overflowY: "auto", ...surface }}>
+                <div className="ac-surface" style={{ position: "absolute", left: 36, bottom: 0, zIndex: 25, borderRadius: 14, padding: 6, minWidth: 218, maxHeight: 320, overflowY: "auto" }} >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "2px 4px 6px" }}>
-                    <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text }}>Objects · {objects.length}</span>
+                    <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ac-text)" }}>Objects · {objects.length}</span>
                     {objects.length > 0 && (
-                      <button style={{ border: "none", background: "transparent", color: th.text, cursor: "pointer", fontSize: 11, fontFamily: th.font }} onClick={() => chartRef.current?.clearDrawings()}>Clear all</button>
+                      <button style={{ border: "none", background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 11, fontFamily: "var(--ac-font)" }} onClick={() => chartRef.current?.clearDrawings()}>Clear all</button>
                     )}
                   </div>
-                  {objects.length === 0 && <div style={{ color: th.text, padding: "6px 4px", fontFamily: th.font, fontSize: 12 }}>No drawings yet — pick a tool above.</div>}
+                  {objects.length === 0 && <div style={{ color: "var(--ac-text)", padding: "6px 4px", fontFamily: "var(--ac-font)", fontSize: 12 }}>No drawings yet — pick a tool above.</div>}
                   {objects.slice().reverse().map((d) => (
-                    <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 7, padding: "3px 4px", borderRadius: 5, fontFamily: th.font, fontSize: 12 }}>
-                      <span style={{ color: d.color ?? th.line, display: "inline-flex", flex: "none" }}><Icon name={d.type} size={14} /></span>
-                      <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: d.hidden ? th.text : th.textStrong, textDecoration: d.hidden ? "line-through" : "none" }}>{TOOL_LABEL[d.type] ?? d.type}</span>
-                      <button title={d.hidden ? "Show" : "Hide"} onClick={() => chartRef.current?.setDrawingHidden(d.id, !d.hidden)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 13, color: d.hidden ? th.text : th.line, padding: "0 2px" }}>{d.hidden ? "◌" : "◉"}</button>
-                      <button title="Delete" onClick={() => chartRef.current?.deleteDrawing(d.id)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 13, color: th.down, padding: "0 2px" }}>✕</button>
+                    <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 4px", borderRadius: 6, fontFamily: "var(--ac-font)", fontSize: 12 }}>
+                      <span style={{ color: d.color ?? "var(--ac-accent)", display: "inline-flex", flex: "none" }}><Icon name={d.type} size={14} /></span>
+                      <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: d.hidden ? "var(--ac-text)" : "var(--ac-ink)", textDecoration: d.hidden ? "line-through" : "none" }}>{TOOL_LABEL[d.type] ?? d.type}</span>
+                      <button title={d.hidden ? "Show" : "Hide"} onClick={() => chartRef.current?.setDrawingHidden(d.id, !d.hidden)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 13, color: d.hidden ? "var(--ac-text)" : "var(--ac-accent-ink)", padding: "0 2px" }}>{d.hidden ? "◌" : "◉"}</button>
+                      <button title="Delete" onClick={() => chartRef.current?.deleteDrawing(d.id)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 13, color: "var(--ac-down-ink)", padding: "0 2px" }}>✕</button>
                     </div>
                   ))}
                 </div>
@@ -1966,22 +1969,22 @@ export function TradingChart({
             if (barMenu) setBarMenu(null);
             if (sheet) setSheet(null);
             if (ctxMenu) setCtxMenu(null);
-          }}
+        }}
         >
           {tipsOpen && (
-            <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 10, right: 10, zIndex: 36, width: 290, borderRadius: 10, padding: 10, ...surface }}>
-              <div style={{ color: th.textStrong, fontFamily: th.font, fontWeight: 700, fontSize: 13 }}>Quick start</div>
-              <div style={{ color: th.text, fontFamily: th.font, fontSize: 12, marginTop: 6, lineHeight: 1.35 }}>Press K to launch commands, ? for shortcuts, and right-click price axis to create alerts quickly.</div>
-              <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-                <button style={{ ...btn(true), height: 26 }} onClick={() => finishOnboarding(true)}>Use Guided mode</button>
-                <button style={{ ...btn(false), height: 26 }} onClick={() => finishOnboarding(false)}>Dismiss</button>
+            <div className="ac-surface" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 10, right: 10, zIndex: 36, width: 290, borderRadius: 10, padding: 10 }} >
+              <div style={{ color: "var(--ac-ink)", fontFamily: "var(--ac-font)", fontWeight: 700, fontSize: 13 }}>Quick start</div>
+              <div style={{ color: "var(--ac-text)", fontFamily: "var(--ac-font)", fontSize: 12, marginTop: 6, lineHeight: 1.35 }}>Press K to launch commands, ? for shortcuts, and right-click price axis to create alerts quickly.</div>
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <button {...btn(true, { height: 26 })} onClick={() => finishOnboarding(true)}>Use Guided mode</button>
+                <button {...btn(false, { height: 26 })} onClick={() => finishOnboarding(false)}>Dismiss</button>
               </div>
             </div>
           )}
           {cmdOpen && (
             <>
-              <div onClick={() => setCmdOpen(false)} style={{ position: "absolute", inset: 0, zIndex: 34, background: "rgba(0,0,0,0.3)" }} />
-              <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", left: "50%", top: 52, transform: "translateX(-50%)", zIndex: 35, width: 420, maxWidth: "calc(100% - 24px)", borderRadius: 10, padding: 8, ...surface }}>
+              <div onClick={() => setCmdOpen(false)} className="ac-scrim" style={{ position: "absolute", inset: 0, zIndex: Z.scrim + 4 }} />
+              <div className="ac-surface" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", left: "50%", top: 52, transform: "translateX(-50%)", zIndex: 35, width: 420, maxWidth: "calc(100% - 24px)", borderRadius: 10, padding: 8 }} >
                 <input
                   autoFocus
                   value={cmdQuery}
@@ -2022,15 +2025,15 @@ export function TradingChart({
                     }
                   }}
                   placeholder="Run action… (type: replay, fit, compare, script). Use ↑/↓ + Enter."
-                  style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 10, border: `1px solid ${th.border}`, background: th.background, color: th.textStrong, fontSize: 13, fontFamily: th.font }}
+                  style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 10, border: "1px solid var(--ac-line)", background: "var(--ac-bg)", color: "var(--ac-ink)", fontSize: 13, fontFamily: "var(--ac-font)" }}
                 />
-                <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
+                <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
                   {([
                     ["all", `All (${quickActions.length})`],
                     ["fav", `Favorites (${cmdFav.length})`],
                     ["recent", `Recent (${cmdRecent.length})`],
                   ] as const).map(([id, label]) => (
-                    <button key={id} style={{ ...btn(cmdFilter === id), height: 24, padding: "0 8px", fontSize: 11.5 }} onClick={() => setCmdFilter(id)}>{label}</button>
+                    <button key={id} {...btn(cmdFilter === id, { height: 24, padding: "0 8px", fontSize: 11 })} onClick={() => setCmdFilter(id)}>{label}</button>
                   ))}
                 </div>
                 <div ref={cmdListRef} style={{ marginTop: 8, maxHeight: 280, overflowY: "auto" }}>
@@ -2039,19 +2042,19 @@ export function TradingChart({
                     return orderedCommandItems.map((a, i) => (
                       <div key={a.id} ref={(el) => { cmdItemRefs.current[a.id] = el; }}>
                         {a.section !== prev && (
-                          <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text, padding: "6px 8px 4px" }}>{(prev = a.section)}</div>
+                          <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ac-text)", padding: "6px 8px 4px" }}>{(prev = a.section)}</div>
                         )}
-                        <button style={{ ...item(i === cmdIndex || !!a.active), justifyContent: "space-between" }} onClick={() => { runQuickAction(a.id); setCmdOpen(false); }}>
+                        <button {...item(i === cmdIndex || !!a.active, { justifyContent: "space-between" })} onClick={() => { runQuickAction(a.id); setCmdOpen(false); }}>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ width: 20, color: th.text, display: "flex", justifyContent: "center" }}><ActionMark id={a.id} glyph={a.glyph} size={15} /></span>
+                            <span style={{ width: 20, color: "var(--ac-text)", display: "flex", justifyContent: "center" }}><ActionMark id={a.id} glyph={a.glyph} size={15} /></span>
                             {a.label}
                           </span>
-                          <span onClick={(e) => { e.stopPropagation(); toggleCmdFav(a.id); }} style={{ color: cmdFav.includes(a.id) ? th.line : th.text, fontSize: 13, padding: "0 3px" }} title="Favorite (F)">{cmdFav.includes(a.id) ? "★" : "☆"}</span>
+                          <span onClick={(e) => { e.stopPropagation(); toggleCmdFav(a.id); }} style={{ color: cmdFav.includes(a.id) ? "var(--ac-accent-ink)" : "var(--ac-text)", fontSize: 13, padding: "0 3px" }} title="Favorite (F)">{cmdFav.includes(a.id) ? "★" : "☆"}</span>
                         </button>
                       </div>
                     ));
                   })()}
-                  {orderedCommandItems.length === 0 && <div style={{ padding: "8px 10px", color: th.text, fontFamily: th.font, fontSize: 12 }}>No actions match that query.</div>}
+                  {orderedCommandItems.length === 0 && <div style={{ padding: "8px 10px", color: "var(--ac-text)", fontFamily: "var(--ac-font)", fontSize: 12 }}>No actions match that query.</div>}
                 </div>
               </div>
             </>
@@ -2059,61 +2062,60 @@ export function TradingChart({
           {ctxMenu && (
             <>
               <div onClick={() => setCtxMenu(null)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu(null); }} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-              <div
+              <div className="ac-surface"
                 style={{
                   position: "fixed",
                   left: Math.min(ctxMenu.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 214),
                   top: Math.min(ctxMenu.y, (typeof window !== "undefined" ? window.innerHeight : 9999) - 320),
                   zIndex: 41,
-                  borderRadius: 12,
+                  borderRadius: 14,
                   padding: 5,
                   minWidth: 204,
-                  fontFamily: th.font,
+                  fontFamily: "var(--ac-font)",
                   fontSize: 12,
-                  ...surface,
-                }}
+              }}
               >
-                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text, padding: "3px 8px 6px" }}>{symbol} · {ctxMenu.price.toFixed(2)}</div>
+                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ac-text)", padding: "3px 8px 6px" }}>{symbol} · {ctxMenu.price.toFixed(2)}</div>
                 {onAxisClickPrice && (
-                  <button style={item(false)} onClick={() => { onAxisClickPrice(ctxMenu.price); setCtxMenu(null); }}>＋ Add alert at {ctxMenu.price.toFixed(2)}</button>
+                  <button {...item(false)} onClick={() => { onAxisClickPrice(ctxMenu.price); setCtxMenu(null); }}>＋ Add alert at {ctxMenu.price.toFixed(2)}</button>
                 )}
-                <button style={item(false)} onClick={() => { chartRef.current?.resetPriceScale(); setCtxMenu(null); }}>Reset price scale</button>
-                <button style={item(false)} onClick={() => { chartRef.current?.fit(); setCtxMenu(null); }}>Fit all bars</button>
-                <button style={item(false)} onClick={() => { chartRef.current?.scrollToRealtime(); setCtxMenu(null); }}>Go to realtime</button>
-                <div style={{ height: 1, background: th.border, margin: "4px 0" }} />
+                <button {...item(false)} onClick={() => { chartRef.current?.resetPriceScale(); setCtxMenu(null); }}>Reset price scale</button>
+                <button {...item(false)} onClick={() => { chartRef.current?.fit(); setCtxMenu(null); }}>Fit all bars</button>
+                <button {...item(false)} onClick={() => { chartRef.current?.scrollToRealtime(); setCtxMenu(null); }}>Go to realtime</button>
+                <div style={{ height: 1, background: "var(--ac-line)", margin: "4px 0" }} />
                 {(["normal", "log", "percent"] as ScaleMode[]).map((m) => (
-                  <button key={m} style={item(scaleMode === m)} onClick={() => { setScaleMode(m); setCtxMenu(null); }}>
-                    <span style={{ width: 16, display: "inline-block", color: scaleMode === m ? th.line : th.text }}>{scaleMode === m ? "✓" : ""}</span>
+                  <button key={m} {...item(scaleMode === m)} onClick={() => { setScaleMode(m); setCtxMenu(null); }}>
+                    <span style={{ width: 16, display: "inline-block", color: scaleMode === m ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{scaleMode === m ? "✓" : ""}</span>
                     {m === "normal" ? "Regular scale" : m === "log" ? "Logarithmic" : "Percent"}
                   </button>
                 ))}
-                <div style={{ height: 1, background: th.border, margin: "4px 0" }} />
-                <button style={item(false)} onClick={() => { saveImage(); setCtxMenu(null); }}>Save chart image (PNG)</button>
-                <button style={item(false)} onClick={() => { navigator.clipboard?.writeText(ctxMenu.price.toFixed(2)); setCtxMenu(null); }}>Copy price</button>
+                <div style={{ height: 1, background: "var(--ac-line)", margin: "4px 0" }} />
+                <button {...item(false)} onClick={() => { saveImage(); setCtxMenu(null); }}>Save chart image (PNG)</button>
+                <button {...item(false)} onClick={() => { navigator.clipboard?.writeText(ctxMenu.price.toFixed(2)); setCtxMenu(null); }}>Copy price</button>
               </div>
             </>
           )}
           {/* legend */}
           {legendShows !== "none" && (
-          <div style={{ position: "absolute", top: 7, left: 9, zIndex: 5, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 3, fontFamily: th.monoFont, fontSize: 11, color: th.text }}>
+          <div style={{ position: "absolute", top: 7, left: 9, zIndex: 5, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, fontFamily: "var(--ac-mono)", fontSize: 11, color: "var(--ac-text)" }}>
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 9,
+                gap: 8,
                 flexWrap: "wrap",
                 pointerEvents: "none",
                 padding: legend.bar ? "3px 9px 3px 7px" : "2px 4px",
                 borderRadius: 10,
-                background: legend.bar ? `color-mix(in srgb, ${th.paneBackground} 78%, transparent)` : "transparent",
+                background: legend.bar ? `color-mix(in srgb, var(--ac-pane) 78%, transparent)` : "transparent",
                 backdropFilter: legend.bar ? "blur(7px)" : undefined,
                 WebkitBackdropFilter: legend.bar ? "blur(7px)" : undefined,
-                border: `1px solid ${legend.bar ? soft(th.border, 70) : "transparent"}`,
+                border: `1px solid ${legend.bar ? "var(--ac-line-soft)" : "transparent"}`,
                 transition: "background 160ms ease, border-color 160ms ease",
-              }}
+            }}
             >
-              <span style={{ color: th.textStrong, fontWeight: 700, fontFamily: th.font, fontSize: 12.5, letterSpacing: "0.01em" }}>{symbol}</span>
-              <span style={{ fontFamily: th.font, fontSize: 10.5, fontWeight: 600, color: th.text, background: soft(th.text, 14), borderRadius: 4, padding: "1px 5px" }}>{TF_SHORT[resolution] ?? resolution}</span>
+              <span style={{ color: "var(--ac-ink)", fontWeight: 700, fontFamily: "var(--ac-font)", fontSize: 12, letterSpacing: "0.01em" }}>{symbol}</span>
+              <span style={{ fontFamily: "var(--ac-font)", fontSize: 10, fontWeight: 600, color: "var(--ac-text)", background: "var(--ac-hover)", borderRadius: 6, padding: "1px 5px" }}>{TF_SHORT[resolution] ?? resolution}</span>
               {legendBar && (
                 <>
                   {legendShows === "ohlc" ? (
@@ -2124,7 +2126,7 @@ export function TradingChart({
                       <span>C <b style={{ color: barCol }}>{legendBar.close.toFixed(2)}</b></span>
                     </>
                   ) : (
-                    <b style={{ color: barCol, fontSize: 12.5 }}>{legendBar.close.toFixed(2)}</b>
+                    <b style={{ color: barCol, fontSize: 12 }}>{legendBar.close.toFixed(2)}</b>
                   )}
                   <span style={{ color: barCol, fontWeight: 700 }}>
                     {legendBar.close - legendBar.open >= 0 ? "+" : ""}
@@ -2154,19 +2156,19 @@ export function TradingChart({
                   width: "fit-content",
                   marginTop: 1,
                   padding: "2px 7px",
-                  border: `1px solid ${soft(th.border, 70)}`,
+                  border: "1px solid var(--ac-line-soft)",
                   borderRadius: 6,
                   cursor: "pointer",
-                  fontFamily: th.font,
-                  fontSize: 10.5,
+                  fontFamily: "var(--ac-font)",
+                  fontSize: 10,
                   fontWeight: 600,
                   letterSpacing: "0.04em",
                   textTransform: "uppercase",
-                  background: `color-mix(in srgb, ${th.paneBackground} 82%, transparent)`,
+                  background: `color-mix(in srgb, var(--ac-pane) 82%, transparent)`,
                   backdropFilter: "blur(6px)",
                   WebkitBackdropFilter: "blur(6px)",
-                  color: th.text,
-                }}
+                  color: "var(--ac-text)",
+              }}
               >
                 Clear all
               </button>
@@ -2182,24 +2184,24 @@ export function TradingChart({
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
-                    gap: 5,
+                    gap: 4,
                     pointerEvents: "auto",
                     width: "fit-content",
                     padding: "2px 6px",
                     borderRadius: 6,
-                    background: hov ? `color-mix(in srgb, ${th.paneBackground} 86%, transparent)` : "transparent",
+                    background: hov ? `color-mix(in srgb, var(--ac-pane) 86%, transparent)` : "transparent",
                     backdropFilter: hov ? "blur(7px)" : undefined,
                     WebkitBackdropFilter: hov ? "blur(7px)" : undefined,
-                    border: `1px solid ${hov ? soft(th.border, 70) : "transparent"}`,
+                    border: `1px solid ${hov ? "var(--ac-line-soft)" : "transparent"}`,
                     opacity: d.hidden ? 0.45 : 1,
                     transition: "background 130ms ease, border-color 130ms ease",
-                  }}
+                }}
                 >
                   <span style={{ width: 8, height: 8, borderRadius: 2, background: d.color, flex: "none" }} />
-                  <span style={{ color: th.textStrong, fontWeight: 700, textDecoration: d.hidden ? "line-through" : "none" }}>{d.label}</span>
+                  <span style={{ color: "var(--ac-ink)", fontWeight: 700, textDecoration: d.hidden ? "line-through" : "none" }}>{d.label}</span>
                   {!d.hidden && val && val.value != null && <span style={{ color: d.color, fontWeight: 700 }}>{val.value.toFixed(2)}</span>}
                   {hov && d.adjustable && !d.hidden && (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                       <button style={legBtn} title="Shorter period" aria-label={`${d.label} shorter period`} onClick={() => stepPeriod(d.id, d.period as number, -1)}>−</button>
                       <button style={legBtn} title="Longer period" aria-label={`${d.label} longer period`} onClick={() => stepPeriod(d.id, d.period as number, 1)}>+</button>
                     </span>
@@ -2226,49 +2228,49 @@ export function TradingChart({
             <button
               onClick={(e) => { e.stopPropagation(); applyTool("cross"); }}
               title="Back to the crosshair"
-              style={{ position: "absolute", left: 8, top: 8, zIndex: 8, display: "inline-flex", alignItems: "center", gap: 6, height: 28, padding: "0 10px", borderRadius: 999, border: `1px solid ${soft(th.line, 45)}`, background: `color-mix(in srgb, ${th.line} 18%, ${th.paneBackground})`, color: th.line, fontFamily: th.font, fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}
+              style={{ position: "absolute", left: 8, top: 8, zIndex: 8, display: "inline-flex", alignItems: "center", gap: 8, height: 28, padding: "0 10px", borderRadius: 999, border: "1px solid color-mix(in srgb, var(--ac-accent) 45%, transparent)", background: `color-mix(in srgb, var(--ac-accent) 18%, var(--ac-pane))`, color: "var(--ac-accent-ink)", fontFamily: "var(--ac-font)", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
             >
               {hasIcon(tool) && <Icon name={tool} size={13} />}
               {TOOL_LABEL[tool] ?? tool} ✕
             </button>
           )}
           {guided && !compact && (
-            <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", left: 8, bottom: 28, zIndex: 7, display: "flex", alignItems: "center", gap: 5, padding: "5px 6px", borderRadius: 12, ...surface }}>
+            <div className="ac-surface" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", left: 8, bottom: 28, zIndex: 7, display: "flex", alignItems: "center", gap: 4, padding: "5px 6px", borderRadius: 14 }} >
               {quickActions
                 .slice()
                 .sort((a, b) => (cmdUsage[b.id] ?? 0) - (cmdUsage[a.id] ?? 0))
                 .filter((a) => a.id !== "guided" && a.id !== "clearrecent")
                 .slice(0, 3)
                 .map((a) => (
-                  <button key={`rec-${a.id}`} style={clusterBtn(!!a.active)} title={`Recommended: ${a.label}`} onClick={() => runQuickAction(a.id)}>
+                  <button key={`rec-${a.id}`} {...clusterBtn(!!a.active)} title={`Recommended: ${a.label}`} onClick={() => runQuickAction(a.id)}>
                     <ActionMark id={a.id} glyph={a.glyph} />
                   </button>
                 ))}
               {visibleGuidedPins.map((id) => {
                 const a = quickById[id];
-                return <button key={id} style={clusterBtn(!!a.active)} title={a.label} onClick={() => runQuickAction(id)}><ActionMark id={id} glyph={a.glyph} /></button>;
+                return <button key={id} {...clusterBtn(!!a.active)} title={a.label} onClick={() => runQuickAction(id)}><ActionMark id={id} glyph={a.glyph} /></button>;
               })}
-              <button style={clusterBtn(dockEditOpen)} title="Customize quick dock" onClick={() => setDockEditOpen((o) => !o)}>⋯</button>
-              <span style={{ marginLeft: 2, color: th.text, fontFamily: th.font, fontSize: 11, whiteSpace: "nowrap" }}>Press G for Pro mode</span>
+              <button {...clusterBtn(dockEditOpen)} title="Customize quick dock" onClick={() => setDockEditOpen((o) => !o)}>⋯</button>
+              <span style={{ marginLeft: 2, color: "var(--ac-text)", fontFamily: "var(--ac-font)", fontSize: 11, whiteSpace: "nowrap" }}>Press G for Pro mode</span>
             </div>
           )}
           {guided && dockEditOpen && (
-            <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", left: 8, bottom: 68, zIndex: 21, width: 250, maxHeight: 280, overflowY: "auto", borderRadius: 12, padding: 6, ...surface }}>
-              <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text, padding: "2px 8px 6px" }}>Quick dock buttons</div>
+            <div className="ac-surface" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", left: 8, bottom: 68, zIndex: 21, width: 250, maxHeight: 280, overflowY: "auto", borderRadius: 14, padding: 6 }} >
+              <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ac-text)", padding: "2px 8px 6px" }}>Quick dock buttons</div>
               {GUIDED_PIN_CHOICES.map((id) => {
                 const a = quickById[id];
                 if (!a) return null;
                 const on = guidedPins.includes(id);
                 return (
-                  <button key={id} style={item(on)} onClick={() => toggleGuidedPin(id)}>
-                    <span style={{ width: 16, color: on ? th.line : th.text }}>{on ? "✓" : ""}</span>
-                    <span style={{ width: 18, color: th.text, display: "flex", justifyContent: "center" }}><ActionMark id={a.id} glyph={a.glyph} size={14} /></span>
+                  <button key={id} {...item(on)} onClick={() => toggleGuidedPin(id)}>
+                    <span style={{ width: 16, color: on ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{on ? "✓" : ""}</span>
+                    <span style={{ width: 18, color: "var(--ac-text)", display: "flex", justifyContent: "center" }}><ActionMark id={a.id} glyph={a.glyph} size={14} /></span>
                     {a.label}
                   </button>
                 );
               })}
-              <div style={{ height: 1, background: th.border, margin: "5px 0" }} />
-              <button style={item(false)} onClick={() => setGuidedPins(DEFAULT_GUIDED_PINS)}>
+              <div style={{ height: 1, background: "var(--ac-line)", margin: "5px 0" }} />
+              <button {...item(false)} onClick={() => setGuidedPins(DEFAULT_GUIDED_PINS)}>
                 <span style={{ width: 16 }} /> Reset default pins
               </button>
             </div>
@@ -2289,52 +2291,52 @@ export function TradingChart({
                 left: 8,
                 zIndex: 7,
                 width: 214,
-                background: `color-mix(in srgb, ${th.paneBackground} 92%, transparent)`,
+                background: `color-mix(in srgb, var(--ac-pane) 92%, transparent)`,
                 backdropFilter: "blur(8px)",
                 WebkitBackdropFilter: "blur(8px)",
-                border: `1px solid ${th.border}`,
-                borderRadius: 12,
-                boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
-                fontFamily: th.monoFont,
+                border: "1px solid var(--ac-line)",
+                borderRadius: 14,
+                boxShadow: ELEV.md,
+                fontFamily: "var(--ac-mono)",
                 fontSize: 11,
                 overflow: "hidden",
-              }}
+            }}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 9px", borderBottom: `1px solid ${th.border}` }}>
-                <span style={{ fontFamily: th.font, fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: th.text }}>Data window</span>
-                <button onClick={() => setDataWindow(false)} aria-label="Close data window" style={{ border: "none", background: "transparent", color: th.text, cursor: "pointer", fontSize: 13, lineHeight: 1 }}>✕</button>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 9px", borderBottom: "1px solid var(--ac-line)" }}>
+                <span style={{ fontFamily: "var(--ac-font)", fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--ac-text)" }}>Data window</span>
+                <button onClick={() => setDataWindow(false)} aria-label="Close data window" style={{ border: "none", background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 13, lineHeight: 1 }}>✕</button>
               </div>
               <div style={{ padding: "6px 9px 8px" }}>
-                {!legend.bar && <div style={{ color: th.text, padding: "6px 0" }}>Hover the chart to read a bar.</div>}
+                {!legend.bar && <div style={{ color: "var(--ac-text)", padding: "6px 0" }}>Hover the chart to read a bar.</div>}
                 {legend.bar && (
                   <>
-                    <div style={{ color: th.text, marginBottom: 5 }}>{new Date(legend.bar.time * 1000).toLocaleString()}</div>
+                    <div style={{ color: "var(--ac-text)", marginBottom: 5 }}>{new Date(legend.bar.time * 1000).toLocaleString()}</div>
                     {(
                       [
                         ["Open", legend.bar.open.toFixed(2), barCol],
                         ["High", legend.bar.high.toFixed(2), barCol],
                         ["Low", legend.bar.low.toFixed(2), barCol],
                         ["Close", legend.bar.close.toFixed(2), barCol],
-                        ["Chg O→C", `${legend.bar.close - legend.bar.open >= 0 ? "+" : ""}${(legend.bar.close - legend.bar.open).toFixed(2)}`, legend.bar.close >= legend.bar.open ? th.up : th.down],
-                        ["Chg %", `${legend.bar.open ? (((legend.bar.close - legend.bar.open) / legend.bar.open) * 100).toFixed(2) : "0.00"}%`, legend.bar.close >= legend.bar.open ? th.up : th.down],
-                        ["Volume", legend.bar.volume ? fmtVol(legend.bar.volume) : "—", th.textStrong],
+                        ["Chg O→C", `${legend.bar.close - legend.bar.open >= 0 ? "+" : ""}${(legend.bar.close - legend.bar.open).toFixed(2)}`, legend.bar.close >= legend.bar.open ? "var(--ac-up-ink)" : "var(--ac-down-ink)"],
+                        ["Chg %", `${legend.bar.open ? (((legend.bar.close - legend.bar.open) / legend.bar.open) * 100).toFixed(2) : "0.00"}%`, legend.bar.close >= legend.bar.open ? "var(--ac-up-ink)" : "var(--ac-down-ink)"],
+                        ["Volume", legend.bar.volume ? fmtVol(legend.bar.volume) : "—", "var(--ac-ink)"],
                       ] as const
                     ).map(([k, v, c]) => (
                       <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "1.5px 0" }}>
-                        <span style={{ color: th.text }}>{k}</span>
+                        <span style={{ color: "var(--ac-text)" }}>{k}</span>
                         <span style={{ color: c, fontWeight: 700 }}>{v}</span>
                       </div>
                     ))}
                     {legend.values.length > 0 && (
                       <>
-                        <div style={{ height: 1, background: th.border, margin: "6px 0" }} />
+                        <div style={{ height: 1, background: "var(--ac-line)", margin: "6px 0" }} />
                         {legend.values.map((v, i) => (
                           <div key={`${v.label}-${i}`} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "1.5px 0" }}>
-                            <span style={{ color: th.text, display: "inline-flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+                            <span style={{ color: "var(--ac-text)", display: "inline-flex", alignItems: "center", gap: 4, minWidth: 0 }}>
                               <span style={{ width: 7, height: 7, borderRadius: 2, background: v.color, flex: "none" }} />
                               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.label}</span>
                             </span>
-                            <span style={{ color: th.textStrong, fontWeight: 700 }}>{v.value == null ? "—" : v.value.toFixed(2)}</span>
+                            <span style={{ color: "var(--ac-ink)", fontWeight: 700 }}>{v.value == null ? "—" : v.value.toFixed(2)}</span>
                           </div>
                         ))}
                       </>
@@ -2347,11 +2349,11 @@ export function TradingChart({
           {/* Keyboard shortcuts — the chart's own keys, live while the pointer is over the plot */}
           {shortcuts && (
             <>
-              <div onClick={() => setShortcuts(false)} style={{ position: "absolute", inset: 0, zIndex: 32, background: "rgba(0,0,0,0.45)" }} />
-              <div style={{ position: "absolute", zIndex: 33, top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 320, background: th.paneBackground, border: `1px solid ${th.border}`, borderRadius: 10, boxShadow: "0 18px 50px rgba(0,0,0,0.6)", overflow: "hidden", fontFamily: th.font }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 13px", borderBottom: `1px solid ${th.border}` }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: th.textStrong }}>Keyboard &amp; mouse</span>
-                  <button onClick={() => setShortcuts(false)} style={{ border: "none", background: "transparent", color: th.text, cursor: "pointer", fontSize: 16, lineHeight: 1 }}>✕</button>
+              <div onClick={() => setShortcuts(false)} className="ac-scrim" style={{ position: "absolute", inset: 0, zIndex: Z.scrim + 2 }} />
+              <div className="ac-surface" style={{ position: "absolute", zIndex: Z.modal, top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 320, borderRadius: RADIUS.lg, overflow: "hidden" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 13px", borderBottom: "1px solid var(--ac-line)" }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "var(--ac-ink)" }}>Keyboard &amp; mouse</span>
+                  <button onClick={() => setShortcuts(false)} style={{ border: "none", background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 17, lineHeight: 1 }}>✕</button>
                 </div>
                 <div style={{ padding: "8px 13px 13px" }}>
                   {(
@@ -2375,9 +2377,9 @@ export function TradingChart({
                       ["Right-click", "Chart context menu"],
                     ] as const
                   ).map(([k, v]) => (
-                    <div key={k} style={{ display: "flex", alignItems: "center", gap: 10, padding: "3px 0", fontSize: 12.5 }}>
-                      <span style={{ minWidth: 128, fontFamily: th.monoFont, fontSize: 11, color: th.line, background: `color-mix(in srgb, ${th.line} 12%, transparent)`, borderRadius: 5, padding: "3px 6px", textAlign: "center" }}>{k}</span>
-                      <span style={{ color: th.textStrong }}>{v}</span>
+                    <div key={k} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0", fontSize: 12 }}>
+                      <span style={{ minWidth: 128, fontFamily: "var(--ac-mono)", fontSize: 11, color: "var(--ac-accent-ink)", background: `color-mix(in srgb, var(--ac-accent) 12%, transparent)`, borderRadius: 6, padding: "3px 6px", textAlign: "center" }}>{k}</span>
+                      <span style={{ color: "var(--ac-ink)" }}>{v}</span>
                     </div>
                   ))}
                 </div>
@@ -2386,7 +2388,7 @@ export function TradingChart({
           )}
           {/* per-drawing style editor — floats beside the selected drawing */}
           {selection && (
-            <div
+            <div className="ac-surface"
               style={{
                 position: "absolute",
                 left: Math.max(4, selection.x - 6),
@@ -2394,11 +2396,10 @@ export function TradingChart({
                 zIndex: 8,
                 display: "flex",
                 alignItems: "center",
-                gap: 5,
+                gap: 4,
                 padding: "5px 7px",
-                borderRadius: 12,
-                ...surface,
-              }}
+                borderRadius: 14,
+            }}
             >
               {SWATCHES.map((c) => (
                 <button
@@ -2408,15 +2409,15 @@ export function TradingChart({
                   style={{
                     width: 16,
                     height: 16,
-                    borderRadius: 4,
+                    borderRadius: 6,
                     padding: 0,
                     cursor: "pointer",
                     background: c,
-                    border: (selection.color ?? th.line).toLowerCase() === c.toLowerCase() ? `2px solid ${th.textStrong}` : `1px solid ${th.border}`,
+                    border: (selection.color ?? th.line).toLowerCase() === c.toLowerCase() ? "2px solid var(--ac-ink)" : "1px solid var(--ac-line)",
                   }}
                 />
               ))}
-              <span style={{ width: 1, height: 16, background: th.border, margin: "0 2px" }} />
+              <span style={{ width: 1, height: 16, background: "var(--ac-line)", margin: "0 2px" }} />
               {[1, 2, 3].map((w) => {
                 const on = (selection.width ?? 1) === w;
                 return (
@@ -2424,13 +2425,13 @@ export function TradingChart({
                     key={w}
                     title={`Line width ${w}`}
                     onClick={() => chartRef.current?.setDrawingWidth(selection.id, w)}
-                    style={{ width: 22, height: 18, display: "flex", alignItems: "center", justifyContent: "center", border: "none", borderRadius: 4, cursor: "pointer", padding: 0, background: on ? `color-mix(in srgb, ${th.line} 20%, transparent)` : "transparent" }}
+                    style={{ width: 22, height: 18, display: "flex", alignItems: "center", justifyContent: "center", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, background: on ? `color-mix(in srgb, var(--ac-accent) 20%, transparent)` : "transparent" }}
                   >
-                    <span style={{ display: "block", width: 14, height: w, borderRadius: 2, background: on ? th.line : th.text }} />
+                    <span style={{ display: "block", width: 14, height: w, borderRadius: 2, background: on ? "var(--ac-accent-ink)" : "var(--ac-text)" }} />
                   </button>
                 );
               })}
-              <span style={{ width: 1, height: 16, background: th.border, margin: "0 2px" }} />
+              <span style={{ width: 1, height: 16, background: "var(--ac-line)", margin: "0 2px" }} />
               {(["solid", "dashed", "dotted"] as const).map((st) => {
                 const on = (selection.style ?? "solid") === st;
                 const dash = st === "dashed" ? "3 2" : st === "dotted" ? "1.5 2" : undefined;
@@ -2439,16 +2440,16 @@ export function TradingChart({
                     key={st}
                     title={`Line style: ${st}`}
                     onClick={() => chartRef.current?.setDrawingStyle(selection.id, st)}
-                    style={{ width: 26, height: 18, display: "flex", alignItems: "center", justifyContent: "center", border: "none", borderRadius: 4, cursor: "pointer", padding: 0, background: on ? `color-mix(in srgb, ${th.line} 20%, transparent)` : "transparent" }}
+                    style={{ width: 26, height: 18, display: "flex", alignItems: "center", justifyContent: "center", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, background: on ? `color-mix(in srgb, var(--ac-accent) 20%, transparent)` : "transparent" }}
                   >
                     <svg width="18" height="8" style={{ display: "block" }}>
-                      <line x1="1" y1="4" x2="17" y2="4" stroke={on ? th.line : th.text} strokeWidth="1.6" strokeDasharray={dash} strokeLinecap="round" />
+                      <line x1="1" y1="4" x2="17" y2="4" stroke={on ? "var(--ac-accent-ink)" : "var(--ac-text)"} strokeWidth="1.6" strokeDasharray={dash} strokeLinecap="round" />
                     </svg>
                   </button>
                 );
               })}
-              <span style={{ width: 1, height: 16, background: th.border, margin: "0 2px" }} />
-              <button title="Delete drawing" onClick={() => chartRef.current?.deleteSelected()} style={{ width: 20, height: 18, border: "none", borderRadius: 4, background: "transparent", color: th.text, cursor: "pointer", fontSize: 13 }}>
+              <span style={{ width: 1, height: 16, background: "var(--ac-line)", margin: "0 2px" }} />
+              <button title="Delete drawing" onClick={() => chartRef.current?.deleteSelected()} style={{ width: 20, height: 18, border: "none", borderRadius: 6, background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 13 }}>
                 ⌫
               </button>
             </div>
@@ -2456,25 +2457,25 @@ export function TradingChart({
           {/* Indicators — a searchable modal (the TradingView pattern), scalable to any length */}
           {indModal && (
             <>
-              <div onClick={() => setIndModal(false)} style={{ position: "absolute", inset: 0, zIndex: 30, background: "rgba(0,0,0,0.4)" }} />
+              <div onClick={() => setIndModal(false)} className="ac-scrim" style={{ position: "absolute", inset: 0, zIndex: Z.scrim }} />
               {/* COMPACT: a bottom sheet, like every other secondary surface here, rather than a
                   326px panel pinned to a 360px screen's top-right corner with 12px of margin —
                   which reads as a window that failed to fit rather than a designed one, and puts
                   a scrolling list under the reader's reach instead of over their thumb. */}
-              <div style={{ position: "absolute", zIndex: 31, ...(compact ? { left: 0, right: 0, bottom: 0, maxHeight: "76%", borderRadius: "16px 16px 0 0" } : { top: 12, right: 12, width: 326, maxHeight: "82%", borderRadius: 10 }), display: "flex", flexDirection: "column", overflow: "hidden", ...surface }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderBottom: `1px solid ${th.border}` }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: th.textStrong, fontFamily: th.font }}>Indicators</span>
-                  <button onClick={() => setIndModal(false)} style={{ border: "none", background: "transparent", color: th.text, cursor: "pointer", fontSize: 16, lineHeight: 1 }}>
+              <div className="ac-surface" style={{ position: "absolute", zIndex: 31, ...(compact ? { left: 0, right: 0, bottom: 0, maxHeight: "76%", borderRadius: "16px 16px 0 0" } : { top: 12, right: 12, width: 326, maxHeight: "82%", borderRadius: 10 }), display: "flex", flexDirection: "column", overflow: "hidden" }} >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderBottom: "1px solid var(--ac-line)" }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "var(--ac-ink)", fontFamily: "var(--ac-font)" }}>Indicators</span>
+                  <button onClick={() => setIndModal(false)} style={{ border: "none", background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 17, lineHeight: 1 }}>
                     ✕
                   </button>
                 </div>
-                <div style={{ padding: "8px 10px", borderBottom: `1px solid ${th.border}` }}>
+                <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--ac-line)" }}>
                   <input
                     value={indSearch}
                     onChange={(e) => setIndSearch(e.target.value)}
                     placeholder="Search…"
                     autoFocus
-                    style={{ width: "100%", boxSizing: "border-box", padding: "7px 10px", borderRadius: 6, border: `1px solid ${th.border}`, background: th.background, color: th.textStrong, fontSize: 13, fontFamily: th.font }}
+                    style={{ width: "100%", boxSizing: "border-box", padding: "7px 10px", borderRadius: 6, border: "1px solid var(--ac-line)", background: "var(--ac-bg)", color: "var(--ac-ink)", fontSize: 13, fontFamily: "var(--ac-font)" }}
                   />
                 </div>
                 <div style={{ overflowY: "auto", padding: 6 }}>
@@ -2495,7 +2496,7 @@ export function TradingChart({
                       shown += items.length;
                       return (
                         <div key={g.label}>
-                          <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text, padding: "8px 10px 4px" }}>{g.label}</div>
+                          <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ac-text)", padding: "8px 10px 4px" }}>{g.label}</div>
                           {items.map((d) => {
                             const locked = isLocked(d.id);
                             const on = active.includes(d.id) && !locked;
@@ -2505,9 +2506,9 @@ export function TradingChart({
                                 onClick={() => toggleInd(d.id)}
                                 aria-disabled={locked}
                                 title={locked ? `${d.label} — not included in your plan` : undefined}
-                                style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "8px 10px", border: "none", borderRadius: 7, cursor: "pointer", textAlign: "left", fontFamily: th.font, fontSize: 13, color: locked ? th.text : th.textStrong, background: on ? `color-mix(in srgb, ${th.line} 12%, transparent)` : "transparent" }}
+                                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", border: "none", borderRadius: 8, cursor: "pointer", textAlign: "left", fontFamily: "var(--ac-font)", fontSize: 13, color: locked ? "var(--ac-text)" : "var(--ac-ink)", background: on ? `color-mix(in srgb, var(--ac-accent) 12%, transparent)` : "transparent" }}
                               >
-                                <span style={{ width: 14, textAlign: "center", color: on ? th.line : th.text }}>{locked ? "🔒" : on ? "✓" : "＋"}</span>
+                                <span style={{ width: 14, textAlign: "center", color: on ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{locked ? "🔒" : on ? "✓" : "＋"}</span>
                                 {d.label}
                               </button>
                             );
@@ -2515,7 +2516,7 @@ export function TradingChart({
                         </div>
                       );
                     });
-                    return shown === 0 ? <div style={{ padding: 12, color: th.text, fontSize: 12.5 }}>No indicators match “{indSearch}”.</div> : body;
+                    return shown === 0 ? <div style={{ padding: 12, color: "var(--ac-text)", fontSize: 12 }}>No indicators match “{indSearch}”.</div> : body;
                   })()}
                 </div>
               </div>
@@ -2523,15 +2524,15 @@ export function TradingChart({
           )}
           {/* Bar-replay: a "click a bar" hint while arming, then a play/step control bar */}
           {replay?.arming && (
-            <div style={{ position: "absolute", top: 40, left: "50%", transform: "translateX(-50%)", zIndex: 9, padding: "6px 12px", background: th.line, color: CHIP_INK, borderRadius: 10, fontSize: 12.5, fontWeight: 700, boxShadow: "0 6px 18px rgba(0,0,0,0.4)" }}>
+            <div style={{ position: "absolute", top: 40, left: "50%", transform: "translateX(-50%)", zIndex: 9, padding: "6px 12px", background: "var(--ac-accent)", color: CHIP_INK, borderRadius: 10, fontSize: 12, fontWeight: 700, boxShadow: ELEV.md }}>
               Click a bar to start replay
             </div>
           )}
           {replay?.active && (
-            <div style={{ position: "absolute", bottom: 14, left: "50%", transform: "translateX(-50%)", zIndex: 9, display: "flex", alignItems: "center", gap: 3, padding: "5px 7px", borderRadius: 10, ...surface }}>
+            <div className="ac-surface" style={{ position: "absolute", bottom: 14, left: "50%", transform: "translateX(-50%)", zIndex: 9, display: "flex", alignItems: "center", gap: 4, padding: "5px 7px", borderRadius: 10 }} >
               {(() => {
                 const cbtn = (glyph: string, title: string, onClick: () => void, on = false) => (
-                  <button title={title} onClick={onClick} style={{ width: 30, height: 26, border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13, background: on ? `color-mix(in srgb, ${th.line} 18%, transparent)` : "transparent", color: on ? th.line : th.textStrong }}>
+                  <button title={title} onClick={onClick} style={{ width: 30, height: 26, border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13, background: on ? `color-mix(in srgb, var(--ac-accent) 18%, transparent)` : "transparent", color: on ? "var(--ac-accent-ink)" : "var(--ac-ink)" }}>
                     {glyph}
                   </button>
                 );
@@ -2540,13 +2541,13 @@ export function TradingChart({
                     {cbtn("⏮", "Step back", () => chartRef.current?.replayBack())}
                     {cbtn(playing ? "⏸" : "▶", playing ? "Pause" : "Play", () => setPlaying((p) => !p), playing)}
                     {cbtn("⏭", "Step forward", () => chartRef.current?.replayForward())}
-                    <span style={{ width: 1, height: 16, background: th.border, margin: "0 3px" }} />
+                    <span style={{ width: 1, height: 16, background: "var(--ac-line)", margin: "0 3px" }} />
                     {[1, 2, 4].map((s) => (
-                      <button key={s} onClick={() => setSpeed(s)} style={{ height: 24, padding: "0 7px", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 11.5, fontWeight: 600, background: speed === s ? `color-mix(in srgb, ${th.line} 18%, transparent)` : "transparent", color: speed === s ? th.line : th.text }}>
+                      <button key={s} onClick={() => setSpeed(s)} style={{ height: 24, padding: "0 7px", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600, background: speed === s ? `color-mix(in srgb, var(--ac-accent) 18%, transparent)` : "transparent", color: speed === s ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>
                         {s}×
                       </button>
                     ))}
-                    <span style={{ padding: "0 6px", fontSize: 11, fontFamily: th.monoFont, color: th.text }}>
+                    <span style={{ padding: "0 6px", fontSize: 11, fontFamily: "var(--ac-mono)", color: "var(--ac-text)" }}>
                       {replay.index + 1}/{replay.total}
                     </span>
                     {cbtn("✕", "Exit replay", () => chartRef.current?.exitReplay())}
@@ -2564,24 +2565,24 @@ export function TradingChart({
           and the settings gear are chart-wide switches, not annotations on a price — they
           belong in chrome. As a real bar they also stop colliding with the axis corner, the
           countdown and anything the host draws in `overlay`. */}
-      <div style={{ display: "flex", alignItems: "center", flexWrap: compact ? "nowrap" : "wrap", gap: 3, padding: compact ? "6px 8px" : "5px 8px", borderTop: `1px solid ${th.border}`, background: th.paneBackground }}>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: compact ? "nowrap" : "wrap", gap: 4, padding: compact ? "6px 8px" : "5px 8px", borderTop: "1px solid var(--ac-line)", background: "var(--ac-pane)" }}>
         {/* Compact scrolls the range strip and the host's settings and keeps the right-hand
             cluster pinned; `display: contents` leaves the wide bar exactly as it was, with its
             children wrapping in the parent. */}
-        <div style={compact ? { ...scrollRow, flex: "1 1 auto", minWidth: 0, gap: 3 } : { display: "contents" }}>
+        <div style={compact ? { ...scrollRow, flex: "1 1 auto", minWidth: 0, gap: 4 } : { display: "contents" }}>
         {/* RANGE — the visible WINDOW, beside the scale switches that draw it.
             Not in the toolbar, where it sat among the interval tabs: those pick the width of a
             BAR and these pick the width of the WINDOW, and with "1D" and "1W" printed in both
             rows, in the same pill, one lit in each, a reader has no way to tell which governs
             what they are looking at. */}
         {rangeList.length > 0 && (
-            <span role="group" aria-label="Visible range" style={{ display: "inline-flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+            <span role="group" aria-label="Visible range" style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
               {rangeList.map((r) => (
                 <button
                   key={r.label}
                   aria-pressed={activeRange === r.label}
                   title={[r.title ?? r.label, r.note].filter(Boolean).join(" · ")}
-                  style={barBtn(activeRange === r.label)}
+                  {...barBtn(activeRange === r.label)}
                   onClick={() => pickRange(r)}
                 >
                   {r.label}
@@ -2595,12 +2596,12 @@ export function TradingChart({
           const cur = g.options.find((o) => o.value === g.value);
           const asMenu = (g.as ?? (g.options.length > 4 ? "menu" : "segmented")) === "menu";
           return (
-            <span key={g.id} style={{ display: "inline-flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+            <span key={g.id} style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
               {rangeList.length > 0 || (settings ?? [])[0] !== g ? barDivider : null}
               {asMenu ? (
                 <span style={{ position: "relative", display: "inline-flex" }}>
                   <button
-                    style={{ ...barBtn(barMenu === g.id || sheetSetting === g.id), gap: 4 }}
+                    {...barBtn(barMenu === g.id || sheetSetting === g.id, { gap: 4 })}
                     title={g.title ?? g.label}
                     aria-label={g.label ?? g.id}
                     aria-expanded={compact ? sheetSetting === g.id : barMenu === g.id}
@@ -2613,35 +2614,35 @@ export function TradingChart({
                     {cur?.label ?? g.value} ▾
                   </button>
                   {!compact && barMenu === g.id && (
-                    <div style={barMenuBox} role="listbox" aria-label={g.label ?? g.id}>
+                    <div className="ac-surface ac-menu" role="listbox" style={barMenuBox} aria-label={g.label ?? g.id}>
                       {g.options.map((o) => (
                         <button
                           key={o.value}
                           role="option"
                           aria-selected={o.value === g.value}
                           title={o.title}
-                          style={{ ...item(o.value === g.value), justifyContent: "space-between", gap: 12 }}
+                          {...item(o.value === g.value, { justifyContent: "space-between", gap: 12 })}
                           onClick={() => {
                             g.onChange(o.value);
                             setBarMenu(null);
-                          }}
+                        }}
                         >
-                          <span style={{ fontFamily: th.monoFont, fontWeight: 600 }}>{o.label}</span>
-                          {o.title && <span style={{ fontSize: 11, color: th.text }}>{o.title}</span>}
+                          <span style={{ fontFamily: "var(--ac-mono)", fontWeight: 600 }}>{o.label}</span>
+                          {o.title && <span style={{ fontSize: 11, color: "var(--ac-text)" }}>{o.title}</span>}
                         </button>
                       ))}
                     </div>
                   )}
                 </span>
               ) : (
-                <span role="group" aria-label={g.label ?? g.id} title={g.title} style={{ display: "inline-flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+                <span role="group" aria-label={g.label ?? g.id} title={g.title} style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                   {g.options.map((o) => (
                     <button
                       key={o.value}
                       aria-pressed={o.value === g.value}
                       title={o.title}
                       disabled={g.disabled}
-                      style={barBtn(o.value === g.value)}
+                      {...barBtn(o.value === g.value)}
                       onClick={() => g.onChange(o.value)}
                     >
                       {o.label}
@@ -2652,7 +2653,7 @@ export function TradingChart({
               {/* A fact about what is CURRENTLY selected — "1 event", "adjusted through 3
                   ex-dates". Only ever the active option's, so it can never describe a basis
                   the chart is not drawing. */}
-              {cur?.note && <span style={barNote}>{cur.note}</span>}
+              {cur?.note && <span className="ac-num ac-muted" style={barNote}>{cur.note}</span>}
             </span>
           );
         })}
@@ -2667,29 +2668,29 @@ export function TradingChart({
         </div>
         <span style={{ marginLeft: "auto", flexShrink: 0 }} />
             {!view.atRealtime && (
-              <button style={{ ...clusterBtn(false), height: compact ? 28 : 23, flexShrink: 0 }} title="Scroll to the latest bar" aria-label="Go to realtime" onClick={() => chartRef.current?.scrollToRealtime()}>»|</button>
+              <button {...clusterBtn(false, { height: compact ? 28 : 23, flexShrink: 0 })} title="Scroll to the latest bar" aria-label="Go to realtime" onClick={() => chartRef.current?.scrollToRealtime()}>»|</button>
             )}
             {/* COMPACT: six switches become one. The scale modes, the profile, the data window
                 and every display toggle live in the sheet, and this is the way in — which also
                 means a host that hides the toolbar still leaves all of them reachable. */}
             {compact ? (
-              <button style={{ ...clusterBtn(sheetIs("menu")), height: 28, minWidth: 30, flexShrink: 0 }} title="Chart settings" aria-label="Chart settings" aria-expanded={sheetIs("menu")} onClick={() => setSheet(sheetIs("menu") ? null : "menu")}>⚙</button>
+              <button {...clusterBtn(sheetIs("menu"), { height: 28, minWidth: 30, flexShrink: 0 })} title="Chart settings" aria-label="Chart settings" aria-expanded={sheetIs("menu")} onClick={() => setSheet(sheetIs("menu") ? null : "menu")}>⚙</button>
             ) : (
               <>
-            <button style={clusterBtn(vpvr)} title="Visible-range volume profile" aria-label="Visible-range volume profile" onClick={() => setVpvr((v) => !v)}>
+            <button {...clusterBtn(vpvr)} title="Visible-range volume profile" aria-label="Visible-range volume profile" onClick={() => setVpvr((v) => !v)}>
               <Icon name="vpvr" size={13} />
             </button>
-            <button style={clusterBtn(dataWindow)} title="Data window — every value at the cursor" aria-label="Data window" onClick={() => setDataWindow((v) => !v)}>
+            <button {...clusterBtn(dataWindow)} title="Data window — every value at the cursor" aria-label="Data window" onClick={() => setDataWindow((v) => !v)}>
               <Icon name="datawindow" size={13} />
             </button>
-            <button style={clusterBtn(!view.autoScale)} title="Reset price scale to auto" aria-label="Reset price scale" onClick={() => chartRef.current?.resetPriceScale()}>Auto</button>
-            <button style={clusterBtn(scaleMode === "log")} title="Logarithmic price scale" aria-label="Logarithmic scale" onClick={() => setScaleMode((m) => (m === "log" ? "normal" : "log"))}>Log</button>
-            <button style={clusterBtn(scaleMode === "percent")} title="Percent price scale" aria-label="Percent scale" onClick={() => setScaleMode((m) => (m === "percent" ? "normal" : "percent"))}>%</button>
+            <button {...clusterBtn(!view.autoScale)} title="Reset price scale to auto" aria-label="Reset price scale" onClick={() => chartRef.current?.resetPriceScale()}>Auto</button>
+            <button {...clusterBtn(scaleMode === "log")} title="Logarithmic price scale" aria-label="Logarithmic scale" onClick={() => setScaleMode((m) => (m === "log" ? "normal" : "log"))}>Log</button>
+            <button {...clusterBtn(scaleMode === "percent")} title="Percent price scale" aria-label="Percent scale" onClick={() => setScaleMode((m) => (m === "percent" ? "normal" : "percent"))}>%</button>
             <span style={{ position: "relative" }}>
-              <button style={clusterBtn(settingsOpen)} title="Chart settings" aria-label="Chart settings" onClick={() => setSettingsOpen((o) => !o)}>⚙</button>
+              <button {...clusterBtn(settingsOpen)} title="Chart settings" aria-label="Chart settings" onClick={() => setSettingsOpen((o) => !o)}>⚙</button>
               {settingsOpen && (
-                <div style={{ position: "absolute", right: 0, bottom: 30, zIndex: 20, background: th.paneBackground, border: `1px solid ${th.border}`, borderRadius: 12, padding: 6, boxShadow: "0 12px 34px rgba(0,0,0,0.5)", minWidth: 226, maxHeight: 340, overflowY: "auto" }}>
-                  <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text, padding: "2px 8px 6px" }}>Appearance</div>
+                <div className="ac-surface ac-menu" style={{ position: "absolute", right: 0, bottom: CONTROL.md + SPACE[1], zIndex: Z.menu, borderRadius: RADIUS.lg, padding: SPACE[1], minWidth: 232, maxHeight: 340, overflowY: "auto" }}>
+                  <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ac-text)", padding: "2px 8px 6px" }}>Appearance</div>
                   {(
                     [
                       ["Grid lines", gridOn, setGridOn],
@@ -2701,12 +2702,12 @@ export function TradingChart({
                       ["Stop / target levels", levelsOn, setLevelsOn],
                     ] as const
                   ).map(([label, val, set]) => (
-                    <button key={label} style={item(false)} onClick={() => set((v) => !v)}>
-                      <span style={{ width: 16, color: val ? th.line : th.text }}>{val ? "✓" : ""}</span> {label}
+                    <button key={label} {...item(false)} onClick={() => set((v) => !v)}>
+                      <span style={{ width: 16, color: val ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{val ? "✓" : ""}</span> {label}
                     </button>
                   ))}
-                  <div style={{ height: 1, background: th.border, margin: "5px 0" }} />
-                  <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: th.text, padding: "2px 8px 6px" }}>Analysis</div>
+                  <div style={{ height: 1, background: "var(--ac-line)", margin: "5px 0" }} />
+                  <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ac-text)", padding: "2px 8px 6px" }}>Analysis</div>
                   {(
                     [
                       ["Visible-range volume profile", vpvr, setVpvr],
@@ -2715,18 +2716,18 @@ export function TradingChart({
                       ["Guided mode", guided, setGuided],
                     ] as const
                   ).map(([label, val, set]) => (
-                    <button key={label} style={item(false)} onClick={() => set((v) => !v)}>
-                      <span style={{ width: 16, color: val ? th.line : th.text }}>{val ? "✓" : ""}</span> {label}
+                    <button key={label} {...item(false)} onClick={() => set((v) => !v)}>
+                      <span style={{ width: 16, color: val ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{val ? "✓" : ""}</span> {label}
                     </button>
                   ))}
-                  <div style={{ height: 1, background: th.border, margin: "5px 0" }} />
-                  <button style={item(false)} onClick={() => { chartRef.current?.resetPanes(); setSettingsOpen(false); }}>
+                  <div style={{ height: 1, background: "var(--ac-line)", margin: "5px 0" }} />
+                  <button {...item(false)} onClick={() => { chartRef.current?.resetPanes(); setSettingsOpen(false); }}>
                     <span style={{ width: 16 }} /> Reset pane heights
                   </button>
-                  <button style={item(false)} onClick={() => { setShortcuts(true); setSettingsOpen(false); }}>
+                  <button {...item(false)} onClick={() => { setShortcuts(true); setSettingsOpen(false); }}>
                     <span style={{ width: 16 }} /> Keyboard shortcuts
                   </button>
-                  <button style={item(false)} onClick={() => { saveImage(); setSettingsOpen(false); }}>
+                  <button {...item(false)} onClick={() => { saveImage(); setSettingsOpen(false); }}>
                     <span style={{ width: 16 }} /> Save chart image (PNG)
                   </button>
                 </div>
@@ -2842,8 +2843,8 @@ export function TradingChart({
           does) costs nothing. */}
       {compact && sheet && (
         <>
-          <div onClick={() => setSheet(null)} style={{ position: "absolute", inset: 0, zIndex: 30, background: "rgba(0,0,0,0.45)" }} />
-          <div
+          <div onClick={() => setSheet(null)} className="ac-scrim" style={{ position: "absolute", inset: 0, zIndex: Z.scrim }} />
+          <div className="ac-surface"
             role="dialog"
             aria-label={sheetIs("interval") ? "Bar interval" : sheetIs("type") ? "Chart type" : sheetIs("compare") ? "Compare" : "Chart controls"}
             style={{
@@ -2859,24 +2860,23 @@ export function TradingChart({
               borderTopLeftRadius: 16,
               borderTopRightRadius: 16,
               padding: "6px 6px 10px",
-              ...surface,
-            }}
+          }}
           >
             {/* The grab handle. It does not drag — it says "this came up from the bottom and
                 goes back down", which is the whole grammar of a sheet. */}
             <div style={{ display: "flex", alignItems: "center", padding: "6px 4px 2px" }}>
-              <span style={{ width: 34, height: 4, borderRadius: 999, background: soft(th.text, 40), margin: "0 auto" }} />
-              <button onClick={() => setSheet(null)} aria-label="Close" style={{ position: "absolute", right: 10, top: 8, width: 30, height: 30, border: "none", borderRadius: 8, background: soft(th.text, 12), color: th.textStrong, cursor: "pointer", fontSize: 14 }}>✕</button>
+              <span style={{ width: 34, height: 4, borderRadius: 999, background: "var(--ac-text)", margin: "0 auto" }} />
+              <button onClick={() => setSheet(null)} aria-label="Close" style={{ position: "absolute", right: 10, top: 8, width: 30, height: 30, border: "none", borderRadius: 8, background: "var(--ac-hover)", color: "var(--ac-ink)", cursor: "pointer", fontSize: 14 }}>✕</button>
             </div>
 
             {/* INTERVAL — the width of a BAR. */}
             {sheetIs("interval") &&
               intervalGroups.map((g) => (
                 <div key={g.label}>
-                  <div style={sheetSection}>{g.label}</div>
+                  <div className="ac-cap" style={sheetSection}>{g.label}</div>
                   {g.items.map((it) => (
-                    <button key={it.v} style={sheetItem(it.v === resolution)} onClick={() => { pickRes(it.v); setSheet(null); }}>
-                      <span style={{ width: 16, color: it.v === resolution ? th.line : th.text }}>{it.v === resolution ? "✓" : ""}</span> {it.l}
+                    <button key={it.v} {...sheetItem(it.v === resolution)} onClick={() => { pickRes(it.v); setSheet(null); }}>
+                      <span style={{ width: 16, color: it.v === resolution ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{it.v === resolution ? "✓" : ""}</span> {it.l}
                     </button>
                   ))}
                 </div>
@@ -2886,9 +2886,9 @@ export function TradingChart({
             {sheetIs("type") &&
               TYPE_GROUPS.map((g) => (
                 <div key={g.label}>
-                  <div style={sheetSection}>{g.label}</div>
+                  <div className="ac-cap" style={sheetSection}>{g.label}</div>
                   {g.ts.map((tt) => (
-                    <button key={tt} style={sheetItem(tt === type)} onClick={() => { setType(tt); setSheet(null); }}>
+                    <button key={tt} {...sheetItem(tt === type)} onClick={() => { setType(tt); setSheet(null); }}>
                       <Icon name={tt} size={17} /> {TYPES.find((y) => y.t === tt)!.label}
                     </button>
                   ))}
@@ -2900,31 +2900,31 @@ export function TradingChart({
                 typing a ticker works, exactly as on a desktop. */}
             {sheetIs("compare") && (
               <>
-                <div style={sheetSection}>Compare</div>
-                <div style={{ display: "flex", gap: 5, padding: "0 6px 6px" }}>
+                <div className="ac-cap" style={sheetSection}>Compare</div>
+                <div style={{ display: "flex", gap: 4, padding: "0 6px 6px" }}>
                   <input
                     value={cmpInput}
                     onChange={(e) => setCmpInput(e.target.value.toUpperCase())}
                     onKeyDown={(e) => { if (e.key === "Enter") addCompare(); }}
                     placeholder="Symbol…"
                     autoFocus
-                    style={{ flex: 1, minWidth: 0, fontFamily: th.font, fontSize: 15, height: 38, padding: "0 10px", borderRadius: 9, border: `1px solid ${th.border}`, background: th.background, color: th.textStrong }}
+                    style={{ flex: 1, minWidth: 0, fontFamily: "var(--ac-font)", fontSize: 14, height: 38, padding: "0 10px", borderRadius: 8, border: "1px solid var(--ac-line)", background: "var(--ac-bg)", color: "var(--ac-ink)" }}
                   />
-                  <button onClick={() => addCompare()} style={{ ...btn(true), height: 38, padding: "0 14px" }}>Add</button>
+                  <button onClick={() => addCompare()} {...btn(true, { height: 38, padding: "0 14px" })}>Add</button>
                 </div>
                 {cmpHits.map((h) => (
-                  <button key={h.symbol} style={sheetItem(false)} onClick={() => addCompare(h.symbol)}>
+                  <button key={h.symbol} {...sheetItem(false)} onClick={() => addCompare(h.symbol)}>
                     <span style={{ fontWeight: 700, minWidth: 54 }}>{h.symbol}</span>
-                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, color: th.text }}>{h.description}</span>
+                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, color: "var(--ac-text)" }}>{h.description}</span>
                   </button>
                 ))}
                 {compares.map((c) => (
-                  <div key={c.symbol} style={{ ...sheetItem(false), justifyContent: "space-between" }}>
+                  <div key={c.symbol} {...sheetItem(false, { justifyContent: "space-between" })}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                       <span style={{ width: 10, height: 10, borderRadius: 2, background: c.color }} />
                       {c.symbol}
                     </span>
-                    <button onClick={() => removeCompare(c.symbol)} aria-label={`Remove ${c.symbol}`} style={{ border: "none", background: "transparent", color: th.text, cursor: "pointer", fontSize: 16, padding: "0 6px" }}>✕</button>
+                    <button onClick={() => removeCompare(c.symbol)} aria-label={`Remove ${c.symbol}`} style={{ border: "none", background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 17, padding: "0 6px" }}>✕</button>
                   </div>
                 ))}
               </>
@@ -2936,12 +2936,12 @@ export function TradingChart({
                 .filter((g) => g.id === sheet.setting)
                 .map((g) => (
                   <div key={g.id}>
-                    <div style={sheetSection}>{g.label ?? g.id}</div>
+                    <div className="ac-cap" style={sheetSection}>{g.label ?? g.id}</div>
                     {g.options.map((o) => (
-                      <button key={o.value} style={sheetItem(o.value === g.value)} onClick={() => { g.onChange(o.value); setSheet(null); }}>
-                        <span style={{ width: 16, color: o.value === g.value ? th.line : th.text }}>{o.value === g.value ? "✓" : ""}</span>
-                        <span style={{ fontFamily: th.monoFont, fontWeight: 600, minWidth: 44 }}>{o.label}</span>
-                        {o.title && <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, color: th.text }}>{o.title}</span>}
+                      <button key={o.value} {...sheetItem(o.value === g.value)} onClick={() => { g.onChange(o.value); setSheet(null); }}>
+                        <span style={{ width: 16, color: o.value === g.value ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{o.value === g.value ? "✓" : ""}</span>
+                        <span style={{ fontFamily: "var(--ac-mono)", fontWeight: 600, minWidth: 44 }}>{o.label}</span>
+                        {o.title && <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: "var(--ac-text)" }}>{o.title}</span>}
                       </button>
                     ))}
                   </div>
@@ -2951,24 +2951,24 @@ export function TradingChart({
                 plot, which is the wrong shape for a phone; the tools themselves are fine. */}
             {sheetIs("menu") && drawingRail && (
               <>
-                <div style={sheetSection}>Tools</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))", gap: 5, padding: "0 6px" }}>
+                <div className="ac-cap" style={sheetSection}>Tools</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))", gap: 4, padding: "0 6px" }}>
                   {RAIL_GROUPS.flatMap((g) => g.tools).map((t) => (
                     <button
                       key={t.t}
                       aria-pressed={tool === t.t}
                       title={t.label}
-                      style={{ ...btn(tool === t.t), height: 52, flexDirection: "column", gap: 3, padding: "0 4px", fontSize: 9.5, lineHeight: 1.15, textAlign: "center", whiteSpace: "normal" }}
+                      {...btn(tool === t.t, { height: 52, flexDirection: "column", gap: 4, padding: "0 4px", fontSize: 10, lineHeight: 1.15, textAlign: "center", whiteSpace: "normal" })}
                       onClick={() => { applyTool(t.t); setSheet(null); }}
                     >
-                      {hasIcon(t.t) ? <Icon name={t.t} size={17} /> : <span style={{ fontSize: 15 }} aria-hidden>{t.glyph}</span>}
+                      {hasIcon(t.t) ? <Icon name={t.t} size={17} /> : <span style={{ fontSize: 14 }} aria-hidden>{t.glyph}</span>}
                       {t.label}
                     </button>
                   ))}
                 </div>
-                <div style={{ display: "flex", gap: 5, padding: "6px 6px 0" }}>
-                  <button style={{ ...btn(magnet), flex: 1 }} onClick={() => setMagnetOn((v) => !v)}>Magnet {magnet ? "on" : "off"}</button>
-                  <button style={{ ...btn(false), flex: 1 }} onClick={() => { applyTool("clear"); setSheet(null); }}>Clear drawings</button>
+                <div style={{ display: "flex", gap: 4, padding: "6px 6px 0" }}>
+                  <button {...btn(magnet, { flex: 1 })} onClick={() => setMagnetOn((v) => !v)}>Magnet {magnet ? "on" : "off"}</button>
+                  <button {...btn(false, { flex: 1 })} onClick={() => { applyTool("clear"); setSheet(null); }}>Clear drawings</button>
                 </div>
               </>
             )}
@@ -2976,47 +2976,47 @@ export function TradingChart({
             {sheetIs("menu") && (
               <>
             {/* CHART — the toolbar actions that did not fit the row. */}
-            <div style={sheetSection}>Chart</div>
-            <button style={sheetItem(active.length > 0)} onClick={() => { setIndModal(true); setSheet(null); }}>
+            <div className="ac-cap" style={sheetSection}>Chart</div>
+            <button {...sheetItem(active.length > 0)} onClick={() => { setIndModal(true); setSheet(null); }}>
               <Icon name="indicators" size={16} /> Indicators{active.length ? ` (${active.length})` : ""}
             </button>
-            <button style={sheetItem(compares.length > 0)} onClick={() => setSheet("compare")}>
+            <button {...sheetItem(compares.length > 0)} onClick={() => setSheet("compare")}>
               <Icon name="compare" size={16} /> Compare{compares.length ? ` (${compares.length})` : ""}
             </button>
             {onRunScript && (
-              <button style={sheetItem(scriptOpen || scripts.length > 0)} onClick={() => { setScriptOpen((o) => !o); setSheet(null); }}>
+              <button {...sheetItem(scriptOpen || scripts.length > 0)} onClick={() => { setScriptOpen((o) => !o); setSheet(null); }}>
                 <Icon name="script" size={16} /> Script editor
               </button>
             )}
-            <button style={sheetItem(!!replay)} onClick={() => { replay ? chartRef.current?.exitReplay() : chartRef.current?.armReplay(); setSheet(null); }}>
+            <button {...sheetItem(!!replay)} onClick={() => { replay ? chartRef.current?.exitReplay() : chartRef.current?.armReplay(); setSheet(null); }}>
               <Icon name="replay" size={14} /> {replay ? "Exit replay" : "Bar replay"}
             </button>
-            <button style={sheetItem(false)} onClick={() => { saveImage(); setSheet(null); }}>
+            <button {...sheetItem(false)} onClick={() => { saveImage(); setSheet(null); }}>
               <Icon name="save" size={15} /> Save chart image
             </button>
-            <button style={sheetItem(cmdOpen)} onClick={() => { setCmdOpen(true); setCmdQuery(""); setSheet(null); }}>
+            <button {...sheetItem(cmdOpen)} onClick={() => { setCmdOpen(true); setCmdQuery(""); setSheet(null); }}>
               <span style={{ width: 16 }} /> Command launcher — search every action
             </button>
-            <button style={sheetItem(false)} onClick={() => { setGuided((v) => !v); setSheet(null); }}>
+            <button {...sheetItem(false)} onClick={() => { setGuided((v) => !v); setSheet(null); }}>
               <span style={{ width: 16 }} /> {guided ? "Switch to Pro mode" : "Switch to Guided mode"}
             </button>
 
             {/* SCALE — Auto / Log / % are chart-wide switches; on a wide bar they are three
                 pills, here they are a segmented row that fits one thumb. */}
-            <div style={sheetSection}>Price scale</div>
-            <div style={{ display: "flex", gap: 5, padding: "0 6px" }}>
-              <button style={{ ...btn(scaleMode === "normal"), flex: 1, justifyContent: "center" }} onClick={() => setScaleMode("normal")}>Linear</button>
-              <button style={{ ...btn(scaleMode === "log"), flex: 1, justifyContent: "center" }} onClick={() => setScaleMode("log")}>Log</button>
-              <button style={{ ...btn(scaleMode === "percent"), flex: 1, justifyContent: "center" }} onClick={() => setScaleMode("percent")}>Percent</button>
+            <div className="ac-cap" style={sheetSection}>Price scale</div>
+            <div style={{ display: "flex", gap: 4, padding: "0 6px" }}>
+              <button {...btn(scaleMode === "normal", { flex: 1, justifyContent: "center" })} onClick={() => setScaleMode("normal")}>Linear</button>
+              <button {...btn(scaleMode === "log", { flex: 1, justifyContent: "center" })} onClick={() => setScaleMode("log")}>Log</button>
+              <button {...btn(scaleMode === "percent", { flex: 1, justifyContent: "center" })} onClick={() => setScaleMode("percent")}>Percent</button>
             </div>
-            <div style={{ display: "flex", gap: 5, padding: "6px 6px 0" }}>
-              <button style={{ ...btn(false), flex: 1, justifyContent: "center" }} onClick={() => { chartRef.current?.resetPriceScale(); setSheet(null); }}>Auto-scale</button>
-              <button style={{ ...btn(false), flex: 1, justifyContent: "center" }} onClick={() => { chartRef.current?.fit(); setSheet(null); }}>Fit all</button>
-              <button style={{ ...btn(false), flex: 1, justifyContent: "center" }} onClick={() => { chartRef.current?.scrollToRealtime(); setSheet(null); }}>Latest</button>
+            <div style={{ display: "flex", gap: 4, padding: "6px 6px 0" }}>
+              <button {...btn(false, { flex: 1, justifyContent: "center" })} onClick={() => { chartRef.current?.resetPriceScale(); setSheet(null); }}>Auto-scale</button>
+              <button {...btn(false, { flex: 1, justifyContent: "center" })} onClick={() => { chartRef.current?.fit(); setSheet(null); }}>Fit all</button>
+              <button {...btn(false, { flex: 1, justifyContent: "center" })} onClick={() => { chartRef.current?.scrollToRealtime(); setSheet(null); }}>Latest</button>
             </div>
 
             {/* DISPLAY — the same toggles the ⚙ popover carries on a desktop, at thumb size. */}
-            <div style={sheetSection}>Display</div>
+            <div className="ac-cap" style={sheetSection}>Display</div>
             {(
               [
                 ["Grid lines", gridOn, setGridOn],
@@ -3030,19 +3030,19 @@ export function TradingChart({
                 ["Data window", dataWindow, setDataWindow],
               ] as const
             ).map(([label, val, set]) => (
-              <button key={label} style={sheetItem(false)} onClick={() => set((v) => !v)} aria-pressed={val}>
-                <span style={{ width: 16, color: val ? th.line : th.text }}>{val ? "✓" : ""}</span> {label}
+              <button key={label} {...sheetItem(false)} onClick={() => set((v) => !v)} aria-pressed={val}>
+                <span style={{ width: 16, color: val ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{val ? "✓" : ""}</span> {label}
               </button>
             ))}
-            <button style={sheetItem(false)} onClick={() => { chartRef.current?.resetPanes(); setSheet(null); }}>
+            <button {...sheetItem(false)} onClick={() => { chartRef.current?.resetPanes(); setSheet(null); }}>
               <span style={{ width: 16 }} /> Reset pane heights
             </button>
 
             {/* THEME last: it is the one setting a reader changes once and never again. */}
-            <div style={sheetSection}>Theme</div>
-            <div style={{ ...scrollRow, gap: 5, padding: "0 6px 4px" }}>
+            <div className="ac-cap" style={sheetSection}>Theme</div>
+            <div style={{ ...scrollRow, gap: 4, padding: "0 6px 4px" }}>
               {["Auto", ...THEME_NAMES].map((n) => (
-                <button key={n} style={{ ...btn(n === themeName), flexShrink: 0 }} onClick={() => setThemeName(n)}>
+                <button key={n} {...btn(n === themeName, { flexShrink: 0 })} onClick={() => setThemeName(n)}>
                   {n === "Auto" ? "Auto (app)" : n}
                 </button>
               ))}

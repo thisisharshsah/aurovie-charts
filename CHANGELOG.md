@@ -4,6 +4,50 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.11.0] - 2026-08-19
+
+### Changed
+
+- **The React UI is rebuilt on a design system.** No behaviour, no props, no routing and no
+  rendering logic changed — every control does exactly what it did. What changed is that the
+  widget now has a vocabulary instead of ~470 hand-typed style literals.
+
+  `react/ui.ts` holds it: a strict **4px spacing grid**, one **radius ramp** (6 · 8 · 10 · 14 · 16
+  · 20) keyed to the size of the thing rather than to whoever wrote the line, a **type scale**
+  replacing eleven ad-hoc sizes (9.5, 10, 10.5, 11, 11.5, 12, 12.5, 13, 13.5, 14.5, 15, 17, 21 —
+  half-pixel type does not render as half a pixel, it renders as an inconsistent one), four
+  **control heights**, and one **elevation set**. A test holds the scales to the grid.
+
+- **Every interactive element now has hover, active, focus and disabled states.** It had none, and
+  could not have had any: the widget was built from inline `style` objects, an inline style cannot
+  express a pseudo-class, and an inline `background` outranks a class's `:hover` in the cascade.
+  So the rule the refactor is built on — **classes own colour, state and elevation; inline styles
+  own layout only** — is not a preference, it is the only arrangement in which a control can
+  respond to being touched. Colour reaches one scoped stylesheet as CSS custom properties stamped
+  on the widget root, so a theme change is one attribute rather than several hundred re-rendered
+  style objects, and the chart, the ticket and the script editor all resolve from the same sheet.
+
+- **Elevation is reserved for surfaces that float.** Every button carried
+  `0 1px 2px rgba(0,0,0,0.08)` — forty shadowed rectangles in a toolbar, which is not depth but
+  grime, and which left nothing for a menu to rise above. Buttons are flat at rest; menus, sheets
+  and modals take the three-step ramp. Scrims are one class at one opacity instead of four
+  hand-written `rgba(0,0,0,0.3–0.45)`.
+
+### Fixed
+
+- **The accent was unreadable as text on light themes.** The widget paints every SELECTED
+  control's label in `theme.line`, and on the built-in light theme that is gold `#ebae3d` on white
+  — **1.97:1**, below the 3:1 floor for large text and nowhere near 4.5:1 for body. The active
+  state of every button in the toolbar was effectively invisible on a white chart, and a host
+  pointing `line` at its own brand colour inherited the same bug with its own hue.
+
+  The accent is now treated as a HUE rather than an ink: `--ac-accent` keeps the exact colour for
+  fills, strokes and borders, while `--ac-accent-ink` is that colour moved toward the surface's
+  opposite until it clears 4.5:1. On dark themes it usually already passes and is returned
+  untouched. `up` and `down` get the same treatment (3.57:1 and 4.15:1 on light) for the OHLC
+  legend, the header's change figure and the ticket's risk readout. Tested against the shipped
+  presets and against arbitrary host brand colours.
+
 ## [0.10.1] - 2026-08-18
 
 ### Fixed

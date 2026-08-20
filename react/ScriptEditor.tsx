@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Icon } from "./icons";
 import type { Theme } from "../src/types";
+import { CONTROL, RADIUS, SPACE, TYPE, WEIGHT, cx } from "./ui";
 
 export interface ScriptError {
   message: string;
@@ -267,28 +268,11 @@ export function ScriptEditor({
   const mono = th.monoFont.replace(/^\d+(\.\d+)?px/, "12px");
   const soft = (c: string, pct: number) => `color-mix(in srgb, ${c} ${pct}%, transparent)`;
 
-  const btn = (primary = false): CSSProperties => ({
-    height: 26,
-    padding: "0 11px",
-    border: "none",
-    borderRadius: 8,
-    cursor: "pointer",
-    fontSize: 12,
-    fontWeight: 600,
-    fontFamily: th.font,
-    background: primary ? soft(th.line, 18) : "transparent",
-    color: primary ? th.line : th.text,
-  });
+  // The editor shares the widget's control vocabulary — it is a panel OF the chart, and a second
+  // button style inside it was the clearest tell that it had been built separately.
+  const btn = (primary = false, style?: CSSProperties) => ({ className: cx("ac-btn", "ac-btn--sm", primary && "is-on"), style });
 
-  const sectionLabel: CSSProperties = {
-    padding: "8px 12px 2px",
-    fontFamily: th.font,
-    fontSize: 10,
-    fontWeight: 700,
-    letterSpacing: "0.05em",
-    textTransform: "uppercase",
-    color: soft(th.text, 70),
-  };
+  const sectionLabel: CSSProperties = { padding: `${SPACE[2]}px ${SPACE[3]}px ${SPACE[1]}px` };
 
   return (
     <div
@@ -305,17 +289,17 @@ export function ScriptEditor({
         flex: expanded ? "1 1 auto" : "0 0 clamp(240px, 42%, 420px)",
         minHeight: 0,
         overflow: "hidden",
-        background: th.paneBackground,
-        borderTop: `1px solid ${th.border}`,
+        background: "var(--ac-pane)",
+        borderTop: "1px solid var(--ac-line)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderBottom: `1px solid ${th.border}` }}>
-        <span style={{ fontFamily: th.font, fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: th.text }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderBottom: "1px solid var(--ac-line)" }}>
+        <span style={{ fontFamily: "var(--ac-font)", fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--ac-text)" }}>
           Script
         </span>
         {(presets.length > 0 || saved.length > 0) && (
           <button
-            style={{ ...btn(browsing), height: 22, padding: "0 9px", fontSize: 11 }}
+            {...btn(browsing, { height: 22, padding: "0 9px", fontSize: 11 })}
             title="Load a strategy from the library"
             onClick={() => setBrowsing((b) => !b)}
           >
@@ -324,11 +308,11 @@ export function ScriptEditor({
         )}
         <span style={{ flex: 1 }} />
         {status && !error && (
-          <span style={{ fontFamily: th.monoFont, fontSize: 11, color: th.text }}>{status}</span>
+          <span style={{ fontFamily: th.monoFont, fontSize: 11, color: "var(--ac-text)" }}>{status}</span>
         )}
         {onSweep && (
           <button
-            style={btn()}
+            {...btn()}
             onClick={onSweep}
             disabled={sweeping}
             title="Score this strategy across every instrument with stored history"
@@ -338,7 +322,7 @@ export function ScriptEditor({
         )}
         {onBacktest && (
           <button
-            style={btn()}
+            {...btn()}
             onClick={onBacktest}
             disabled={backtesting}
             title="Score this strategy out-of-sample, after costs"
@@ -348,7 +332,7 @@ export function ScriptEditor({
         )}
         {onSaveAs && (
           <button
-            style={btn()}
+            {...btn()}
             onClick={() => {
               setSavingAs(true);
               setSaveAsTitle("");
@@ -360,7 +344,7 @@ export function ScriptEditor({
         )}
         {onSave && (
           <button
-            style={btn()}
+            {...btn()}
             onClick={onSave}
             disabled={dirty === false}
             title="Save changes to this strategy"
@@ -368,11 +352,11 @@ export function ScriptEditor({
             {dirty ? "Save •" : "Save"}
           </button>
         )}
-        <button style={btn(true)} onClick={onRun} disabled={running} title="Run (Ctrl/Cmd + Enter)">
+        <button {...btn(true)} onClick={onRun} disabled={running} title="Run (Ctrl/Cmd + Enter)">
           {running ? "Running…" : "▶ Run"}
         </button>
         <button
-          style={btn(expanded)}
+          {...btn(expanded)}
           onClick={() => setExpanded((v) => !v)}
           aria-pressed={expanded}
           title={expanded ? "Restore the editor to a dock" : "Expand to a full workspace"}
@@ -380,7 +364,7 @@ export function ScriptEditor({
         >
           <Icon name={expanded ? "collapse" : "expand"} size={14} />
         </button>
-        <button style={btn()} onClick={onClose} aria-label="Close editor">✕</button>
+        <button {...btn()} onClick={onClose} aria-label="Close editor">✕</button>
       </div>
 
       {savingAs && (
@@ -390,8 +374,8 @@ export function ScriptEditor({
             gap: 6,
             alignItems: "center",
             padding: "6px 10px",
-            borderBottom: `1px solid ${th.border}`,
-            background: th.background,
+            borderBottom: "1px solid var(--ac-line)",
+            background: "var(--ac-bg)",
           }}
         >
           <input
@@ -407,20 +391,20 @@ export function ScriptEditor({
             style={{
               flex: 1,
               height: 24,
-              border: `1px solid ${th.border}`,
+              border: "1px solid var(--ac-line)",
               borderRadius: 8,
-              background: th.paneBackground,
-              color: th.textStrong,
-              fontFamily: th.font,
+              background: "var(--ac-pane)",
+              color: "var(--ac-ink)",
+              fontFamily: "var(--ac-font)",
               fontSize: 12,
               padding: "0 8px",
               outline: "none",
             }}
           />
-          <button style={btn(true)} disabled={!saveAsTitle.trim()} onClick={commitSaveAs}>
+          <button {...btn(true)} disabled={!saveAsTitle.trim()} onClick={commitSaveAs}>
             Save
           </button>
-          <button style={btn()} onClick={() => setSavingAs(false)}>
+          <button {...btn()} onClick={() => setSavingAs(false)}>
             Cancel
           </button>
         </div>
@@ -432,7 +416,7 @@ export function ScriptEditor({
           produced, instead of the two taking turns in one short scrolling box. */}
       <div style={{ display: "flex", flexDirection: split ? "row" : "column", flex: 1, minHeight: 0, minWidth: 0 }}>
         <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, minWidth: 0, order: split ? 0 : 1 }}>
-        <div style={{ display: "flex", flex: 1, minHeight: 0, background: th.background }}>
+        <div style={{ display: "flex", flex: 1, minHeight: 0, background: "var(--ac-bg)" }}>
           <div
             ref={gutterRef}
             style={{
@@ -444,8 +428,8 @@ export function ScriptEditor({
               fontFamily: mono,
               fontSize: 12,
               lineHeight: "18px",
-              color: soft(th.text, 70),
-              borderRight: `1px solid ${th.border}`,
+              color: "var(--ac-text)",
+              borderRight: "1px solid var(--ac-line)",
               userSelect: "none",
             }}
           >
@@ -499,7 +483,7 @@ export function ScriptEditor({
               outline: "none",
               padding: "8px 10px",
               background: "transparent",
-              color: th.textStrong,
+              color: "var(--ac-ink)",
               fontFamily: mono,
               fontSize: 12,
               lineHeight: "18px",
@@ -512,11 +496,11 @@ export function ScriptEditor({
           <div
             style={{
               padding: "7px 10px",
-              borderTop: `1px solid ${th.border}`,
+              borderTop: "1px solid var(--ac-line)",
               background: soft(th.down, 12),
               color: th.down,
               fontFamily: th.monoFont,
-              fontSize: 11.5,
+              fontSize: 11,
             }}
           >
             line {error.line}: {error.message}
@@ -532,7 +516,7 @@ export function ScriptEditor({
             order: split ? 1 : 0,
             flex: split ? "0 0 42%" : "none",
             overflowY: split ? "auto" : undefined,
-            borderLeft: split ? `1px solid ${th.border}` : undefined,
+            borderLeft: split ? "1px solid var(--ac-line)" : undefined,
           }}
         >
         {browsing && (
@@ -542,14 +526,14 @@ export function ScriptEditor({
               flexDirection: "column",
               maxHeight: 260,
               overflowY: "auto",
-              background: th.background,
-              borderBottom: `1px solid ${th.border}`,
+              background: "var(--ac-bg)",
+              borderBottom: "1px solid var(--ac-line)",
             }}
           >
             <div
               style={{
                 padding: "8px 12px 4px",
-                fontFamily: th.font,
+                fontFamily: "var(--ac-font)",
                 fontSize: 11,
                 lineHeight: 1.5,
                 color: soft(th.text, 80),
@@ -559,7 +543,7 @@ export function ScriptEditor({
               not a product. Loading one replaces the editor's contents.
             </div>
             {presets.length > 0 && saved.length > 0 && (
-              <div style={sectionLabel}>Built-in · read-only</div>
+              <div className="ac-cap" style={sectionLabel}>Built-in · read-only</div>
             )}
             {presets.map((p) => (
               <button
@@ -579,10 +563,10 @@ export function ScriptEditor({
                   borderTop: `1px solid ${soft(th.border, 60)}`,
                   background: "transparent",
                   cursor: "pointer",
-                  fontFamily: th.font,
+                  fontFamily: "var(--ac-font)",
                 }}
               >
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: th.textStrong }}>{p.title}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ac-ink)" }}>{p.title}</div>
                 <div style={{ fontSize: 11, lineHeight: 1.45, color: soft(th.text, 85), marginTop: 2 }}>
                   {gist(p.description)}
                 </div>
@@ -590,7 +574,7 @@ export function ScriptEditor({
             ))}
             {saved.length > 0 && (
               <>
-                <div style={sectionLabel}>Yours · editable</div>
+                <div className="ac-cap" style={sectionLabel}>Yours · editable</div>
                 {saved.map((sv) => (
                   <div
                     key={String(sv.id)}
@@ -612,10 +596,10 @@ export function ScriptEditor({
                         border: "none",
                         background: "transparent",
                         cursor: "pointer",
-                        fontFamily: th.font,
+                        fontFamily: "var(--ac-font)",
                       }}
                     >
-                      <div style={{ fontSize: 12.5, fontWeight: 600, color: th.textStrong }}>{sv.title}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ac-ink)" }}>{sv.title}</div>
                       {sv.badge && (
                         <div style={{ fontSize: 11, lineHeight: 1.45, color: soft(th.text, 85), marginTop: 2, fontFamily: mono }}>
                           {sv.badge}
@@ -626,7 +610,7 @@ export function ScriptEditor({
                       <button
                         onClick={() => onDeleteSaved(sv.id)}
                         title={`Delete ${sv.title}`}
-                        style={{ ...btn(), height: 22, marginRight: 8, color: th.down }}
+                        className="ac-btn ac-btn--xs ac-btn--danger" style={{ marginRight: SPACE[2] }}
                       >
                         ✕
                       </button>
@@ -639,7 +623,7 @@ export function ScriptEditor({
         )}
 
         {sweep && !browsing && (
-          <div style={{ padding: "10px 12px 12px", background: th.background, borderBottom: `1px solid ${th.border}` }}>
+          <div style={{ padding: "10px 12px 12px", background: "var(--ac-bg)", borderBottom: "1px solid var(--ac-line)" }}>
             {(() => {
               const s = sweep;
               // Defensive for the same reason the host reads payloads defensively: this renders
@@ -661,33 +645,33 @@ export function ScriptEditor({
               const pct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(0)}%`;
               const tile = (l: string, v: string) => (
                 <div key={l} style={{ minWidth: 78 }}>
-                  <div style={{ fontFamily: mono, fontSize: 13, fontWeight: 600, color: th.textStrong, fontVariantNumeric: "tabular-nums" }}>{v}</div>
-                  <div style={{ fontFamily: th.font, fontSize: 10, color: soft(th.text, 85), marginTop: 1 }}>{l}</div>
+                  <div style={{ fontFamily: mono, fontSize: 13, fontWeight: 600, color: "var(--ac-ink)", fontVariantNumeric: "tabular-nums" }}>{v}</div>
+                  <div style={{ fontFamily: "var(--ac-font)", fontSize: 10, color: soft(th.text, 85), marginTop: 1 }}>{l}</div>
                 </div>
               );
               return (
                 <>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                    <span style={{ fontFamily: th.font, fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: soft(th.text, 90) }}>
+                    <span style={{ fontFamily: "var(--ac-font)", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: soft(th.text, 90) }}>
                       Universe sweep
                     </span>
                     <span
                       style={{
-                        fontFamily: th.font,
-                        fontSize: 10.5,
+                        fontFamily: "var(--ac-font)",
+                        fontSize: 10,
                         fontWeight: 700,
                         letterSpacing: "0.04em",
                         textTransform: "uppercase",
                         color: tone,
                         border: `1px solid ${soft(tone, 45)}`,
                         background: soft(tone, 12),
-                        borderRadius: 5,
+                        borderRadius: 6,
                         padding: "2px 7px",
                       }}
                     >
                       {label}
                     </span>
-                    <span style={{ fontFamily: th.font, fontSize: 11, color: soft(th.text, 90) }}>
+                    <span style={{ fontFamily: "var(--ac-font)", fontSize: 11, color: soft(th.text, 90) }}>
                       {num(s.total_trades)} trades across {d.tested} instruments · {num(s.span_years).toFixed(1)}y
                     </span>
                   </div>
@@ -709,7 +693,7 @@ export function ScriptEditor({
                   {rows.length > 0 && (
                     <div style={{ marginBottom: 9 }}>
                       <button
-                        style={{ ...btn(showRows), height: 20, padding: "0 8px", fontSize: 10.5, marginBottom: showRows ? 5 : 0 }}
+                        {...btn(showRows, { height: 20, padding: "0 8px", fontSize: 10, marginBottom: showRows ? 5 : 0 })}
                         onClick={() => setShowRows((v) => !v)}
                       >
                         {showRows ? "Hide instruments" : `Show all ${rows.length} instruments`}
@@ -730,7 +714,7 @@ export function ScriptEditor({
                                 fontVariantNumeric: "tabular-nums",
                               }}
                             >
-                              <span style={{ width: 62, color: th.textStrong }}>{r.symbol}</span>
+                              <span style={{ width: 62, color: "var(--ac-ink)" }}>{r.symbol}</span>
                               <span style={{ width: 62, textAlign: "right", color: r.total_return >= 0 ? th.up : th.down }}>
                                 {pct(num(r.total_return))}
                               </span>
@@ -754,8 +738,8 @@ export function ScriptEditor({
                   {caveats.length > 0 && (
                     <div
                       style={{
-                        fontFamily: th.font,
-                        fontSize: 10.5,
+                        fontFamily: "var(--ac-font)",
+                        fontSize: 10,
                         lineHeight: 1.55,
                         color: soft(th.text, 92),
                         borderLeft: `2px solid ${soft(th.down, 55)}`,
@@ -776,7 +760,7 @@ export function ScriptEditor({
         )}
 
         {scorecard && !browsing && (
-          <div style={{ padding: "10px 12px 12px", background: th.background, borderBottom: `1px solid ${th.border}` }}>
+          <div style={{ padding: "10px 12px 12px", background: "var(--ac-bg)", borderBottom: "1px solid var(--ac-line)" }}>
             {(() => {
               const sc = scorecard;
               const o = sc.out_of_sample;
@@ -794,10 +778,10 @@ export function ScriptEditor({
               // proportional figures, which is what a large standalone number wants.
               const tile = (label: string, val: string) => (
                 <div key={label} style={{ minWidth: 74 }}>
-                  <div style={{ fontFamily: mono, fontSize: 13.5, fontWeight: 600, color: th.textStrong, fontVariantNumeric: "tabular-nums" }}>
+                  <div style={{ fontFamily: mono, fontSize: 13, fontWeight: 600, color: "var(--ac-ink)", fontVariantNumeric: "tabular-nums" }}>
                     {val}
                   </div>
-                  <div style={{ fontFamily: th.font, fontSize: 10, color: soft(th.text, 85), marginTop: 1 }}>{label}</div>
+                  <div style={{ fontFamily: "var(--ac-font)", fontSize: 10, color: soft(th.text, 85), marginTop: 1 }}>{label}</div>
                 </div>
               );
               return (
@@ -805,29 +789,29 @@ export function ScriptEditor({
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                     <span
                       style={{
-                        fontFamily: th.font,
-                        fontSize: 10.5,
+                        fontFamily: "var(--ac-font)",
+                        fontSize: 10,
                         fontWeight: 700,
                         letterSpacing: "0.04em",
                         textTransform: "uppercase",
                         color: verdict.tone,
                         border: `1px solid ${soft(verdict.tone, 45)}`,
                         background: soft(verdict.tone, 12),
-                        borderRadius: 5,
+                        borderRadius: 6,
                         padding: "2px 7px",
                       }}
                     >
                       {verdict.label}
                     </span>
-                    <span style={{ fontFamily: th.font, fontSize: 11, color: soft(th.text, 90) }}>{verdict.note}</span>
+                    <span style={{ fontFamily: "var(--ac-font)", fontSize: 11, color: soft(th.text, 90) }}>{verdict.note}</span>
                   </div>
 
                   {/* Exactly one hero figure, and it is the OUT-OF-SAMPLE return. */}
                   <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 9 }}>
-                    <div style={{ fontFamily: th.font, fontSize: 30, fontWeight: 600, lineHeight: 1.05, color: o.trades > 0 ? (o.total_return >= 0 ? th.up : th.down) : th.text }}>
+                    <div style={{ fontFamily: "var(--ac-font)", fontSize: 30, fontWeight: 600, lineHeight: 1.05, color: o.trades > 0 ? (o.total_return >= 0 ? th.up : th.down) : th.text }}>
                       {o.trades > 0 ? pct(o.total_return) : "—"}
                     </div>
-                    <div style={{ fontFamily: th.font, fontSize: 11, color: soft(th.text, 90) }}>
+                    <div style={{ fontFamily: "var(--ac-font)", fontSize: 11, color: soft(th.text, 90) }}>
                       Out-of-sample return · {o.trades} closed {o.trades === 1 ? "trade" : "trades"} over {o.bars} bars
                     </div>
                   </div>
@@ -854,7 +838,7 @@ export function ScriptEditor({
                     return (
                       <div style={{ marginBottom: 9 }}>
                         {fs.map((f) => (
-                          <div key={f.code} style={{ fontFamily: th.font, fontSize: 10.5, lineHeight: 1.6, marginBottom: 4 }}>
+                          <div key={f.code} style={{ fontFamily: "var(--ac-font)", fontSize: 10, lineHeight: 1.6, marginBottom: 4 }}>
                             <span style={{ color: tone(f.severity), fontWeight: 600, textTransform: "uppercase", fontSize: 9 }}>
                               {f.severity}
                             </span>{" "}
@@ -880,7 +864,7 @@ export function ScriptEditor({
                     if (!b || o.trades === 0) return null;
                     const won = sc.beats_hold === true;
                     return (
-                      <div style={{ fontFamily: th.font, fontSize: 10.5, lineHeight: 1.6, color: soft(th.text, 85), marginBottom: 7 }}>
+                      <div style={{ fontFamily: "var(--ac-font)", fontSize: 10, lineHeight: 1.6, color: soft(th.text, 85), marginBottom: 7 }}>
                         Buy and hold, same bars ·{" "}
                         <span style={{ color: soft(th.text, 95) }}>{pct(b.total_return)} return</span>
                         {" · "}
@@ -907,7 +891,7 @@ export function ScriptEditor({
                     if (st == null || tg == null || sg == null || o.trades === 0) return null;
                     const share = (n: number) => `${((n / o.trades) * 100).toFixed(0)}%`;
                     return (
-                      <div style={{ fontFamily: th.font, fontSize: 10.5, lineHeight: 1.6, color: soft(th.text, 85), marginBottom: 7 }}>
+                      <div style={{ fontFamily: "var(--ac-font)", fontSize: 10, lineHeight: 1.6, color: soft(th.text, 85), marginBottom: 7 }}>
                         How trades ended ·{" "}
                         <span style={{ color: st > 0 ? th.down : soft(th.text, 70) }}>{st} stopped out ({share(st)})</span>
                         {" · "}
@@ -915,7 +899,7 @@ export function ScriptEditor({
                         {" · "}
                         <span>{sg} on signal ({share(sg)})</span>
                         {st === 0 && tg === 0 && (
-                          <span style={{ color: soft(th.text, 70) }}>
+                          <span style={{ color: "var(--ac-text)" }}>
                             {" "}— no protective level was ever touched, so the stop changed nothing here.
                           </span>
                         )}
@@ -935,7 +919,7 @@ export function ScriptEditor({
                     // undermining a result the scorer just certified.
                     if (sc.verdict === "clears-exam-one" || o.trades === 0) return null;
                     return (
-                      <div style={{ fontFamily: th.font, fontSize: 10, lineHeight: 1.6, color: soft(th.text, 62), marginBottom: 7 }}>
+                      <div style={{ fontFamily: "var(--ac-font)", fontSize: 10, lineHeight: 1.6, color: soft(th.text, 62), marginBottom: 7 }}>
                         Most strategies land here. Of the seventeen in this library, two beat buy-and-hold
                         over twenty years — both by margins indistinguishable from noise. A negative
                         verdict is the usual outcome of an honest test, not a fault in the strategy or
@@ -955,7 +939,7 @@ export function ScriptEditor({
                     return (
                       <div style={{ marginBottom: 9, paddingTop: 7, borderTop: `1px solid ${soft(th.text, 15)}` }}>
                         {ds.map((d) => (
-                          <div key={d.code} style={{ fontFamily: th.font, fontSize: 10.5, lineHeight: 1.6, marginBottom: 6 }}>
+                          <div key={d.code} style={{ fontFamily: "var(--ac-font)", fontSize: 10, lineHeight: 1.6, marginBottom: 6 }}>
                             <span
                               style={{
                                 color: th.background,
@@ -993,7 +977,7 @@ export function ScriptEditor({
                     );
                   })()}
 
-                  <div style={{ fontFamily: th.font, fontSize: 10.5, lineHeight: 1.6, color: soft(th.text, 85) }}>
+                  <div style={{ fontFamily: "var(--ac-font)", fontSize: 10, lineHeight: 1.6, color: soft(th.text, 85) }}>
                     <div>
                       {sc.deflated_sharpe == null
                         ? `Nothing to deflate — the out-of-sample half never traded.`

@@ -1,6 +1,6 @@
 {
   "name": "aurovie-charts",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "description": "Framework-agnostic canvas charting engine \u2014 a TradingView-class financial chart (candles/volume, indicators, drawings, crosshair, pan/zoom) with a datafeed abstraction. React-free core; optional ./react binding.",
   "license": "MIT",
   "author": "Harsh Kumar Sah",
@@ -31,7 +31,7 @@
     "build": "node scripts/clean-dist.mjs && tsup && node scripts/preserve-use-client.mjs",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "test": "node --import tsx --test \"src/**/*.test.ts\" \"react/**/*.test.ts\"",
     "prepublishOnly": "npm run typecheck && npm run test && npm run build"
   },
   "peerDependencies": {

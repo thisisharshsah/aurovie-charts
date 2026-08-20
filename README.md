@@ -260,6 +260,35 @@ block entirely when your ticker animates.
 for any other venue or the shading marks the wrong bars. Use `utc: true` when your bar times are
 exchange wall-clock stamped as UTC — otherwise the shading is computed in the *reader's* timezone.
 
+## Design system
+
+The React layer resolves through one module, [`react/ui.ts`](./react/ui.ts): a 4px spacing grid, a
+radius ramp keyed to the size of the thing, a type scale, four control heights, one elevation set,
+and a single scoped stylesheet carrying every interactive state.
+
+The rule it enforces:
+
+> **Classes own colour, state and elevation. Inline styles own layout only.**
+
+That is not a style preference. An inline `background` outranks a class's `:hover` in the cascade,
+so a control that paints itself inline can never light up under the pointer — which is why the
+widget previously had no hover or pressed states anywhere. Theme reaches the stylesheet as CSS
+custom properties stamped on the widget root, so one static sheet serves every theme and every
+host override.
+
+Two colour helpers are worth knowing about if you pass a `themeOverride`:
+
+```ts
+import { readable, contrast } from "aurovie-charts/react";
+
+contrast("#ebae3d", "#ffffff"); // 1.97 — the default gold, unreadable as text on white
+readable("#ebae3d", "#ffffff"); // a darkened gold that clears 4.5:1
+```
+
+The widget applies this automatically: `--ac-accent` keeps your exact hue for fills and strokes,
+while `--ac-accent-ink` is the same colour moved until it is legible as text. Point `theme.line` at
+whatever brand colour you like — selected controls stay readable on light and dark alike.
+
 ## Standalone build (no ES modules)
 
 For hosts that cannot import an ES module — a React Native WebView, a `<script>` tag, a page that

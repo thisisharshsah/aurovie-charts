@@ -5,6 +5,7 @@
 // wide monitor. Measured on the CONTAINER, not the viewport — a workspace inside a split pane is
 // narrow no matter how wide the window is.
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { SPACE } from "./ui";
 
 export interface ChartWorkspaceProps {
   /** The chart. Given the remaining width and the full height. */
@@ -25,7 +26,7 @@ export interface ChartWorkspaceProps {
   className?: string;
 }
 
-export function ChartWorkspace({ children, aside, side = "right", asideWidth = 340, breakpoint = 880, gap = 12, style, className }: ChartWorkspaceProps) {
+export function ChartWorkspace({ children, aside, side = "right", asideWidth = 340, breakpoint = 880, gap = SPACE[3], style, className }: ChartWorkspaceProps) {
   const ref = useRef<HTMLDivElement>(null);
   // Start docked. A stacked first paint that immediately re-docks is a visible jump on every
   // desktop load, and desktop is the common case for a workspace.

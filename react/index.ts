@@ -18,6 +18,9 @@ export type {
 } from "./TradeTicket";
 
 export { ChartWorkspace } from "./ChartWorkspace";
+
+// The design system, for hosts that theme the widget or build chrome beside it.
+export { SPACE, RADIUS, TYPE, WEIGHT, CONTROL, ELEV, MOTION, Z, contrast, luminance, readable, themeVars, cx } from "./ui";
 export type { ChartWorkspaceProps } from "./ChartWorkspace";
 
 export type { ScriptPreset, ScriptScorecard, ScriptSweep, ScriptMetrics, SavedStrategy } from "./ScriptEditor";

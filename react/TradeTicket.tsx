@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { DARK, LIGHT } from "../src/util";
 import type { Theme } from "../src/types";
+import { CONTROL, RADIUS, SHEET, SPACE, TYPE, WEIGHT, cx, readable, themeVars } from "./ui";
 import { HAS_LIMIT, HAS_TIF, HAS_TRIGGER, bracketCoherent, deriveTicketRisk } from "../src/ticket";
 import type { OrderType, SizeMode, TicketAccount, TicketOrder, TicketQuote, TicketRisk, TimeInForce } from "../src/ticket";
 
@@ -180,44 +181,29 @@ export function TradeTicket({
   const failed = (checks ?? []).filter((c) => !c.ok);
   const gated = failed.length > 0;
 
-  const gap = compact ? 8 : 10;
+  const gap = compact ? SPACE[2] : SPACE[3];
 
-  // ——— shared styles, all derived from the CHART's theme so a ticket beside a plot is visibly
-  // the same object rather than a second design system sharing a screen ———
-  const cap: CSSProperties = { fontSize: 9.5, fontFamily: th.monoFont, textTransform: "uppercase", letterSpacing: "0.09em", color: th.text, whiteSpace: "nowrap" };
-  const mono: CSSProperties = { fontFamily: th.monoFont, fontVariantNumeric: "tabular-nums" };
-  const segWrap: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 2, padding: 2, borderRadius: 10, background: soft(th.text, 10), border: `1px solid ${soft(th.border, 70)}` };
-  const seg = (on: boolean, tone?: string): CSSProperties => ({
-    height: 26,
-    padding: "0 11px",
-    border: "none",
-    borderRadius: 8,
-    cursor: disabled ? "not-allowed" : "pointer",
-    fontSize: 11.5,
-    fontWeight: 700,
-    fontFamily: th.font,
-    letterSpacing: "0.02em",
-    background: on ? soft(tone ?? th.line, 18) : "transparent",
-    color: on ? (tone ?? th.line) : th.text,
-    transition: "background 140ms ease, color 140ms ease",
-    whiteSpace: "nowrap",
+  // ——— SHARED STYLES ———
+  // Colour, state and elevation come from the shared stylesheet (`react/ui.ts`), the same one the
+  // chart uses, so a ticket beside a plot is visibly the same object rather than a second design
+  // system sharing a screen. What is left here is layout, plus the two things a ticket has that a
+  // chart does not: a side (buy/sell) and a set of tones for figures.
+  type P = { className: string; style?: CSSProperties };
+  const cap: CSSProperties = {};                       // → class `ac-cap`
+  const mono: CSSProperties = { fontVariantNumeric: "tabular-nums", fontFamily: "var(--ac-mono)" };
+  const segWrap: CSSProperties = {};                   // → class `ac-seg`
+  /**
+   * A segmented option. `tone` lets buy/sell wear their own direction colour instead of the
+   * accent — passed as a CSS custom property so the class still owns the state model, and the
+   * `-ink` form so the label stays readable when the tone is a pale green on white.
+   */
+  const seg = (on: boolean, tone?: string, toneInk?: string): P => ({
+    className: cx("ac-btn", "ac-btn--sm", on && "is-on"),
+    style: tone ? ({ "--ac-accent": tone, "--ac-accent-ink": toneInk ?? tone } as CSSProperties) : undefined,
   });
-  const chip: CSSProperties = { height: 22, padding: "0 8px", borderRadius: 7, border: `1px solid ${soft(th.border, 70)}`, background: "transparent", color: th.text, cursor: "pointer", fontSize: 11, fontWeight: 600, ...mono };
-  const field: CSSProperties = {
-    height: 32,
-    width: "100%",
-    minWidth: 0,
-    padding: "0 10px",
-    borderRadius: 9,
-    border: `1px solid ${soft(th.border, 80)}`,
-    background: soft(th.text, 8),
-    color: th.textStrong,
-    fontSize: 13.5,
-    fontWeight: 600,
-    ...mono,
-    outline: "none",
-  };
-  const tile: CSSProperties = { display: "flex", flexDirection: "column", gap: 3, padding: "8px 10px", borderRadius: 10, background: soft(th.text, 7), border: `1px solid ${soft(th.border, 55)}` };
+  const chip = (style?: CSSProperties): P => ({ className: cx("ac-btn", "ac-btn--xs", "ac-btn--outline", "ac-num"), style });
+  const field: CSSProperties = {};                     // → class `ac-field`
+  const tile: CSSProperties = {};                      // → class `ac-tile`
 
   const set = (patch: Partial<TicketOrder>) => {
     if (!disabled) onChange(patch);
@@ -228,38 +214,39 @@ export function TradeTicket({
       ref={rootRef}
       data-aurovie-ticket
       style={{
+        // The theme, as custom properties — the ticket resolves from the SAME stylesheet as the
+        // chart, so a ticket docked beside a plot cannot drift into being a second design system.
+        ...themeVars(th),
         display: "flex",
         flexDirection: "column",
         gap,
         width,
-        padding: compact ? 10 : 12,
-        borderRadius: frame ? 14 : 0,
-        border: frame ? `1px solid ${th.border}` : "none",
-        background: th.paneBackground,
-        boxShadow: frame ? "0 1px 2px rgba(0,0,0,0.2), 0 8px 28px rgba(0,0,0,0.16)" : "none",
-        fontFamily: th.font,
-        color: th.textStrong,
+        padding: compact ? SPACE[3] : SPACE[4],
+        borderRadius: frame ? RADIUS.xl : 0,
+        border: frame ? "1px solid var(--ac-line)" : "none",
+        background: "var(--ac-pane)",
+        boxShadow: frame ? "0 1px 2px rgba(0,0,0,0.16), 0 8px 28px rgba(0,0,0,0.12)" : "none",
+        fontFamily: "var(--ac-font)",
+        color: "var(--ac-ink)",
         // The side is stated by the whole card, not only by the toggle: a hairline in the side's
         // colour down the leading edge means the reader can never mistake a sell ticket for a
         // buy one at a glance, which is the mistake that costs the most.
         borderLeft: frame ? `2px solid ${soft(sideColor, 55)}` : "none",
       }}
     >
-      {/* Inline styles cannot express a pseudo-class, so focus and hover live in one scoped
-          block keyed on the root attribute — it cannot leak into the host page. */}
-      <style>{`
-        [data-aurovie-ticket] :is(button,input,select):focus-visible { outline: 2px solid currentColor; outline-offset: 1px; border-radius: 6px; }
-        [data-aurovie-ticket] input::-webkit-outer-spin-button,
-        [data-aurovie-ticket] input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        [data-aurovie-ticket] input[type=number] { -moz-appearance: textfield; }
-        [data-aurovie-ticket] button:not(:disabled):hover { filter: brightness(1.12); }
-        @media (prefers-reduced-motion: reduce) { [data-aurovie-ticket] * { transition-duration: 1ms !important; } }
-      `}</style>
+      {/*
+        THE SAME STYLESHEET THE CHART USES, scoped so it cannot leak into the host page. It
+        replaces the ticket's own five-rule block, whose only hover was `filter: brightness(1.12)`
+        applied to EVERY button — which lightens a disabled control and a destructive one exactly
+        as much as it lightens a harmless one, and does nothing at all to a transparent
+        background. States are per-role now. See `react/ui.ts`.
+      */}
+      <style>{SHEET}</style>
 
       {/* ——— title + desk status ——— */}
       {(title || status?.length) && (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-          {title && <span style={{ fontSize: 12.5, fontWeight: 700, letterSpacing: "0.01em" }}>{title}</span>}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {title && <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.01em" }}>{title}</span>}
           <span style={{ marginLeft: "auto", display: "inline-flex", gap: 4, flexWrap: "wrap" }}>
             {(status ?? []).map((s, i) => (
               <span
@@ -287,10 +274,11 @@ export function TradeTicket({
       {/* ——— SIDE. Two buttons, full width, the chosen one filled in its own direction colour.
               Side is the single most consequential field on the ticket and it used to be the
               same size as the venue picker. ——— */}
-      <div role="radiogroup" aria-label="Order side" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+      <div role="radiogroup" aria-label="Order side" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         {(["buy", "sell"] as const).map((s) => {
           const on = order.side === s;
           const c = s === "buy" ? th.up : th.down;
+          const ink = pickInk(c);
           return (
             <button
               key={s}
@@ -298,20 +286,17 @@ export function TradeTicket({
               aria-checked={on}
               disabled={disabled}
               onClick={() => set({ side: s })}
+              className={cx("ac-btn", "ac-btn--side", on && "is-on")}
               style={{
-                height: 36,
-                border: `1px solid ${on ? c : soft(th.border, 75)}`,
-                borderRadius: 10,
-                cursor: disabled ? "not-allowed" : "pointer",
-                fontFamily: th.font,
-                fontSize: 13,
-                fontWeight: 800,
+                // Layout + the side's own hue, handed to the class as variables so the shared
+                // state model (hover, press, focus, disabled) still applies unchanged.
+                "--ac-side": c,
+                "--ac-side-ink": ink,
+                height: CONTROL.xl,
+                fontSize: TYPE.base,
+                fontWeight: WEIGHT.bold,
                 letterSpacing: "0.08em",
-                background: on ? c : "transparent",
-                color: on ? pickInk(c) : th.text,
-                boxShadow: on ? `0 4px 14px ${soft(c, 30)}` : "none",
-                transition: "background 140ms ease, color 140ms ease, border-color 140ms ease",
-              }}
+              } as CSSProperties}
             >
               {s === "buy" ? "BUY" : "SELL"}
             </button>
@@ -325,12 +310,12 @@ export function TradeTicket({
           <span style={{ ...mono, fontSize: 13, fontWeight: 700, letterSpacing: "0.04em" }}>{symbol}</span>
         )}
         {symbolExtra}
-        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "baseline", gap: 8 }}>
           {num(quote?.last) != null && (
-            <span style={{ ...mono, fontSize: 17, fontWeight: 700, color: th.textStrong }}>{price(quote!.last!)}</span>
+            <span style={{ ...mono, fontSize: 17, fontWeight: 700, color: "var(--ac-ink)" }}>{price(quote!.last!)}</span>
           )}
           {num(quote?.changePct) != null && (
-            <span style={{ ...mono, fontSize: 11.5, fontWeight: 700, color: quote!.changePct! >= 0 ? th.up : th.down }}>
+            <span style={{ ...mono, fontSize: 11, fontWeight: 700, color: quote!.changePct! >= 0 ? "var(--ac-up-ink)" : "var(--ac-down-ink)" }}>
               {quote!.changePct! >= 0 ? "▲" : "▼"} {Math.abs(quote!.changePct!).toFixed(2)}%
             </span>
           )}
@@ -338,20 +323,20 @@ export function TradeTicket({
       </div>
 
       {/* ——— order type · time in force ——— */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         {orderTypes.length > 1 && (
-          <span role="radiogroup" aria-label="Order type" style={segWrap}>
+          <span role="radiogroup" aria-label="Order type" className="ac-seg">
             {orderTypes.map((t) => (
-              <button key={t} role="radio" aria-checked={order.type === t} disabled={disabled} title={ORDER_TYPE_HINT[t]} style={seg(order.type === t)} onClick={() => set({ type: t })}>
+              <button key={t} role="radio" aria-checked={order.type === t} disabled={disabled} title={ORDER_TYPE_HINT[t]} {...seg(order.type === t)} onClick={() => set({ type: t })}>
                 {ORDER_TYPE_LABEL[t]}
               </button>
             ))}
           </span>
         )}
         {HAS_TIF.includes(order.type) && tifs.length > 1 && (
-          <span role="radiogroup" aria-label="Time in force" style={segWrap}>
+          <span role="radiogroup" aria-label="Time in force" className="ac-seg">
             {tifs.map((t) => (
-              <button key={t} role="radio" aria-checked={order.tif === t} disabled={disabled} title={TIF_HINT[t]} style={{ ...seg(order.tif === t), ...mono, padding: "0 9px" }} onClick={() => set({ tif: t })}>
+              <button key={t} role="radio" aria-checked={order.tif === t} disabled={disabled} title={TIF_HINT[t]} {...seg(order.tif === t, undefined, undefined)} className={cx("ac-btn", "ac-btn--sm", "ac-num", order.tif === t && "is-on")} onClick={() => set({ tif: t })}>
                 {TIF_LABEL[t]}
               </button>
             ))}
@@ -360,7 +345,7 @@ export function TradeTicket({
       </div>
 
       {/* ——— SIZE ——— */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {sizeModes.length > 1 && (
           <span role="radiogroup" aria-label="Size by" style={{ ...segWrap, alignSelf: "flex-start" }}>
             {sizeModes.map((m) => (
@@ -376,7 +361,7 @@ export function TradeTicket({
                       ? "Size by cash budget — rounds DOWN to whole shares"
                       : "Size by percent of equity risked to your stop"
                 }
-                style={seg(order.sizeMode === m)}
+                {...seg(order.sizeMode === m)}
                 onClick={() => set({ sizeMode: m })}
               >
                 {SIZE_LABEL[m]}
@@ -395,9 +380,6 @@ export function TradeTicket({
             onChange={(v) => set({ qty: v })}
             presets={qtyPresets.map((n) => ({ label: String(n), value: n }))}
             th={th}
-            field={field}
-            chip={chip}
-            cap={cap}
             disabled={disabled}
           />
         )}
@@ -411,9 +393,6 @@ export function TradeTicket({
             onChange={(v) => set({ amount: v })}
             presets={amountPresets.map((n) => ({ label: n >= 1000 ? `${n / 1000}k` : String(n), value: n }))}
             th={th}
-            field={field}
-            chip={chip}
-            cap={cap}
             disabled={disabled}
           />
         )}
@@ -428,9 +407,6 @@ export function TradeTicket({
             onChange={(v) => set({ riskPct: v })}
             presets={[0.25, 0.5, 1].map((n) => ({ label: `${n}%`, value: n }))}
             th={th}
-            field={field}
-            chip={chip}
-            cap={cap}
             disabled={disabled}
           />
         )}
@@ -438,7 +414,7 @@ export function TradeTicket({
         {/* Sizing by cash or by risk RESOLVES to a share count, and the reader is entitled to see
             the number that will actually be sent — not to discover it on the fill. */}
         {order.sizeMode !== "shares" && (
-          <span style={{ ...cap, color: th.text }}>
+          <span style={{ ...cap }}>
             {num(risk.qty) != null ? `→ ${whole(risk.qty!)} share${risk.qty === 1 ? "" : "s"}` : "→ size needs a price" + (order.sizeMode === "risk" ? " and a stop" : "")}
           </span>
         )}
@@ -446,12 +422,12 @@ export function TradeTicket({
 
       {/* ——— price fields ——— */}
       {(HAS_TRIGGER.includes(order.type) || HAS_LIMIT.includes(order.type)) && (
-        <div style={{ display: "grid", gridTemplateColumns: HAS_TRIGGER.includes(order.type) && HAS_LIMIT.includes(order.type) ? "1fr 1fr" : "1fr", gap: 6 }}>
+        <div style={{ display: "grid", gridTemplateColumns: HAS_TRIGGER.includes(order.type) && HAS_LIMIT.includes(order.type) ? "1fr 1fr" : "1fr", gap: 8 }}>
           {HAS_TRIGGER.includes(order.type) && (
-            <PriceField label="Trigger" value={order.stopPrice} onChange={(v) => set({ stopPrice: v })} th={th} field={field} cap={cap} disabled={disabled} />
+            <PriceField label="Trigger" value={order.stopPrice} onChange={(v) => set({ stopPrice: v })} th={th} disabled={disabled} />
           )}
           {HAS_LIMIT.includes(order.type) && (
-            <PriceField label="Limit" value={order.limit} onChange={(v) => set({ limit: v })} th={th} field={field} cap={cap} disabled={disabled} />
+            <PriceField label="Limit" value={order.limit} onChange={(v) => set({ limit: v })} th={th} disabled={disabled} />
           )}
         </div>
       )}
@@ -459,20 +435,20 @@ export function TradeTicket({
       {/* Snap the limit to the real top of book. NEUTRAL tone on purpose — a bid is not a gain
           and an ask is not a loss, and up/down here are reserved for direction. */}
       {HAS_LIMIT.includes(order.type) && (num(quote?.bid) != null || num(quote?.ask) != null) && (
-        <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
-          <span style={cap}>Book</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+          <span className="ac-cap">Book</span>
           {num(quote?.bid) != null && (
-            <button style={chip} disabled={disabled} title="Set the limit to the bid" onClick={() => set({ limit: quote!.bid! })}>
+            <button {...chip()} disabled={disabled} title="Set the limit to the bid" onClick={() => set({ limit: quote!.bid! })}>
               bid {price(quote!.bid!)}
             </button>
           )}
           {num(quote?.bid) != null && num(quote?.ask) != null && (
-            <button style={chip} disabled={disabled} title="Set the limit to the midpoint" onClick={() => set({ limit: (quote!.bid! + quote!.ask!) / 2 })}>
+            <button {...chip()} disabled={disabled} title="Set the limit to the midpoint" onClick={() => set({ limit: (quote!.bid! + quote!.ask!) / 2 })}>
               mid {price((quote!.bid! + quote!.ask!) / 2)}
             </button>
           )}
           {num(quote?.ask) != null && (
-            <button style={chip} disabled={disabled} title="Set the limit to the ask" onClick={() => set({ limit: quote!.ask! })}>
+            <button {...chip()} disabled={disabled} title="Set the limit to the ask" onClick={() => set({ limit: quote!.ask! })}>
               ask {price(quote!.ask!)}
             </button>
           )}
@@ -482,9 +458,9 @@ export function TradeTicket({
       {/* ——— BRACKET. Stop first: it is the field the whole risk readout hangs off, and a ticket
               that lists the target above the stop puts the pleasant number first. ——— */}
       {showBracket && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-          <PriceField label="Stop loss" value={order.stop} onChange={(v) => set({ stop: v })} accent={th.down} th={th} field={field} cap={cap} disabled={disabled} />
-          <PriceField label="Take profit" value={order.target} onChange={(v) => set({ target: v })} accent={th.up} th={th} field={field} cap={cap} disabled={disabled} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <PriceField label="Stop loss" value={order.stop} onChange={(v) => set({ stop: v })} accent="var(--ac-down-ink)" th={th} disabled={disabled} />
+          <PriceField label="Take profit" value={order.target} onChange={(v) => set({ target: v })} accent="var(--ac-up-ink)" th={th} disabled={disabled} />
         </div>
       )}
 
@@ -493,7 +469,7 @@ export function TradeTicket({
           derived from it: both distances are absolute, so the risk/reward tile reads perfectly
           healthy for a plan that would take profit at a loss. */}
       {showBracket && !bracketCoherent(order, risk.entry ?? null) && (
-        <div style={{ fontSize: 11.5, lineHeight: 1.45, color: th.down, fontWeight: 600 }}>
+        <div style={{ fontSize: 11, lineHeight: 1.45, color: "var(--ac-down-ink)", fontWeight: WEIGHT.semibold }}>
           This bracket is inverted for a {buying ? "long" : "short"} — the stop and target sit on the wrong sides of{" "}
           {num(risk.entry) != null ? price(risk.entry!) : "the entry"}.
         </div>
@@ -501,18 +477,18 @@ export function TradeTicket({
 
       {/* ——— what it costs ——— */}
       {(num(cost) != null || num(account?.buyingPower) != null || num(account?.position) != null) && (
-        <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap", paddingTop: 2, borderTop: `1px solid ${soft(th.border, 60)}` }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", paddingTop: 2, borderTop: `1px solid ${"var(--ac-line-soft)"}` }}>
           {num(cost) != null && (
             <>
-              <span style={cap}>Est. cost</span>
-              <span style={{ ...mono, fontSize: 15, fontWeight: 700 }}>{money(cost!)}</span>
+              <span className="ac-cap">Est. cost</span>
+              <span style={{ ...mono, fontSize: 14, fontWeight: 700 }}>{money(cost!)}</span>
             </>
           )}
           {num(account?.buyingPower) != null && (
-            <span style={{ ...mono, fontSize: 11, color: th.text }}>of {money(account!.buyingPower!)} buying power</span>
+            <span style={{ ...mono, fontSize: 11, color: "var(--ac-text)" }}>of {money(account!.buyingPower!)} buying power</span>
           )}
           {num(account?.position) != null && account!.position !== 0 && (
-            <span style={{ ...mono, fontSize: 11, marginLeft: "auto", color: th.text }}>
+            <span style={{ ...mono, fontSize: 11, marginLeft: "auto", color: "var(--ac-text)" }}>
               holding {whole(account!.position!)}
             </span>
           )}
@@ -523,26 +499,26 @@ export function TradeTicket({
               most needs before they press a coloured button. Every tile is omitted when its
               input is missing rather than printed as a zero. ——— */}
       {(num(risk.riskAmount) != null || num(risk.rr) != null || num(risk.notional) != null) && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))", gap: 6 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))", gap: 8 }}>
           {num(risk.notional) != null && <Tile label="Notional" value={money(risk.notional!)} th={th} tile={tile} cap={cap} mono={mono} />}
           {num(risk.riskAmount) != null && (
-            <Tile label="Risk / trade" value={money(risk.riskAmount!)} accent={th.down} th={th} tile={tile} cap={cap} mono={mono} />
+            <Tile label="Risk / trade" value={money(risk.riskAmount!)} accent="var(--ac-down-ink)" th={th} tile={tile} cap={cap} mono={mono} />
           )}
           {num(risk.riskPct) != null && <Tile label="Risk of equity" value={`${risk.riskPct!.toFixed(2)}%`} th={th} tile={tile} cap={cap} mono={mono} />}
           {num(risk.rr) != null && (
-            <Tile label="Risk / reward" value={`1 : ${risk.rr!.toFixed(2)}`} accent={risk.rr! >= 1 ? th.up : undefined} th={th} tile={tile} cap={cap} mono={mono} />
+            <Tile label="Risk / reward" value={`1 : ${risk.rr!.toFixed(2)}`} accent={risk.rr! >= 1 ? "var(--ac-up-ink)" : undefined} th={th} tile={tile} cap={cap} mono={mono} />
           )}
         </div>
       )}
 
       {/* ——— the host's pre-trade gate ——— */}
       {checks && checks.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {checks.map((c) => (
-            <div key={c.label} style={{ display: "flex", alignItems: "baseline", gap: 6, fontSize: 11.5 }}>
-              <span style={{ color: c.ok ? th.up : th.down, fontWeight: 800, width: 12 }}>{c.ok ? "✓" : "✕"}</span>
+            <div key={c.label} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 11 }}>
+              <span style={{ color: c.ok ? "var(--ac-up-ink)" : "var(--ac-down-ink)", fontWeight: 800, width: 12 }}>{c.ok ? "✓" : "✕"}</span>
               <span style={{ color: c.ok ? th.text : th.textStrong }}>{c.label}</span>
-              {c.detail && <span style={{ ...mono, fontSize: 10.5, color: th.text, marginLeft: "auto" }}>{c.detail}</span>}
+              {c.detail && <span style={{ ...mono, fontSize: 10, color: "var(--ac-text)", marginLeft: "auto" }}>{c.detail}</span>}
             </div>
           ))}
         </div>
@@ -554,16 +530,16 @@ export function TradeTicket({
           disabled={disabled || busy || gated || !onSubmit}
           onClick={onSubmit}
           style={{
-            height: 40,
+            height: CONTROL.xl,
             width: "100%",
             border: "none",
-            borderRadius: 11,
+            borderRadius: RADIUS.md,
             cursor: disabled || busy || gated || !onSubmit ? "not-allowed" : "pointer",
-            fontFamily: th.font,
-            fontSize: 13.5,
+            fontFamily: "var(--ac-font)",
+            fontSize: 13,
             fontWeight: 800,
             letterSpacing: "0.02em",
-            background: disabled || gated ? soft(th.text, 14) : sideColor,
+            background: disabled || gated ? "var(--ac-press)" : sideColor,
             color: disabled || gated ? th.text : pickInk(sideColor),
             boxShadow: disabled || gated ? "none" : `0 6px 18px ${soft(sideColor, 30)}`,
             transition: "background 140ms ease, color 140ms ease",
@@ -580,8 +556,8 @@ export function TradeTicket({
         </button>
       )}
 
-      {notes && <div style={{ fontSize: 11, lineHeight: 1.45, color: th.text }}>{notes}</div>}
-      {footer && <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 11, color: th.text }}>{footer}</div>}
+      {notes && <div style={{ fontSize: 11, lineHeight: 1.45, color: "var(--ac-text)" }}>{notes}</div>}
+      {footer && <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 11, color: "var(--ac-text)" }}>{footer}</div>}
     </div>
   );
 }
@@ -597,9 +573,6 @@ function Stepper({
   onChange,
   presets,
   th,
-  field,
-  chip,
-  cap,
   disabled,
 }: {
   label: string;
@@ -611,9 +584,6 @@ function Stepper({
   onChange: (v: number | null) => void;
   presets?: { label: string; value: number }[];
   th: Theme;
-  field: CSSProperties;
-  chip: CSSProperties;
-  cap: CSSProperties;
   disabled: boolean;
 }) {
   // The raw text, so a half-typed "1." or a cleared box is not rewritten under the cursor.
@@ -625,11 +595,11 @@ function Stepper({
     setDraft(null);
     onChange(next);
   };
-  const stepBtn: CSSProperties = { width: 32, height: 32, flexShrink: 0, borderRadius: 9, border: `1px solid ${th.border}`, background: "transparent", color: th.textStrong, cursor: disabled ? "not-allowed" : "pointer", fontSize: 15, fontWeight: 700, lineHeight: 1 };
+  const stepBtn: CSSProperties = { width: 32, height: 32, flexShrink: 0, borderRadius: 8, border: "1px solid var(--ac-line)", background: "transparent", color: "var(--ac-ink)", cursor: disabled ? "not-allowed" : "pointer", fontSize: 14, fontWeight: 700, lineHeight: 1 };
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-      <span style={cap}>{label}</span>
-      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <span className="ac-cap">{label}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
         <button style={stepBtn} disabled={disabled} aria-label={`Decrease ${label}`} onClick={() => bump(-1)}>−</button>
         <span style={{ position: "relative", flex: 1, minWidth: 0, display: "flex", alignItems: "center" }}>
           <input
@@ -646,13 +616,14 @@ function Stepper({
               onChange(v === "" ? null : Number(v));
             }}
             onBlur={() => setDraft(null)}
-            style={{ ...field, paddingRight: suffix ? 26 : 10 }}
+            className="ac-field"
+            style={{ paddingRight: suffix ? SPACE[6] : SPACE[3] }}
           />
-          {suffix && <span style={{ position: "absolute", right: 10, fontSize: 12, color: th.text, pointerEvents: "none", fontFamily: th.monoFont }}>{suffix}</span>}
+          {suffix && <span className="ac-num" style={{ position: "absolute", right: SPACE[3], fontSize: TYPE.sm, color: "var(--ac-text)", pointerEvents: "none" }}>{suffix}</span>}
         </span>
         <button style={stepBtn} disabled={disabled} aria-label={`Increase ${label}`} onClick={() => bump(1)}>+</button>
         {(presets ?? []).map((p) => (
-          <button key={p.label} style={chip} disabled={disabled} onClick={() => { setDraft(null); onChange(p.value); }}>
+          <button key={p.label} className="ac-btn ac-btn--xs ac-btn--outline ac-num" disabled={disabled} onClick={() => { setDraft(null); onChange(p.value); }}>
             {p.label}
           </button>
         ))}
@@ -668,8 +639,6 @@ function PriceField({
   onChange,
   accent,
   th,
-  field,
-  cap,
   disabled,
 }: {
   label: string;
@@ -677,15 +646,13 @@ function PriceField({
   onChange: (v: number | null) => void;
   accent?: string;
   th: Theme;
-  field: CSSProperties;
-  cap: CSSProperties;
   disabled: boolean;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const shown = draft ?? (value == null ? "" : String(value));
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 0 }}>
-      <span style={{ ...cap, color: accent ?? th.text }}>{label}</span>
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+      <span className="ac-cap" style={accent ? { color: accent } : undefined}>{label}</span>
       <input
         type="number"
         inputMode="decimal"
@@ -700,7 +667,8 @@ function PriceField({
           onChange(v === "" ? null : Number(v));
         }}
         onBlur={() => setDraft(null)}
-        style={{ ...field, borderLeft: accent ? `2px solid ${accent}` : field.border, color: accent && value != null ? accent : th.textStrong }}
+        className="ac-field"
+        style={{ borderLeft: accent ? `2px solid ${accent}` : undefined, color: accent && value != null ? accent : undefined }}
       />
     </div>
   );
@@ -709,8 +677,8 @@ function PriceField({
 function Tile({ label, value, accent, th, tile, cap, mono }: { label: string; value: string; accent?: string; th: Theme; tile: CSSProperties; cap: CSSProperties; mono: CSSProperties }) {
   return (
     <div style={{ ...tile, borderLeft: accent ? `2px solid ${accent}` : (tile.border as string) }}>
-      <span style={cap}>{label}</span>
-      <span style={{ ...mono, fontSize: 14.5, fontWeight: 700, color: accent ?? th.textStrong }}>{value}</span>
+      <span className="ac-cap">{label}</span>
+      <span style={{ ...mono, fontSize: 14, fontWeight: 700, color: accent ?? th.textStrong }}>{value}</span>
     </div>
   );
 }
