@@ -227,6 +227,7 @@ export class Chart {
   private axisDrag: { startY: number; startZoom: number; moved: boolean } | null = null;
   private pointers = new Map<number, { x: number; y: number }>(); // live pointers (for multi-touch pinch)
   private pinch: { startDist: number; startSpacing: number; anchorIndex: number } | null = null;
+  private touchGesture: "pan" | "crosshair" = "pan";
   private nextId = 1;
   // --- animation state (the smooth, premium feel) ---
   // The price scale glides: dispMin/dispMax are the RENDERED range, eased toward the visible
@@ -254,9 +255,14 @@ export class Chart {
     this.session = s.utc === undefined ? { ...s, utc: this.utc } : s;
     this.applyAxes(opts.axes);
     this.interactive = opts.interactive !== false;
+    this.touchGesture = opts.touchGesture ?? "pan";
     host.style.position = host.style.position || "relative";
     host.style.userSelect = "none";
-    host.style.touchAction = "none";
+    // `pan-y` in crosshair mode: a vertical drag still scrolls the PAGE past the
+    // chart, and only horizontal movement reaches the scrub. `none` would make a
+    // chart in mid-page a scroll trap, which is the usual way this gesture is got
+    // wrong.
+    host.style.touchAction = this.touchGesture === "crosshair" ? "pan-y" : "none";
     this.base = this.mkCanvas(1);
     this.overlay = this.mkCanvas(2);
     this.bctx = this.base.getContext("2d")!;
@@ -3423,6 +3429,21 @@ export class Chart {
     }
     this.momentum = 0;
     this.zoomAnchor = null;
+    // ONE FINGER READS, TWO FINGERS MOVE — when the host asks for it.
+    //
+    // `onMove` falls through to the crosshair branch whenever `dragging` is null, so
+    // declining to start the drag IS the whole gesture: the finger lands, the
+    // crosshair follows it, and `onCrosshair` reports the bar under it. Panning is
+    // not lost — the pinch path already tracks the midpoint of two fingers and moves
+    // `offset` with it, so a two-finger swipe scrolls time with or without a zoom.
+    //
+    // Mouse and pen still drag: they have a hover state to read a bar with, and a
+    // desktop reader expects a drag to move the chart.
+    if (this.touchGesture === "crosshair" && e.pointerType === "touch") {
+      this.cross = { x, y };
+      this.requestDraw();
+      return;
+    }
     this.dragging = { startX: x, startOffset: this.offset, moved: false, lastX: x, vel: 0 };
     this.overlay.style.cursor = "grabbing";
   };

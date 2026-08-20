@@ -221,6 +221,26 @@ export interface ChartOptions {
    * still tracks the pointer, so `onCrosshair` keeps driving a host's scrub readout.
    */
   interactive?: boolean;
+  /**
+   * What ONE finger does on a touch screen.
+   *
+   * `"pan"` (default) mirrors a desktop mouse drag: one finger scrolls the chart
+   * through time, two pinch to zoom. That is the right default for a chart that IS
+   * the screen.
+   *
+   * `"crosshair"` swaps the two, which is what a chart embedded in a scrolling page
+   * usually wants: one finger READS — it puts the crosshair on the bar under it and
+   * drives `onCrosshair`, so a reader can pick a day without leaving the page — and
+   * panning moves to two fingers, which already pan today (the pinch handler tracks
+   * the finger midpoint, so a two-finger swipe scrolls time whether or not the
+   * distance between them changes).
+   *
+   * Vertical page scrolling survives either way: in `"crosshair"` the host element
+   * takes `touch-action: pan-y`, so a vertical drag still scrolls the page past the
+   * chart and only horizontal movement is read as a scrub. Without that a chart in
+   * the middle of a page becomes a scroll trap.
+   */
+  touchGesture?: "pan" | "crosshair";
   /** The exchange session for intraday shading. Defaults to `US_EQUITIES_SESSION`. */
   session?: SessionSpec;
   /**

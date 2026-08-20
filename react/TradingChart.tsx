@@ -281,6 +281,13 @@ export interface TradingChartProps {
    */
   axes?: boolean | { price?: boolean; time?: boolean };
   /**
+   * What one finger does on a touch screen — `"pan"` (default) or `"crosshair"`,
+   * where a single finger reads the bar under it and two fingers pan. See
+   * `ChartOptions.touchGesture`; a chart embedded in a scrolling page usually wants
+   * `"crosshair"`.
+   */
+  touchGesture?: "pan" | "crosshair";
+  /**
    * The COMPACT layout — one scrolling row of controls instead of a wrapping toolbar, touch-sized
    * targets, and everything else behind a bottom sheet.
    *
@@ -645,6 +652,7 @@ export function TradingChart({
   endpointMarker = false,
   volume,
   axes = true,
+  touchGesture,
   frame = true,
   footer,
   onRangeChange,
@@ -911,6 +919,7 @@ export function TradingChart({
       volumeEmphasis,
       endpointMarker,
       axes,
+      touchGesture,
       onCrosshair: (bar, values) => {
         setLegend({ bar, values });
         crosshairRef.current?.(bar, values);
