@@ -4,6 +4,31 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.12.0] - 2026-08-21
+
+### Added
+
+- **`touchGesture`: one finger reads, two fingers move.** One finger panned the chart, mirroring a
+  desktop mouse drag. That is right for a chart that IS the screen and wrong for one embedded in a
+  scrolling page: on a phone the reader's first instinct — put a finger on a bar to see what it did
+  — scrolled the chart instead, and there was no gesture at all for picking a day.
+
+  `touchGesture: "crosshair"` swaps them. One finger sets the crosshair and drives `onCrosshair`;
+  panning moves to two fingers. Little had to be built for either half: the pinch path already
+  tracks the midpoint of two fingers and moves `offset` with it, so a two-finger swipe has always
+  scrolled time whether or not the distance between the fingers changes — and `onMove` already
+  falls through to the crosshair branch whenever `dragging` is null, so declining to start the drag
+  IS the gesture.
+
+  It carries `touch-action: pan-y`. Without that a chart in mid-page becomes a scroll trap: with one
+  finger bound to the crosshair there is no gesture left to scroll past it. `pan-y` keeps vertical
+  drags scrolling the page and lets only horizontal movement reach the scrub, which is also the
+  correct reading — the time axis is horizontal.
+
+  Mouse and pen still drag: they have a hover state to read a bar with, and a desktop reader expects
+  a drag to move the chart. Exposed on `TradingChart` as well. Default is `"pan"`, so no existing
+  embed changes.
+
 ## [0.11.0] - 2026-08-19
 
 ### Changed
