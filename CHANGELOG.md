@@ -4,6 +4,37 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.13.0] - 2026-08-25
+
+### Added
+
+- **`mode`: one chart, two depths.** A chart embedded in a page is read by two people at different
+  moments. One is glancing — what is this worth, and which way did it go. The other is working:
+  candles, indicators, drawings, an order on the axis. Hosts have been serving both by assembling
+  the same seven props by hand (`toolbar`, `drawingRail`, `chartType`, `legend`, `axes`, `volume`,
+  `endpointMarker`), and they assembled them slightly differently — which is how two pages of one
+  application end up looking like two products.
+
+  `mode="simple"` names that set once: a baseline series with an endpoint dot, a price axis and no
+  time axis, no volume pane, no toolbar, no drawing rail, no legend. What it does NOT remove is the
+  chart. Zoom, pan, pinch and the crosshair belong to the widget and stay in both modes, because a
+  glance chart that cannot be interrogated is a picture of a chart rather than one.
+
+  Two properties make it safe to adopt. It is a layer of DEFAULTS, not an override — any of those
+  props passed explicitly still wins, so `mode="simple" volume` is a glance chart that happens to
+  want a volume pane. And `"advanced"` is the default and implies nothing at all: `DEPTH.advanced`
+  is an empty object, asserted by a test, so every existing host keeps the exact behaviour it had.
+
+  The preset lives in `react/ui.ts` as data (`DEPTH`) rather than as branches inside the component,
+  which is what lets the contract be tested without rendering a chart.
+
+  Two details in the set are deliberate and easy to get wrong. `volume: false` is stated rather
+  than left `undefined`, because "this view has no volume" and "the user's saved preference
+  decides" are different claims and only one of them survives a reload. And the PRICE axis stays
+  while the TIME axis goes: the range pills already say which window is on screen, so the time
+  axis is the one that can be spared, whereas a price with no scale beside it is not simpler — it
+  is vaguer.
+
 ## [0.12.0] - 2026-08-21
 
 ### Added

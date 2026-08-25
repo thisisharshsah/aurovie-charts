@@ -115,6 +115,36 @@ ma50 · ma200 · ema21 · vwap · boll · donch · rsi · macd · atr · stoch �
 - `ChartWorkspace` — the chart-and-panel layout, docked or stacked on container width
 - Types: `TradingChartProps`, `TimeframeOption`, `RangePreset`, `ChartSettingGroup`, `TradeTicketProps`, `TicketOrder`
 
+### One chart, two depths
+
+A chart in a page is read by two people at different moments: one glancing at what a thing is
+worth, one working with candles, indicators and orders. `mode` serves both from one widget.
+
+```tsx
+const [mode, setMode] = useState<"simple" | "advanced">("simple");
+
+<TradingChart datafeed={feed} symbol="DEMO" mode={mode} />
+```
+
+`"simple"` is a baseline series with an endpoint dot, a price axis and no time axis, no volume
+pane, no toolbar, no drawing rail and no legend. What it does **not** remove is the chart — zoom,
+pan, pinch and the crosshair are the widget's and they stay in both modes, because a glance chart
+that cannot be interrogated is a picture of a chart.
+
+It is a layer of **defaults**, not an override, so any prop passed explicitly still wins:
+
+```tsx
+// a glance chart that happens to want its volume pane
+<TradingChart datafeed={feed} symbol="DEMO" mode="simple" volume />
+```
+
+`"advanced"` is the default and implies nothing, so a host that never passes `mode` behaves
+exactly as it did before this existed.
+
+Own the switch and remember the choice. A chart that opens advanced because some flag was set
+makes its page feel like a different product from the one next door — having the drawing rail
+available is not the same as asking to start inside it.
+
 ### Driving host chrome from the widget
 
 The widget owns its toolbar and legend, but a host usually has chrome of its own to keep in sync.

@@ -385,3 +385,49 @@ export const SHEET = `
 
 /** Join class names, dropping anything falsy — `cx("ac-btn", on && "is-on")`. */
 export const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
+
+/* ── The depth preset ─────────────────────────────────────────────────────────────────────── */
+
+/**
+ * What `mode` implies, as data.
+ *
+ * A chart embedded in a page is read by two people at different moments: one glancing at what a
+ * thing is worth, one working with candles, indicators and orders. Hosts were serving both by
+ * assembling the same seven props by hand, and assembling them slightly differently — which is
+ * how two pages of one application come to look like two products.
+ *
+ * `undefined` here means "this mode has no opinion; the prop's own default stands". That is what
+ * keeps `"advanced"` byte-identical to the behaviour that existed before the preset did.
+ *
+ * Pure and exported so the contract is testable without rendering a chart: the component only
+ * ever writes `prop ?? DEPTH[mode].thing`.
+ */
+export interface DepthDefaults {
+  toolbar?: boolean;
+  drawingRail?: boolean;
+  chartType?: "baseline";
+  endpointMarker?: boolean;
+  /** `false` states "this view has no volume", distinct from `undefined` = the user's own choice. */
+  volume?: boolean;
+  axes?: { price: boolean; time: boolean };
+  legend?: "none";
+}
+
+export const DEPTH: Record<"simple" | "advanced", DepthDefaults> = {
+  advanced: {},
+  simple: {
+    toolbar: false,
+    drawingRail: false,
+    // Coloured against its reference, which is the question a glance is asking.
+    chartType: "baseline",
+    // The baseline series draws no endpoint dot of its own; without one the live price has
+    // nothing marking where it actually is.
+    endpointMarker: true,
+    volume: false,
+    // The TIME axis goes and the PRICE axis stays: range pills already say which window is on
+    // screen, and a price with no scale beside it is not simpler, it is vaguer.
+    axes: { price: true, time: false },
+    legend: "none",
+  },
+};
+

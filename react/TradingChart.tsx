@@ -8,7 +8,7 @@ import { Icon, hasIcon } from "./icons";
 import { ScriptEditor, type ScriptError, type ScriptPreset, type ScriptScorecard, type ScriptSweep, type SavedStrategy } from "./ScriptEditor";
 import { parseScriptDraw, type ScriptRender } from "../src/script";
 import { DARK, LIGHT, THEMES, THEME_NAMES, SERIES_PALETTE as IND_PALETTE, SWATCHES, CMP_COLORS, CHIP_INK } from "../src/util";
-import { CONTROL, ELEV, RADIUS, SHEET, SPACE, TYPE, WEIGHT, Z, cx, themeVars } from "./ui";
+import { CONTROL, DEPTH, ELEV, RADIUS, SHEET, SPACE, TYPE, WEIGHT, Z, cx, themeVars } from "./ui";
 import type { Drawing } from "../src/drawings";
 import type { Bar, DataFeed, IndicatorInstance, LegendValue, PriceLine, Projection, ScaleMode, SeriesType, SessionSpec, Theme, ChartMarker, TradePlan } from "../src/types";
 
@@ -78,6 +78,32 @@ export interface TradingChartProps {
   theme?: "dark" | "light";
   themeOverride?: Partial<Theme>;
   height?: number | string;
+  /**
+   * THE CHART'S DEPTH — one widget, two audiences.
+   *
+   * A chart embedded in a page is read by two people at different moments. One is glancing: what
+   * is this worth, and which way did it go. The other is working: candles, indicators, drawings,
+   * an order on the axis. Hosts have been serving both by assembling the same seven props over
+   * and over — `toolbar`, `drawingRail`, `chartType`, `legend`, `axes`, `volume`,
+   * `endpointMarker` — and they assembled them slightly differently, so two pages of one app
+   * ended up looking like two products.
+   *
+   * `mode` names that set once. `"simple"` is a baseline series with an endpoint dot, a price
+   * axis and no time axis, no volume pane, no toolbar, no drawing rail and no legend. What it
+   * does NOT remove is the chart: zoom, pan, pinch and the crosshair are the widget's and they
+   * stay in both modes, because a glance chart that cannot be interrogated is a picture.
+   *
+   * It is a DEFAULT LAYER, not an override. Any of those props passed explicitly still wins, so
+   * `mode="simple" volume` is a glance chart that happens to want volume. `"advanced"` is the
+   * default and every existing prop keeps the value it had, so this changes nothing for a host
+   * that does not ask for it.
+   *
+   * The host is expected to own the switch and to remember it. A chart that opens advanced
+   * because some flag was set makes the page it sits on feel like a different product from the
+   * one next door — having the drawing rail available is not the same as asking to start inside
+   * it.
+   */
+  mode?: "simple" | "advanced";
   toolbar?: boolean;
   drawingRail?: boolean;
   onProvenance?: (dataVersion: string | undefined) => void;
@@ -612,13 +638,14 @@ export function TradingChart({
   theme = "dark",
   themeOverride,
   height = 540,
-  toolbar = true,
-  drawingRail = true,
+  mode = "advanced",
+  toolbar: toolbarProp,
+  drawingRail: drawingRailProp,
   onProvenance,
   onResolutionChange,
   indicators,
-  chartType,
-  legend: legendMode = "auto",
+  chartType: chartTypeProp,
+  legend: legendProp,
   compareSymbols,
   sr,
   overlay,
@@ -649,15 +676,34 @@ export function TradingChart({
   onReady,
   plan = null,
   volumeEmphasis = false,
-  endpointMarker = false,
-  volume,
-  axes = true,
+  endpointMarker: endpointMarkerProp,
+  volume: volumeProp,
+  axes: axesProp,
   touchGesture,
   frame = true,
   footer,
   onRangeChange,
   header,
 }: TradingChartProps) {
+  // ── THE DEPTH PRESET ────────────────────────────────────────────────────────────────────────
+  //
+  // `mode` is a layer of DEFAULTS beneath the individual props, never an override: every one of
+  // these reads "what the host said, or else what this mode implies". So `mode="simple" volume`
+  // is a glance chart that happens to want a volume pane, and a host that never sets `mode` gets
+  // exactly the values it got before this existed.
+  //
+  // The set is small on purpose. Each entry is a thing a host would otherwise have to know to
+  // turn off, and getting one of them wrong is what made two pages of the same app look like two
+  // products.
+  const depth = DEPTH[mode];
+  const toolbar = toolbarProp ?? depth.toolbar ?? true;
+  const drawingRail = drawingRailProp ?? depth.drawingRail ?? true;
+  const chartType = chartTypeProp ?? (depth.chartType as SeriesType | undefined);
+  const endpointMarker = endpointMarkerProp ?? depth.endpointMarker ?? false;
+  const volume = volumeProp ?? depth.volume;
+  const axes = axesProp ?? depth.axes ?? true;
+  const legendMode = legendProp ?? depth.legend ?? "auto";
+
   const hostRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<Chart | null>(null);

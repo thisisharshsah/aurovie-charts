@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CONTROL, RADIUS, SPACE, TYPE, contrast, cx, readable, themeVars } from "./ui";
+import { CONTROL, DEPTH, RADIUS, SPACE, TYPE, contrast, cx, readable, themeVars } from "./ui";
 import { DARK, LIGHT, THEMES } from "../src/util";
 
 // The failure this exists to prevent: the widget paints every SELECTED control's label in
@@ -50,3 +50,46 @@ test("the scales are a grid, not a pile of literals", () => {
 test("cx drops falsy parts so a conditional class cannot print 'false'", () => {
   assert.equal(cx("ac-btn", false, null, undefined, "is-on"), "ac-btn is-on");
 });
+
+// ── The depth preset ────────────────────────────────────────────────────────────────────────
+//
+// `mode` is a layer of defaults beneath the individual props. The component only ever writes
+// `prop ?? DEPTH[mode].thing ?? oldDefault`, so these three properties are the whole contract.
+
+test("advanced has no opinion, so it cannot change an existing host", () => {
+  // Every key absent means every `prop ?? DEPTH.advanced.x ?? default` falls through to the
+  // default that existed before the preset did. A host that never passes `mode` is untouched.
+  assert.deepEqual(DEPTH.advanced, {}, "advanced must stay empty — anything here is a silent breaking change");
+});
+
+test("simple strips the working chrome and keeps the chart", () => {
+  const s = DEPTH.simple;
+  assert.equal(s.toolbar, false);
+  assert.equal(s.drawingRail, false);
+  assert.equal(s.legend, "none");
+  assert.equal(s.chartType, "baseline");
+  // The baseline series draws no endpoint dot of its own.
+  assert.equal(s.endpointMarker, true);
+  // Explicit false, NOT undefined: "this view has no volume" is a different statement from
+  // "the user's saved preference decides", and only one of them survives a page reload.
+  assert.equal(s.volume, false, "volume must be stated, not left to the saved preference");
+  assert.ok(Object.prototype.hasOwnProperty.call(s, "volume"));
+});
+
+test("simple keeps the price axis and drops only the time axis", () => {
+  // A price with no scale beside it is not simpler, it is vaguer — and the range pills already
+  // say which window is on screen, so the time axis is the one that can go.
+  assert.deepEqual(DEPTH.simple.axes, { price: true, time: false });
+});
+
+test("an explicit prop still wins over the mode", () => {
+  // The resolution the component performs, reproduced exactly: prop, then preset, then default.
+  const resolve = <T,>(prop: T | undefined, preset: T | undefined, fallback: T): T =>
+    prop ?? preset ?? fallback;
+  assert.equal(resolve(true, DEPTH.simple.volume, false), true, "mode=simple volume -> volume on");
+  assert.equal(resolve(undefined, DEPTH.simple.volume, false), false, "mode=simple alone -> volume off");
+  assert.equal(resolve(undefined, DEPTH.advanced.volume, false), false, "advanced defers to the old default");
+  assert.equal(resolve(false, DEPTH.simple.toolbar, true), false);
+  assert.equal(resolve(true, DEPTH.simple.toolbar, true), true, "mode=simple toolbar -> toolbar back");
+});
+
