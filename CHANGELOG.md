@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.13.1] - 2026-08-25
+
+### Fixed
+
+- **The quick-start tip belongs to advanced.** It teaches `K`, `?` and right-click-the-price-axis —
+  chrome that `mode="simple"` does not present — so it no longer appears there. Teaching a reader
+  three entrances to a room they are not standing in is worse than teaching them nothing, and on a
+  phone the card landed squarely over the plot it was explaining.
+
+  It is gated on the mode rather than behind a new flag: a host should not have to know to turn off
+  a tip about a toolbar it already asked not to have. Switching to advanced brings it back, once,
+  if the browser has not been onboarded. The shortcuts themselves stay live in both modes — simple
+  removes chrome, not capability.
+
+  This was written for 0.13.0 and missed it: the commit landed after that release was cut, so the
+  published build carried the whole `mode` preset with the tip still ungated.
+
 ## [0.13.0] - 2026-08-25
 
 ### Added
@@ -27,13 +44,6 @@ All notable changes to this project are documented here. The format follows
 
   The preset lives in `react/ui.ts` as data (`DEPTH`) rather than as branches inside the component,
   which is what lets the contract be tested without rendering a chart.
-
-  The quick-start tip is part of the same decision. It teaches `K`, `?` and right-click-the-price-
-  axis — chrome that simple mode does not present — so it no longer appears there. Teaching a
-  reader three entrances to a room they are not standing in is worse than teaching them nothing,
-  and on a phone the card landed squarely over the plot it was explaining. Switching to advanced
-  brings it back, once, if the browser has not been onboarded. The shortcuts themselves stay live
-  in both modes: simple removes chrome, not capability.
 
   Two details in the set are deliberate and easy to get wrong. `volume: false` is stated rather
   than left `undefined`, because "this view has no volume" and "the user's saved preference
