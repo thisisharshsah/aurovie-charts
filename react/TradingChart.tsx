@@ -2026,7 +2026,13 @@ export function TradingChart({
             if (ctxMenu) setCtxMenu(null);
         }}
         >
-          {tipsOpen && (
+          {/* The quick-start tip belongs to ADVANCED, and not because it is in the way.
+              It teaches K, ?, and right-click-the-price-axis — chrome that simple mode does not
+              present. Teaching a reader three entrances to a room they are not standing in is
+              worse than teaching them nothing, and on a phone the card lands squarely over the
+              plot it is explaining. Switching to advanced brings it back, once, if this browser
+              has not been onboarded yet. */}
+          {tipsOpen && mode !== "simple" && (
             <div className="ac-surface" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 10, right: 10, zIndex: 36, width: 290, borderRadius: 10, padding: 10 }} >
               <div style={{ color: "var(--ac-ink)", fontFamily: "var(--ac-font)", fontWeight: 700, fontSize: 13 }}>Quick start</div>
               <div style={{ color: "var(--ac-text)", fontFamily: "var(--ac-font)", fontSize: 12, marginTop: 6, lineHeight: 1.35 }}>Press K to launch commands, ? for shortcuts, and right-click price axis to create alerts quickly.</div>

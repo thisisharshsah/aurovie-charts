@@ -28,6 +28,13 @@ All notable changes to this project are documented here. The format follows
   The preset lives in `react/ui.ts` as data (`DEPTH`) rather than as branches inside the component,
   which is what lets the contract be tested without rendering a chart.
 
+  The quick-start tip is part of the same decision. It teaches `K`, `?` and right-click-the-price-
+  axis — chrome that simple mode does not present — so it no longer appears there. Teaching a
+  reader three entrances to a room they are not standing in is worse than teaching them nothing,
+  and on a phone the card landed squarely over the plot it was explaining. Switching to advanced
+  brings it back, once, if the browser has not been onboarded. The shortcuts themselves stay live
+  in both modes: simple removes chrome, not capability.
+
   Two details in the set are deliberate and easy to get wrong. `volume: false` is stated rather
   than left `undefined`, because "this view has no volume" and "the user's saved preference
   decides" are different claims and only one of them survives a reload. And the PRICE axis stays
