@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.13.2] - 2026-08-25
+
+### Fixed
+
+- **The ticket's risk tiles were unstyled.** `.ac-tile` carries everything a risk tile looks like —
+  the column direction, the gap, the padding, the border, the sunken ground — and it was never
+  applied. The style object it replaced is an empty `{}` whose comment says the styles moved to a
+  class, and the class then went unreferenced.
+
+  Without `flex-direction: column` the label and the value sit side by side with nothing between
+  them, so the row rendered as one run-on string: `Notional$309.55Risk / trade$6.19Risk of
+  equity0.` The accented left border was the only part of the design that survived, because it is
+  the one property still set inline.
+
+  Found by measuring rather than reading: the tile's computed style reported no padding and no
+  background, which is not something a stylesheet with a `.ac-tile` rule in it should produce.
+
 ## [0.13.1] - 2026-08-25
 
 ### Fixed

@@ -676,7 +676,16 @@ function PriceField({
 
 function Tile({ label, value, accent, th, tile, cap, mono }: { label: string; value: string; accent?: string; th: Theme; tile: CSSProperties; cap: CSSProperties; mono: CSSProperties }) {
   return (
-    <div style={{ ...tile, borderLeft: accent ? `2px solid ${accent}` : (tile.border as string) }}>
+    // `ac-tile` carries everything this tile looks like — the column direction, the gap, the
+    // padding, the border and the sunken ground. It was NEVER APPLIED: `tile` is an empty object
+    // whose comment says the styles moved to a class, and the class then went unreferenced, so
+    // every risk tile rendered as two bare inline spans. Without `flex-direction: column` the
+    // label and the value sit side by side with nothing between them, which reads as
+    // "Notional$309.55Risk / trade$6.19Risk of equity0." — one run-on string across the row.
+    //
+    // `borderLeft` still overrides for an accented tile, which is why the coloured edge was the
+    // one part of the design that survived.
+    <div className="ac-tile" style={{ ...tile, borderLeft: accent ? `2px solid ${accent}` : undefined }}>
       <span className="ac-cap">{label}</span>
       <span style={{ ...mono, fontSize: 14, fontWeight: 700, color: accent ?? th.textStrong }}>{value}</span>
     </div>
