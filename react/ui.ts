@@ -411,6 +411,14 @@ export interface DepthDefaults {
   volume?: boolean;
   axes?: { price: boolean; time: boolean };
   legend?: "none";
+  /**
+   * Chart FURNITURE a glance does not need. These two are unlike the rest of this table: they are
+   * stored user PREFERENCES, not props, so a depth preset can only suppress them for as long as
+   * the mode is on — it must never write to the stored blob, or picking Simple once would silently
+   * un-tick a reader's grid in the advanced chart they go back to.
+   */
+  grid?: boolean;
+  watermark?: boolean;
 }
 
 export const DEPTH: Record<"simple" | "advanced", DepthDefaults> = {
@@ -428,6 +436,12 @@ export const DEPTH: Record<"simple" | "advanced", DepthDefaults> = {
     // screen, and a price with no scale beside it is not simpler, it is vaguer.
     axes: { price: true, time: false },
     legend: "none",
+    // A glance chart is a SHAPE. The grid measures a shape that is not being measured — the
+    // reader wants "up or down, and by how much", and the price axis answers the second half
+    // already. The watermark names an instrument the host has just named in its own header
+    // directly above the plot, in type four times the size.
+    grid: false,
+    watermark: false,
   },
 };
 

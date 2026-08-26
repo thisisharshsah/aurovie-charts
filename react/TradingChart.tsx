@@ -1147,7 +1147,10 @@ export function TradingChart({
   }, [type, box]);
   useEffect(() => chartRef.current?.setScaleMode(scaleMode), [scaleMode]);
   useEffect(() => chartRef.current?.setSR(!!sr), [sr]);
-  useEffect(() => chartRef.current?.setGrid(gridOn), [gridOn]);
+  // The depth preset SUPPRESSES rather than sets: `gridOn` stays the reader's own stored
+  // preference and simple mode just declines to draw it, so switching modes never edits it.
+  const gridDrawn = gridOn && depth.grid !== false;
+  useEffect(() => chartRef.current?.setGrid(gridDrawn), [gridDrawn]);
   useEffect(() => chartRef.current?.setVolume(volume ?? showVol), [volume, showVol]);
   useEffect(() => chartRef.current?.setLastPriceLine(priceLineOn), [priceLineOn]);
   // Markers come from two places and must not fight: whatever the host supplied, plus the fills of
@@ -1195,8 +1198,9 @@ export function TradingChart({
   useEffect(() => chartRef.current?.setLoading(loading), [loading]);
   // The identity mark behind the plot follows whatever the chart is actually showing.
   useEffect(() => {
-    chartRef.current?.setWatermark(watermark ? symbol.toUpperCase() : "", watermark ? (TF_SHORT[resolution] ?? resolution) : "");
-  }, [watermark, symbol, resolution]);
+    const on = watermark && depth.watermark !== false;
+    chartRef.current?.setWatermark(on ? symbol.toUpperCase() : "", on ? (TF_SHORT[resolution] ?? resolution) : "");
+  }, [watermark, symbol, resolution, depth.watermark]);
   // The engine takes ONE array of horizontal levels, so the alert book and the stop/target levels
   // are merged here rather than in the host. The toggle gates only the levels half: hiding your
   // protection should never silently hide your alerts too.
