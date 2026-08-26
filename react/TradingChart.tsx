@@ -266,6 +266,16 @@ export interface TradingChartProps {
    */
   footer?: ReactNode;
   /**
+   * Host content for the RIGHT of the bottom bar, beside the scale switches and the settings
+   * gear.
+   *
+   * `footer` is the left of that bar, where the range strip lives, and the two ends mean
+   * different things: the left is "what am I looking at" (period, mode), the right is "how is it
+   * drawn" (scale, profile, settings). A host control that opens a PANEL about the chart belongs
+   * with the second group — put beside the range presets it reads as another range.
+   */
+  footerRight?: ReactNode;
+  /**
    * Fired when a built-in range preset is picked, with the preset itself.
    *
    * The widget can only move the VIEWPORT — it calls `showSince` and stops there. It cannot know
@@ -682,6 +692,7 @@ export function TradingChart({
   touchGesture,
   frame = true,
   footer,
+  footerRight,
   onRangeChange,
   header,
 }: TradingChartProps) {
@@ -2735,6 +2746,9 @@ export function TradingChart({
             {!view.atRealtime && (
               <button {...clusterBtn(false, { height: compact ? 28 : 23, flexShrink: 0 })} title="Scroll to the latest bar" aria-label="Go to realtime" onClick={() => chartRef.current?.scrollToRealtime()}>»|</button>
             )}
+            {/* The host's own panel controls, with the "how is it drawn" group rather than with
+                the period strip at the other end. */}
+            {footerRight}
             {/* COMPACT: six switches become one. The scale modes, the profile, the data window
                 and every display toggle live in the sheet, and this is the way in — which also
                 means a host that hides the toolbar still leaves all of them reachable. */}
