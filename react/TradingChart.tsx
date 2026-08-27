@@ -1160,6 +1160,17 @@ export function TradingChart({
   useEffect(() => chartRef.current?.setSR(!!sr), [sr]);
   // The depth preset SUPPRESSES rather than sets: `gridOn` stays the reader's own stored
   // preference and simple mode just declines to draw it, so switching modes never edits it.
+  /**
+   * A toggle the DEPTH PRESET overrides is not shown, because it cannot do anything.
+   *
+   * Simple mode declines to draw the grid and the watermark while leaving the reader's stored
+   * preference alone — which is the right call for the preference and the wrong thing to put in
+   * a menu: the settings sheet listed "Grid lines ✓" beside a plot with no grid on it, and
+   * clicking it changed a tick and nothing else. A control that reports a state the chart is not
+   * in is worse than an absent one, and this is the honest way to say "not in this mode".
+   */
+  const suppressed = (key: "grid" | "watermark") => depth[key] === false;
+
   const gridDrawn = gridOn && depth.grid !== false;
   useEffect(() => chartRef.current?.setGrid(gridDrawn), [gridDrawn]);
   useEffect(() => chartRef.current?.setVolume(volume ?? showVol), [volume, showVol]);
@@ -2783,7 +2794,8 @@ export function TradingChart({
                       ["Extended-hours shading", sessions, setSessions],
                       ["Stop / target levels", levelsOn, setLevelsOn],
                     ] as const
-                  ).map(([label, val, set]) => (
+                  ).filter(([label]) => !(label === "Grid lines" && suppressed("grid")) && !(label === "Symbol watermark" && suppressed("watermark")))
+                   .map(([label, val, set]) => (
                     <button key={label} {...item(false)} onClick={() => set((v) => !v)}>
                       <span style={{ width: 16, color: val ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{val ? <Icon name="check" size={12} /> : null}</span> {label}
                     </button>
@@ -3111,7 +3123,8 @@ export function TradingChart({
                 ["Volume profile", vpvr, setVpvr],
                 ["Data window", dataWindow, setDataWindow],
               ] as const
-            ).map(([label, val, set]) => (
+            ).filter(([label]) => !(label === "Grid lines" && suppressed("grid")) && !(label === "Symbol watermark" && suppressed("watermark")))
+             .map(([label, val, set]) => (
               <button key={label} {...sheetItem(false)} onClick={() => set((v) => !v)} aria-pressed={val}>
                 <span style={{ width: 16, color: val ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{val ? <Icon name="check" size={12} /> : null}</span> {label}
               </button>
