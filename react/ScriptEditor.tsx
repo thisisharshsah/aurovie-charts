@@ -364,7 +364,7 @@ export function ScriptEditor({
         >
           <Icon name={expanded ? "collapse" : "expand"} size={14} />
         </button>
-        <button {...btn()} onClick={onClose} aria-label="Close editor">✕</button>
+        <button {...btn()} onClick={onClose} aria-label="Close editor"><Icon name="close" size={13} /></button>
       </div>
 
       {savingAs && (

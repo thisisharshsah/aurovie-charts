@@ -337,6 +337,23 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M4 19h16" />
     </>
   ),
+  // ---- the two the chart chrome had been drawing with text ----
+  //
+  // A menu's selected tick and a panel's close button were "✓" and "✕" — characters, at whatever
+  // weight and baseline the reader's font supplied, beside a set of 1.5-stroke line icons. There
+  // were seventeen of them, which made them the most-rendered marks in the widget and the only
+  // two that did not match anything around them.
+  check: (
+    <>
+      <path d="M20 6 9 17l-5-5" />
+    </>
+  ),
+  close: (
+    <>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </>
+  ),
   expand: (
     <>
       <path d="M14 4h6v6" />

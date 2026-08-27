@@ -1932,7 +1932,7 @@ export function TradingChart({
               <div className="ac-surface ac-menu" style={{ ...menuBox, right: 0 }}>
                 {["Auto", ...THEME_NAMES].map((n) => (
                   <button key={n} {...item(n === themeName)} onClick={() => { setThemeName(n); setMenu(null); }}>
-                    <span style={{ width: 16 }}>{n === themeName ? "✓" : ""}</span> {n === "Auto" ? "Auto (app)" : n}
+                    <span style={{ width: 16 }}>{n === themeName ? <Icon name="check" size={12} /> : null}</span> {n === "Auto" ? "Auto (app)" : n}
                   </button>
                 ))}
               </div>
@@ -2005,7 +2005,7 @@ export function TradingChart({
                       <span style={{ color: d.color ?? "var(--ac-accent)", display: "inline-flex", flex: "none" }}><Icon name={d.type} size={14} /></span>
                       <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: d.hidden ? "var(--ac-text)" : "var(--ac-ink)", textDecoration: d.hidden ? "line-through" : "none" }}>{TOOL_LABEL[d.type] ?? d.type}</span>
                       <button title={d.hidden ? "Show" : "Hide"} onClick={() => chartRef.current?.setDrawingHidden(d.id, !d.hidden)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 13, color: d.hidden ? "var(--ac-text)" : "var(--ac-accent-ink)", padding: "0 2px" }}>{d.hidden ? "◌" : "◉"}</button>
-                      <button title="Delete" onClick={() => chartRef.current?.deleteDrawing(d.id)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 13, color: "var(--ac-down-ink)", padding: "0 2px" }}>✕</button>
+                      <button title="Delete" onClick={() => chartRef.current?.deleteDrawing(d.id)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 13, color: "var(--ac-down-ink)", padding: "0 2px" }}><Icon name="close" size={13} /></button>
                     </div>
                   ))}
                 </div>
@@ -2161,7 +2161,7 @@ export function TradingChart({
                 <div style={{ height: 1, background: "var(--ac-line)", margin: "4px 0" }} />
                 {(["normal", "log", "percent"] as ScaleMode[]).map((m) => (
                   <button key={m} {...item(scaleMode === m)} onClick={() => { setScaleMode(m); setCtxMenu(null); }}>
-                    <span style={{ width: 16, display: "inline-block", color: scaleMode === m ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{scaleMode === m ? "✓" : ""}</span>
+                    <span style={{ width: 16, display: "inline-block", color: scaleMode === m ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{scaleMode === m ? <Icon name="check" size={12} /> : null}</span>
                     {m === "normal" ? "Regular scale" : m === "log" ? "Logarithmic" : "Percent"}
                   </button>
                 ))}
@@ -2286,7 +2286,7 @@ export function TradingChart({
                     <button style={legBtn} title={d.hidden ? "Show indicator" : "Hide indicator"} aria-label={`${d.hidden ? "Show" : "Hide"} ${d.label}`} onClick={() => toggleHide(d.id)}>{d.hidden ? "◌" : "◉"}</button>
                   )}
                   {hov && (
-                    <button style={legBtn} title="Remove indicator" aria-label={`Remove ${d.label}`} onClick={() => toggleInd(d.id)}>✕</button>
+                    <button style={legBtn} title="Remove indicator" aria-label={`Remove ${d.label}`} onClick={() => toggleInd(d.id)}><Icon name="close" size={13} /></button>
                   )}
                 </div>
               );
@@ -2339,7 +2339,7 @@ export function TradingChart({
                 const on = guidedPins.includes(id);
                 return (
                   <button key={id} {...item(on)} onClick={() => toggleGuidedPin(id)}>
-                    <span style={{ width: 16, color: on ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{on ? "✓" : ""}</span>
+                    <span style={{ width: 16, color: on ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{on ? <Icon name="check" size={12} /> : null}</span>
                     <span style={{ width: 18, color: "var(--ac-text)", display: "flex", justifyContent: "center" }}><ActionMark id={a.id} glyph={a.glyph} size={14} /></span>
                     {a.label}
                   </button>
@@ -2380,7 +2380,7 @@ export function TradingChart({
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 9px", borderBottom: "1px solid var(--ac-line)" }}>
                 <span style={{ fontFamily: "var(--ac-font)", fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--ac-text)" }}>Data window</span>
-                <button onClick={() => setDataWindow(false)} aria-label="Close data window" style={{ border: "none", background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 13, lineHeight: 1 }}>✕</button>
+                <button onClick={() => setDataWindow(false)} aria-label="Close data window" style={{ border: "none", background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 13, lineHeight: 1 }}><Icon name="close" size={13} /></button>
               </div>
               <div style={{ padding: "6px 9px 8px" }}>
                 {!legend.bar && <div style={{ color: "var(--ac-text)", padding: "6px 0" }}>Hover the chart to read a bar.</div>}
@@ -2429,7 +2429,7 @@ export function TradingChart({
               <div className="ac-surface" style={{ position: "absolute", zIndex: Z.modal, top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 320, borderRadius: RADIUS.lg, overflow: "hidden" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 13px", borderBottom: "1px solid var(--ac-line)" }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: "var(--ac-ink)" }}>Keyboard &amp; mouse</span>
-                  <button onClick={() => setShortcuts(false)} style={{ border: "none", background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 17, lineHeight: 1 }}>✕</button>
+                  <button onClick={() => setShortcuts(false)} style={{ border: "none", background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 17, lineHeight: 1 }}><Icon name="close" size={13} /></button>
                 </div>
                 <div style={{ padding: "8px 13px 13px" }}>
                   {(
@@ -2584,7 +2584,7 @@ export function TradingChart({
                                 title={locked ? `${d.label} — not included in your plan` : undefined}
                                 style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", border: "none", borderRadius: 8, cursor: "pointer", textAlign: "left", fontFamily: "var(--ac-font)", fontSize: 13, color: locked ? "var(--ac-text)" : "var(--ac-ink)", background: on ? `color-mix(in srgb, var(--ac-accent) 12%, transparent)` : "transparent" }}
                               >
-                                <span style={{ width: 14, textAlign: "center", color: on ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{locked ? "🔒" : on ? "✓" : "＋"}</span>
+                                <span style={{ width: 14, textAlign: "center", color: on ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{locked ? "🔒" : on ? <Icon name="check" size={12} /> : "＋"}</span>
                                 {d.label}
                               </button>
                             );
@@ -2607,7 +2607,10 @@ export function TradingChart({
           {replay?.active && (
             <div className="ac-surface" style={{ position: "absolute", bottom: 14, left: "50%", transform: "translateX(-50%)", zIndex: 9, display: "flex", alignItems: "center", gap: 4, padding: "5px 7px", borderRadius: 10 }} >
               {(() => {
-                const cbtn = (glyph: string, title: string, onClick: () => void, on = false) => (
+                // `ReactNode`, not `string`: the replay bar's controls are icons now like every
+                // other control in the widget, and the play/pause/step marks that are still
+                // characters keep working through the same parameter.
+                const cbtn = (glyph: ReactNode, title: string, onClick: () => void, on = false) => (
                   <button title={title} onClick={onClick} style={{ width: 30, height: 26, border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13, background: on ? `color-mix(in srgb, var(--ac-accent) 18%, transparent)` : "transparent", color: on ? "var(--ac-accent-ink)" : "var(--ac-ink)" }}>
                     {glyph}
                   </button>
@@ -2626,7 +2629,7 @@ export function TradingChart({
                     <span style={{ padding: "0 6px", fontSize: 11, fontFamily: "var(--ac-mono)", color: "var(--ac-text)" }}>
                       {replay.index + 1}/{replay.total}
                     </span>
-                    {cbtn("✕", "Exit replay", () => chartRef.current?.exitReplay())}
+                    {cbtn(<Icon name="close" size={13} />, "Exit replay", () => chartRef.current?.exitReplay())}
                   </>
                 );
               })()}
@@ -2744,7 +2747,7 @@ export function TradingChart({
         </div>
         <span style={{ marginLeft: "auto", flexShrink: 0 }} />
             {!view.atRealtime && (
-              <button {...clusterBtn(false, { height: compact ? 28 : 23, flexShrink: 0 })} title="Scroll to the latest bar" aria-label="Go to realtime" onClick={() => chartRef.current?.scrollToRealtime()}>»|</button>
+              <button {...clusterBtn(false, { height: compact ? 28 : 23, flexShrink: 0 })} title="Scroll to the latest bar" aria-label="Go to realtime" onClick={() => chartRef.current?.scrollToRealtime()}><Icon name="realtime" size={13} /></button>
             )}
             {/* The host's own panel controls, with the "how is it drawn" group rather than with
                 the period strip at the other end. */}
@@ -2753,7 +2756,7 @@ export function TradingChart({
                 and every display toggle live in the sheet, and this is the way in — which also
                 means a host that hides the toolbar still leaves all of them reachable. */}
             {compact ? (
-              <button {...clusterBtn(sheetIs("menu"), { height: 28, minWidth: 30, flexShrink: 0 })} title="Chart settings" aria-label="Chart settings" aria-expanded={sheetIs("menu")} onClick={() => setSheet(sheetIs("menu") ? null : "menu")}>⚙</button>
+              <button {...clusterBtn(sheetIs("menu"), { height: 28, minWidth: 30, flexShrink: 0 })} title="Chart settings" aria-label="Chart settings" aria-expanded={sheetIs("menu")} onClick={() => setSheet(sheetIs("menu") ? null : "menu")}><Icon name="settings" size={13} /></button>
             ) : (
               <>
             <button {...clusterBtn(vpvr)} title="Visible-range volume profile" aria-label="Visible-range volume profile" onClick={() => setVpvr((v) => !v)}>
@@ -2766,7 +2769,7 @@ export function TradingChart({
             <button {...clusterBtn(scaleMode === "log")} title="Logarithmic price scale" aria-label="Logarithmic scale" onClick={() => setScaleMode((m) => (m === "log" ? "normal" : "log"))}>Log</button>
             <button {...clusterBtn(scaleMode === "percent")} title="Percent price scale" aria-label="Percent scale" onClick={() => setScaleMode((m) => (m === "percent" ? "normal" : "percent"))}>%</button>
             <span style={{ position: "relative" }}>
-              <button {...clusterBtn(settingsOpen)} title="Chart settings" aria-label="Chart settings" onClick={() => setSettingsOpen((o) => !o)}>⚙</button>
+              <button {...clusterBtn(settingsOpen)} title="Chart settings" aria-label="Chart settings" onClick={() => setSettingsOpen((o) => !o)}><Icon name="settings" size={13} /></button>
               {settingsOpen && (
                 <div className="ac-surface ac-menu" style={{ position: "absolute", right: 0, bottom: CONTROL.md + SPACE[1], zIndex: Z.menu, borderRadius: RADIUS.lg, padding: SPACE[1], minWidth: 232, maxHeight: 340, overflowY: "auto" }}>
                   <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ac-text)", padding: "2px 8px 6px" }}>Appearance</div>
@@ -2782,7 +2785,7 @@ export function TradingChart({
                     ] as const
                   ).map(([label, val, set]) => (
                     <button key={label} {...item(false)} onClick={() => set((v) => !v)}>
-                      <span style={{ width: 16, color: val ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{val ? "✓" : ""}</span> {label}
+                      <span style={{ width: 16, color: val ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{val ? <Icon name="check" size={12} /> : null}</span> {label}
                     </button>
                   ))}
                   <div style={{ height: 1, background: "var(--ac-line)", margin: "5px 0" }} />
@@ -2796,7 +2799,7 @@ export function TradingChart({
                     ] as const
                   ).map(([label, val, set]) => (
                     <button key={label} {...item(false)} onClick={() => set((v) => !v)}>
-                      <span style={{ width: 16, color: val ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{val ? "✓" : ""}</span> {label}
+                      <span style={{ width: 16, color: val ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{val ? <Icon name="check" size={12} /> : null}</span> {label}
                     </button>
                   ))}
                   <div style={{ height: 1, background: "var(--ac-line)", margin: "5px 0" }} />
@@ -2945,7 +2948,7 @@ export function TradingChart({
                 goes back down", which is the whole grammar of a sheet. */}
             <div style={{ display: "flex", alignItems: "center", padding: "6px 4px 2px" }}>
               <span style={{ width: 34, height: 4, borderRadius: 999, background: "var(--ac-text)", margin: "0 auto" }} />
-              <button onClick={() => setSheet(null)} aria-label="Close" style={{ position: "absolute", right: 10, top: 8, width: 30, height: 30, border: "none", borderRadius: 8, background: "var(--ac-hover)", color: "var(--ac-ink)", cursor: "pointer", fontSize: 14 }}>✕</button>
+              <button onClick={() => setSheet(null)} aria-label="Close" style={{ position: "absolute", right: 10, top: 8, width: 30, height: 30, border: "none", borderRadius: 8, background: "var(--ac-hover)", color: "var(--ac-ink)", cursor: "pointer", fontSize: 14 }}><Icon name="close" size={13} /></button>
             </div>
 
             {/* INTERVAL — the width of a BAR. */}
@@ -2955,7 +2958,7 @@ export function TradingChart({
                   <div className="ac-cap" style={sheetSection}>{g.label}</div>
                   {g.items.map((it) => (
                     <button key={it.v} {...sheetItem(it.v === resolution)} onClick={() => { pickRes(it.v); setSheet(null); }}>
-                      <span style={{ width: 16, color: it.v === resolution ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{it.v === resolution ? "✓" : ""}</span> {it.l}
+                      <span style={{ width: 16, color: it.v === resolution ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{it.v === resolution ? <Icon name="check" size={12} /> : null}</span> {it.l}
                     </button>
                   ))}
                 </div>
@@ -3003,7 +3006,7 @@ export function TradingChart({
                       <span style={{ width: 10, height: 10, borderRadius: 2, background: c.color }} />
                       {c.symbol}
                     </span>
-                    <button onClick={() => removeCompare(c.symbol)} aria-label={`Remove ${c.symbol}`} style={{ border: "none", background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 17, padding: "0 6px" }}>✕</button>
+                    <button onClick={() => removeCompare(c.symbol)} aria-label={`Remove ${c.symbol}`} style={{ border: "none", background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 17, padding: "0 6px" }}><Icon name="close" size={13} /></button>
                   </div>
                 ))}
               </>
@@ -3018,7 +3021,7 @@ export function TradingChart({
                     <div className="ac-cap" style={sheetSection}>{g.label ?? g.id}</div>
                     {g.options.map((o) => (
                       <button key={o.value} {...sheetItem(o.value === g.value)} onClick={() => { g.onChange(o.value); setSheet(null); }}>
-                        <span style={{ width: 16, color: o.value === g.value ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{o.value === g.value ? "✓" : ""}</span>
+                        <span style={{ width: 16, color: o.value === g.value ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{o.value === g.value ? <Icon name="check" size={12} /> : null}</span>
                         <span style={{ fontFamily: "var(--ac-mono)", fontWeight: 600, minWidth: 44 }}>{o.label}</span>
                         {o.title && <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: "var(--ac-text)" }}>{o.title}</span>}
                       </button>
@@ -3110,7 +3113,7 @@ export function TradingChart({
               ] as const
             ).map(([label, val, set]) => (
               <button key={label} {...sheetItem(false)} onClick={() => set((v) => !v)} aria-pressed={val}>
-                <span style={{ width: 16, color: val ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{val ? "✓" : ""}</span> {label}
+                <span style={{ width: 16, color: val ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{val ? <Icon name="check" size={12} /> : null}</span> {label}
               </button>
             ))}
             <button {...sheetItem(false)} onClick={() => { chartRef.current?.resetPanes(); setSheet(null); }}>

@@ -5,6 +5,7 @@
 // the pre-trade gate and the submit; this owns the layout, the arithmetic that is pure derivation
 // from the numbers on screen, and the job of never showing a figure it cannot stand behind.
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Icon } from "./icons";
 import { DARK, LIGHT } from "../src/util";
 import type { Theme } from "../src/types";
 import { CONTROL, RADIUS, SHEET, SPACE, TYPE, WEIGHT, cx, readable, themeVars } from "./ui";
@@ -516,7 +517,7 @@ export function TradeTicket({
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {checks.map((c) => (
             <div key={c.label} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 11 }}>
-              <span style={{ color: c.ok ? "var(--ac-up-ink)" : "var(--ac-down-ink)", fontWeight: 800, width: 12 }}>{c.ok ? "✓" : "✕"}</span>
+              <span style={{ color: c.ok ? "var(--ac-up-ink)" : "var(--ac-down-ink)", fontWeight: 800, width: 12 }}><Icon name={c.ok ? "check" : "close"} size={11} /></span>
               <span style={{ color: c.ok ? th.text : th.textStrong }}>{c.label}</span>
               {c.detail && <span style={{ ...mono, fontSize: 10, color: "var(--ac-text)", marginLeft: "auto" }}>{c.detail}</span>}
             </div>
