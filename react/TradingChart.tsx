@@ -1607,7 +1607,13 @@ export function TradingChart({
     alignItems: "center",
     gap: SPACE[2],
     padding: `${SPACE[2]}px ${SPACE[3]}px`,
-    borderBottom: `1px solid var(--ac-line-soft)`,
+    // NO RULE WHEN UNFRAMED. `frame={false}` says this chart IS its host's card rather than a
+    // card dropped into one — and the rules that separate the widget's own chrome from the plot
+    // are what a card needs, not what a panel does. Inside a host card they draw a box around
+    // the plot that the host never asked for: the toolbar, the series and the range strip read
+    // as three stacked boxes instead of one instrument. The plot's own weight does the
+    // separating there.
+    borderBottom: frame ? `1px solid var(--ac-line-soft)` : "none",
     background: "var(--ac-pane)",
     flexWrap: "wrap",
   };
@@ -2655,7 +2661,7 @@ export function TradingChart({
           and the settings gear are chart-wide switches, not annotations on a price — they
           belong in chrome. As a real bar they also stop colliding with the axis corner, the
           countdown and anything the host draws in `overlay`. */}
-      <div style={{ display: "flex", alignItems: "center", flexWrap: compact ? "nowrap" : "wrap", gap: 4, padding: compact ? "6px 8px" : "5px 8px", borderTop: "1px solid var(--ac-line)", background: "var(--ac-pane)" }}>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: compact ? "nowrap" : "wrap", gap: 4, padding: compact ? "6px 8px" : "5px 8px", borderTop: frame ? "1px solid var(--ac-line)" : "none", background: "var(--ac-pane)" }}>
         {/* Compact scrolls the range strip and the host's settings and keeps the right-hand
             cluster pinned; `display: contents` leaves the wide bar exactly as it was, with its
             children wrapping in the parent. */}
