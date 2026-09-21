@@ -4,6 +4,54 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.13.9] - 2026-09-21
+
+### Added
+
+- **`PriceLine.inScale`** — count this line when scaling the price pane. A forward plan's target
+  routinely sits outside the window the bars produce, so the one number the reader is looking for
+  was the one drawn off-screen. Opt-in, because an alert set far from the market must NOT be
+  allowed to flatten the chart it is drawn on.
+
+- **`PriceLine.labelSide`** — `"both"` (default), `"split"`, `"left"` or `"right"`. On a card-sized
+  chart the full chip (`T 283.40`) plus the axis pill (`283.40`) prints the price twice, in two
+  columns, for every level. `"split"` gives each side one job: the NAME rides the line on the left,
+  the NUMBER sits on the price axis where every other number on the chart already is. `"right"`
+  drops the chip and folds the name into the axis pill; `"left"` keeps the full chip.
+
+- **`lastPriceLine`** (React prop) — draw the dashed last-price line and its axis tag. A host
+  drawing its OWN "now" level, from a live quote rather than from the last bar the series happens
+  to end on, needs this off or the chart states the same idea twice with two different numbers:
+  after the close, the last bar is yesterday and the quote is today. The host's `false` wins over
+  the stored preference; a host that says nothing leaves the preference in charge.
+
+- **`controls`** (React prop) — the widget's own scale / navigation bar under the plot: range
+  presets, Auto / Log / %, the volume profile, the data window, the settings gear. A card-sized
+  chart has no use for them; it states one picture, and the way to interrogate it is to open the
+  instrument, not to change the scale inside a 110px pane. With this off the bar is drawn only if
+  the host filled `footer` or `footerRight`, and otherwise not at all.
+
+### Fixed
+
+- **Axis scale labels were painted under the level pills.** The price gutter is drawn before the
+  levels are, so every tick label went down first and the pills landed on top of them — `200.00`
+  reading as `2  .00` behind a stop. A half-covered number is worse than a missing one: a reader
+  scanning the scale sees a price that is not a price. Tick labels are now collected during the
+  grid pass and flushed after the pills, and a tick whose row a pill has claimed is dropped rather
+  than nudged — the pill already carries that row's price, and a number moved off its own tick no
+  longer says what the gutter's positions mean.
+
+- **`labelSide: "right"` drew an empty chip.** The name moves into the axis pill and the left side
+  has nothing to say, but the pill was still painted — a bare coloured stub against the plot edge
+  for every level, a mark that looks like a legend and carries no legend.
+
+- **A split label and its price drifted apart.** The left chips and the right axis pills reserve
+  slots in two independent columns, so two crowded levels could nudge the letter 2px and its number
+  4px — leaving the reader to match names to numbers by eye, which is the one thing `split` exists
+  to prevent. A split level now takes the slot its own axis pill took, so the two halves move as one
+  row, and when the market crosses a level both columns re-sort identically because there is only
+  one placement to make.
+
 ## [0.13.2] - 2026-08-25
 
 ### Fixed

@@ -98,6 +98,37 @@ export interface PriceLine {
   label?: string; // shown in the left chip (e.g. a bell glyph)
   dashed?: boolean;
   removable?: boolean; // draw a small ✕ in the chip; clicking it fires onPriceLineRemove(id)
+  /**
+   * COUNT THIS LINE WHEN SCALING THE PRICE PANE, so it is always on screen.
+   *
+   * Off by default, and that default is the important half: an alert set 40% away would otherwise
+   * flatten every candle into a band to keep itself visible, and the alert book is the common
+   * case. A line only asks for this when being OFF SCREEN makes it useless — a suggestion's
+   * target is the clearest case, since the whole proposal is "the price goes here" and a chart
+   * scaled to recent bars alone will not show it. An open trade's stop is the same argument.
+   *
+   * Opt-in on the line rather than a chart-wide switch, because a host commonly has both kinds at
+   * once: draw my bracket, keep my alerts where they are.
+   */
+  inScale?: boolean;
+  /**
+   * WHICH SIDE CARRIES WHAT — `"both"` (default), `"split"`, `"left"` or `"right"`.
+   *
+   * A line has two places it can say what it is: the chip riding the line at the left edge, and
+   * the pill on the price axis. Drawing both is right for an alert book, where the chip carries a
+   * glyph and the axis carries the number. It is wrong for a bracket on a small chart: three
+   * levels then print six labels, the same three prices twice, and on a card-width plot the two
+   * columns eat the series between them.
+   *
+   * `"split"` gives each side ONE job: the name rides the line on the left ("T"), the number sits
+   * on the price axis where every other price on the chart is read. Nothing is said twice, and a
+   * four-level bracket costs four letters of plot width instead of four prices. It is the right
+   * mode for a bracket on a small chart.
+   *
+   * `"right"` drops the chip entirely and moves the label into the axis pill ("T 283.40").
+   * `"left"` keeps the full chip and leaves the axis showing the bare price.
+   */
+  labelSide?: "left" | "right" | "both" | "split";
 }
 
 // A host-supplied event ANCHORED TO A BAR AND A PRICE — a backtest fill, a real execution.

@@ -119,6 +119,21 @@ test("placeAxisTag: the anchor keeps its slot and the level steps aside", () => 
   assert.ok(Math.abs(target - price) >= 24, `target still overlaps: ${target} vs ${price}`);
 });
 
+test("placeAxisTag: a level the market moves THROUGH swaps sides with it", () => {
+  // The reorder is the point: entry sits below the market, the market rises through it, and the
+  // entry row must end up above. A placement that only avoided collisions — or one that cached a
+  // side — would leave the column claiming the trade is still waiting below.
+  const run = (entryY: number) => {
+    const slots: AxisSlot[] = [];
+    const now = placeAxisTag(200, 19, slots);
+    return { now, entry: placeAxisTag(entryY, 19, slots, now) };
+  };
+  const before = run(203); // entry 3px BELOW the live price (larger y): not reached yet
+  const after = run(197); // the market has risen through it: the same entry is now ABOVE
+  assert.ok(before.entry > before.now, `below before the cross: ${before.entry} vs ${before.now}`);
+  assert.ok(after.entry < after.now, `above after the cross: ${after.entry} vs ${after.now}`);
+});
+
 test("placeAxisTag: a tag never crosses to the wrong side of the price", () => {
   const slots: AxisSlot[] = [];
   const price = placeAxisTag(200, 19, slots);

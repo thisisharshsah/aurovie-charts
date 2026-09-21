@@ -160,6 +160,14 @@ export class Chart {
   // Separate from `axisSlots`: the left chips and the right pills are two independent
   // columns, so a chip must not be pushed aside by a pill it can never overlap.
   private chipSlots: { y0: number; y1: number }[] = [];
+  // AXIS SCALE LABELS ARE PAINTED LAST, and a row a level pill has taken is not painted at all.
+  //
+  // The gutter is drawn before the levels are, so every tick label went down first and the pills
+  // landed on top of them — "200.00" reading as "2  .00" behind a stop. The half-covered number is
+  // worse than a missing one: a reader scanning the scale sees a price that is not a price. The
+  // labels are collected here during the grid pass and flushed after the pills, which by then know
+  // which rows they occupy.
+  private axisLabels: { y: number; text: string }[] = [];
   private lastPriceY: number | null = null; // what level tags step away from
   private srOn = false; // auto support/resistance overlay (pivot levels off the real bars)
   private srCache: { key: string; levels: { price: number; kind: "s" | "r" }[] } = { key: "", levels: [] };
@@ -1230,6 +1238,18 @@ export class Chart {
             mx = Math.max(mx, v);
           }
         }
+    // HOST LEVELS THAT ASKED TO BE KEPT ON SCREEN. A suggestion's target sits above everything the
+    // name has done recently by construction — that is what makes it a target — so a pane scaled
+    // to the bars alone draws the line off the top and the reader sees a proposal with its point
+    // missing. Only lines that opted in (`inScale`) count, so the alert book cannot stretch the
+    // pane; see `PriceLine.inScale`.
+    if (this.scaleMode !== "percent") {
+      for (const pl of this.priceLines) {
+        if (!pl.inScale || !isFinite(pl.price)) continue;
+        mn = Math.min(mn, pl.price);
+        mx = Math.max(mx, pl.price);
+      }
+    }
     // Displaced series (Ichimoku's cloud + spans + chikou) are DRAWN, so they must also be SCALED —
     // scanned over exactly the source indices their renderer will visit, or the cloud would float
     // outside the pane. Same helper both sides, so the two can never disagree.
@@ -1775,6 +1795,7 @@ export class Chart {
     // intraday extended-hours shading, under the grid
     this.drawSessions(ctx, f, l, pw);
     // price-pane grid + right axis
+    this.axisLabels = [];
     for (const p of this.panes) this.drawGridAndAxis(ctx, p, pw);
     if (this.axisH > 0) this.drawTimeAxis(ctx, f, l, pw);
     // the hovered bar's column, tinted across every pane — a modern chart tracks the cursor
@@ -1822,8 +1843,12 @@ export class Chart {
       this.drawOverlayAxisTags(ctx, price);
       // Last, and therefore on top. The live price outranks every level on the axis.
       paintLastPriceTag?.();
+      this.paintAxisLabels(ctx, pw);
       this.drawDrawings(ctx);
     }
+    // Compare mode skips the level block entirely, so nothing has flushed them; no pills were
+    // reserved either, which means every label draws. A no-op once the block above has run.
+    this.paintAxisLabels(ctx, pw);
     // pane separators (with a grip on hover/drag — they're draggable) + frame
     for (let i = 1; i < this.panes.length; i++) {
       const p = this.panes[i];
@@ -1967,6 +1992,22 @@ export class Chart {
     ctx.fillRect(Math.round(x - w / 2), 0, Math.round(w), this.plotH());
   }
 
+  // See `axisLabels`. A tick whose row is claimed by a pill is DROPPED rather than nudged: the
+  // scale's job is to say what the gutter's positions mean, and a number moved off its own tick
+  // no longer does that — the pill sitting there already carries the price for that row.
+  private paintAxisLabels(ctx: CanvasRenderingContext2D, pw: number) {
+    if (this.axisW === 0 || !this.axisLabels.length) return;
+    ctx.font = this.theme.monoFont;
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
+    ctx.fillStyle = this.theme.text;
+    for (const { y, text } of this.axisLabels) {
+      if (this.axisSlots.some((s) => y > s.y0 - 6 && y < s.y1 + 6)) continue;
+      ctx.fillText(text, pw + 6, y);
+    }
+    this.axisLabels = [];
+  }
+
   private drawGridAndAxis(ctx: CanvasRenderingContext2D, p: Pane, pw: number) {
     const t = this.theme;
     ctx.font = t.monoFont;
@@ -1996,7 +2037,7 @@ export class Chart {
               : this.scaleMode === "percent" && p.base
                 ? `${((tick / p.base - 1) * 100).toFixed(2)}%`
                 : fmtPrice(tick, this.decimals);
-      ctx.fillText(label, pw + 6, y);
+      this.axisLabels.push({ y, text: label });
     }
     if (p.study?.kind === "RSI" || p.study?.kind === "STOCH") {
       for (const lvl of p.study.kind === "RSI" ? [30, 70] : [20, 80]) {
@@ -2863,6 +2904,23 @@ export class Chart {
     }
   }
 
+  // The left chip: a rounded pill in the line's colour carrying its name (and, off `split`, its
+  // price). Factored out of `drawPriceLines` so every chip is the same object.
+  private levelChip(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, text: string, fill: string, ink: string) {
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.3)";
+    ctx.shadowBlur = 5;
+    ctx.shadowOffsetY = 1;
+    ctx.fillStyle = fill;
+    roundRectPath(ctx, x, y - 9, w, 18, 5);
+    ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = ink;
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
+    if (text) ctx.fillText(text, x + 6, y + 0.5);
+  }
+
   // Host-supplied horizontal price lines (alerts/orders): a dashed line across the plot, a left chip
   // ("label · price ✕") and a right-axis price tag, all in the line's colour. ✕ hit rects are cached
   // for onDown. Percent mode is skipped (the lines are absolute prices, not % of the window start).
@@ -2906,10 +2964,27 @@ export class Chart {
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
-      this.axisTag(ctx, ty, fmtPrice(pl.price, this.decimals), pl.color, ink);
+      // The axis pill carries the LABEL TOO when the chip is off, so a right-only bracket still
+      // says which line is which rather than leaving three bare prices to be matched by eye.
+      const side = pl.labelSide ?? "both";
+      const axisText =
+        side === "right" && pl.label
+          ? `${pl.label} ${fmtPrice(pl.price, this.decimals)}`
+          : fmtPrice(pl.price, this.decimals);
+      this.axisTag(ctx, ty, axisText, pl.color, ink);
       // Left chip: label AND price. The axis pill can be nudged or clipped off-pane, so the number
       // rides with the line too — the same way the S/R chips already carry theirs.
-      const text = pl.label ? `${pl.label} ${fmtPrice(pl.price, this.decimals)}` : "";
+      // `split` puts the NAME here and the number on the axis — each side says one thing.
+      const text =
+        !pl.label || side === "right"
+          ? ""
+          : side === "split"
+            ? pl.label
+            : `${pl.label} ${fmtPrice(pl.price, this.decimals)}`;
+      // NOTHING TO SAY, NO CHIP. `right` moves the name into the axis pill and leaves this side
+      // empty, which drew a bare coloured stub against the plot edge for every level — a mark
+      // that looks like a legend and carries no legend.
+      if (!text && !pl.removable) continue;
       const tw = text ? ctx.measureText(text).width : 0;
       const closeW = pl.removable ? 15 : 0;
       const chipW = 10 + tw + (text && closeW ? 6 : 0) + closeW;
@@ -2919,7 +2994,15 @@ export class Chart {
       // construction, which makes that the ordinary case rather than an edge case. The pills
       // on the right axis have always stepped apart; the chips had no such treatment.
       // The LINE stays at the true price and only the chip moves, so the geometry never lies.
-      const cy = placeAxisTag(y, 18, this.chipSlots, this.lastPriceY ?? undefined);
+      //
+      // SPLIT KEEPS ITS TWO HALVES ON ONE ROW. The name on the left and the number on the right are
+      // one label cut in two, so they must move together: give the chip the slot the AXIS PILL
+      // already took rather than reserving its own. Two independent slot columns drift apart the
+      // moment levels crowd — the letter steps down 2px, the price steps down 4 — and then the
+      // reader is matching names to numbers by eye, which is the one thing split exists to avoid.
+      // It also makes the reorder free: when the market moves through a level and the price order
+      // changes, both columns re-sort identically because there is only one placement.
+      const cy = side === "split" ? ty : placeAxisTag(y, 18, this.chipSlots, this.lastPriceY ?? undefined);
       // A chip that cannot sit NEAR its line is not drawn at all.
       //
       // Zoomed out, a plan's levels compress into a few pixels, and fanning five chips into
@@ -2939,18 +3022,7 @@ export class Chart {
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.3)";
-      ctx.shadowBlur = 5;
-      ctx.shadowOffsetY = 1;
-      ctx.fillStyle = pl.color;
-      roundRectPath(ctx, chipX, cy - 9, chipW, 18, 5);
-      ctx.fill();
-      ctx.restore();
-      ctx.fillStyle = ink;
-      ctx.textBaseline = "middle";
-      ctx.textAlign = "left";
-      if (text) ctx.fillText(text, chipX + 6, cy + 0.5);
+      this.levelChip(ctx, chipX, cy, chipW, text, pl.color, ink);
       if (pl.removable) {
         const cxx = chipX + chipW - closeW + 3;
         ctx.strokeStyle = ink;

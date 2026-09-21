@@ -133,6 +133,23 @@ export interface TradingChartProps {
    */
   levels?: PriceLine[];
   /**
+   * Draw the dashed last-price line and its axis tag. Defaults on.
+   *
+   * A host that draws its OWN "now" level — from a live quote rather than from the last bar the
+   * series happens to end on — needs this off, or the chart states the same idea twice with two
+   * different numbers: after the close, the last bar is yesterday and the quote is today.
+   */
+  lastPriceLine?: boolean;
+  /**
+   * The widget's own scale / navigation bar under the plot — range presets, Auto / Log / %, the
+   * volume profile, the data window and the settings gear. Defaults on.
+   *
+   * A card-sized chart has no use for them: it states one picture, and the way to interrogate it
+   * is to open the instrument, not to change the scale inside a 110px pane. With this off the bar
+   * is drawn only if the host put something in `footer` or `footerRight`, and otherwise not at all.
+   */
+  controls?: boolean;
+  /**
    * Score the current strategy. Host-supplied, like `onRunScript` — the chart never fetches. When
    * a saved strategy is loaded, its id is passed too, so the host can cache the score against it.
    */
@@ -666,6 +683,8 @@ export function TradingChart({
   onRunScript,
   scriptLibrary,
   levels,
+  lastPriceLine = true,
+  controls = true,
   onBacktestScript,
   onSweepScript,
   savedLibrary,
@@ -1174,7 +1193,10 @@ export function TradingChart({
   const gridDrawn = gridOn && depth.grid !== false;
   useEffect(() => chartRef.current?.setGrid(gridDrawn), [gridDrawn]);
   useEffect(() => chartRef.current?.setVolume(volume ?? showVol), [volume, showVol]);
-  useEffect(() => chartRef.current?.setLastPriceLine(priceLineOn), [priceLineOn]);
+  // The host's `false` WINS over the stored preference: a host turns this off because it is
+  // drawing the live price itself, and a reader who once ticked "last price" in some other chart
+  // must not get two of them here. A host that says nothing leaves the preference in charge.
+  useEffect(() => chartRef.current?.setLastPriceLine(lastPriceLine && priceLineOn), [priceLineOn, lastPriceLine]);
   // Markers come from two places and must not fight: whatever the host supplied, plus the fills of
   // the most recent backtest. Backtest fills are DERIVED state — clearing the scorecard clears them,
   // so a chart can never show the exits of a script that is no longer the one in the editor.
@@ -2661,6 +2683,7 @@ export function TradingChart({
           and the settings gear are chart-wide switches, not annotations on a price — they
           belong in chrome. As a real bar they also stop colliding with the axis corner, the
           countdown and anything the host draws in `overlay`. */}
+      {(controls || footer || footerRight) && (
       <div style={{ display: "flex", alignItems: "center", flexWrap: compact ? "nowrap" : "wrap", gap: 4, padding: compact ? "6px 8px" : "5px 8px", borderTop: frame ? "1px solid var(--ac-line)" : "none", background: "var(--ac-pane)" }}>
         {/* Compact scrolls the range strip and the host's settings and keeps the right-hand
             cluster pinned; `display: contents` leaves the wide bar exactly as it was, with its
@@ -2671,7 +2694,7 @@ export function TradingChart({
             BAR and these pick the width of the WINDOW, and with "1D" and "1W" printed in both
             rows, in the same pill, one lit in each, a reader has no way to tell which governs
             what they are looking at. */}
-        {rangeList.length > 0 && (
+        {controls && rangeList.length > 0 && (
             <span role="group" aria-label="Visible range" style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
               {rangeList.map((r) => (
                 <button
@@ -2763,7 +2786,7 @@ export function TradingChart({
         {footer}
         </div>
         <span style={{ marginLeft: "auto", flexShrink: 0 }} />
-            {!view.atRealtime && (
+            {controls && !view.atRealtime && (
               <button {...clusterBtn(false, { height: compact ? 28 : 23, flexShrink: 0 })} title="Scroll to the latest bar" aria-label="Go to realtime" onClick={() => chartRef.current?.scrollToRealtime()}><Icon name="realtime" size={13} /></button>
             )}
             {/* The host's own panel controls, with the "how is it drawn" group rather than with
@@ -2772,7 +2795,7 @@ export function TradingChart({
             {/* COMPACT: six switches become one. The scale modes, the profile, the data window
                 and every display toggle live in the sheet, and this is the way in — which also
                 means a host that hides the toolbar still leaves all of them reachable. */}
-            {compact ? (
+            {!controls ? null : compact ? (
               <button {...clusterBtn(sheetIs("menu"), { height: 28, minWidth: 30, flexShrink: 0 })} title="Chart settings" aria-label="Chart settings" aria-expanded={sheetIs("menu")} onClick={() => setSheet(sheetIs("menu") ? null : "menu")}><Icon name="settings" size={13} /></button>
             ) : (
               <>
@@ -2836,6 +2859,7 @@ export function TradingChart({
               </>
             )}
       </div>
+      )}
 
       {/* THE SCRIPT EDITOR IS A SIBLING OF THE PLOT, NOT A SHEET OVER IT.
           It used to sit absolutely inside the plot at 62% of its height, so writing a script
