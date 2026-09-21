@@ -582,15 +582,63 @@ export class Chart {
     this.requestDraw();
   }
   /**
-   * The trade plan: reward and risk as areas, not arithmetic.
+   * The trade plan's ZONES: reward and risk as areas, not arithmetic.
    *
    * Drawn UNDER the series — a translucent fill over the candles would tint the very bars the
    * reader is judging the plan against. The zones stop at the entry from both sides, so the
    * boundary between them IS the entry, and their relative heights are the reward:risk ratio at
    * a glance. Percent mode is skipped: the plan is in absolute prices and a % window would place
    * it somewhere meaningless.
+   *
+   * THE RULES AND LABELS ARE A SEPARATE PASS (`drawPlanLevels`, after the series). Only the fill
+   * belongs under the candles; a 1px target line under them is simply hidden by them.
    */
-  private drawPlan(ctx: CanvasRenderingContext2D, p: Pane) {
+  private drawPlanFills(ctx: CanvasRenderingContext2D, p: Pane) {
+    if (!this.plans.length || this.comparing || this.scaleMode === "percent") return;
+    ctx.save();
+    for (const plan of this.plans) {
+      // A closed plan is outlined, not filled — see `drawPlanLevels` for why shape carries this
+      // rather than opacity.
+      if (plan.to != null) continue;
+      const yE = this.priceToY(p, plan.entry);
+      const yT = this.priceToY(p, plan.target);
+      const yS = this.priceToY(p, plan.stop);
+      const x0 = plan.from != null ? Math.max(0, this.xAtTime(plan.from)) : 0;
+      const x1 = plan.to != null ? Math.min(this.plotW(), this.xAtTime(plan.to)) : this.plotW();
+      if (!(x1 > x0)) continue;
+      const w = x1 - x0;
+      ctx.fillStyle = alpha(this.theme.up, 0.1);
+      ctx.fillRect(x0, Math.min(yE, yT), w, Math.abs(yT - yE));
+      ctx.fillStyle = alpha(this.theme.down, 0.1);
+      ctx.fillRect(x0, Math.min(yE, yS), w, Math.abs(yS - yE));
+    }
+    ctx.restore();
+  }
+
+  /**
+   * The trade plan's LEVELS: the three rules, and — for a live plan — what the two that nothing
+   * else names are worth.
+   *
+   * WHY THIS IS NOT PART OF THE FILL PASS. The rules used to be drawn with the zones, under the
+   * series, where the candles painted straight over them: a 1px target line beneath a green bar
+   * is not a line the reader ever saw. They are drawn after the series now, which is also what
+   * lets them carry text.
+   *
+   * WHY THEY CARRY TEXT AT ALL. `TradePlan` has always documented a label "on the entry chip",
+   * and nothing in this file ever drew a chip, or any text, for a plan. So a host that handed us
+   * a target and a stop got two anonymous hairlines and had to state the numbers somewhere else
+   * — or, believing the plan already said them, not at all. The prices ARE the plan; a band
+   * without them is a mood.
+   *
+   * TARGET AND STOP ONLY. The entry keeps its bare dashed rule: it is the one level a host
+   * routinely draws itself, with an attribution the library cannot know ("Entry · Suggested"),
+   * and labelling it here would print the same price twice on the same row.
+   *
+   * LIVE PLANS ONLY. A chart showing a season of resolved calls, each with two priced chips,
+   * buries the one being carried under its own track record — the same reasoning that leaves a
+   * closed plan outlined instead of filled.
+   */
+  private drawPlanLevels(ctx: CanvasRenderingContext2D, p: Pane) {
     if (!this.plans.length || this.comparing || this.scaleMode === "percent") return;
     const pw = this.plotW();
     ctx.save();
@@ -601,7 +649,6 @@ export class Chart {
       const x0 = plan.from != null ? Math.max(0, this.xAtTime(plan.from)) : 0;
       const x1 = plan.to != null ? Math.min(pw, this.xAtTime(plan.to)) : pw;
       if (!(x1 > x0)) continue;
-      const w = x1 - x0;
       /**
        * LIVE plans are FILLED, closed ones are OUTLINED. The difference is shape, not opacity.
        *
@@ -611,14 +658,9 @@ export class Chart {
        * tell a target from an entry. Colour was carrying the meaning and opacity was destroying
        * it. Dropping the fill instead pushes history back just as hard — a filled band reads as
        * far heavier than two hairlines — while every line keeps the colour that says what it is.
+       * (The fill itself is `drawPlanFills`, which runs before the series.)
        */
       const closed = plan.to != null;
-      if (!closed) {
-        ctx.fillStyle = alpha(this.theme.up, 0.1);
-        ctx.fillRect(x0, Math.min(yE, yT), w, Math.abs(yT - yE));
-        ctx.fillStyle = alpha(this.theme.down, 0.1);
-        ctx.fillRect(x0, Math.min(yE, yS), w, Math.abs(yS - yE));
-      }
       ctx.setLineDash([]);
       ctx.lineWidth = 1;
       ctx.strokeStyle = alpha(this.theme.up, closed ? 0.6 : 0.75);
@@ -632,6 +674,33 @@ export class Chart {
       ctx.setLineDash([4, 3]);
       ctx.strokeStyle = alpha(this.theme.entry ?? this.theme.textStrong, closed ? 0.7 : 0.85);
       ctx.beginPath(); ctx.moveTo(x0, yE); ctx.lineTo(x1, yE); ctx.stroke();
+      ctx.setLineDash([]);
+      if (closed) continue;
+
+      /*
+       * WHAT THE TWO LIVE LEVELS ARE WORTH.
+       *
+       * `T`/`S` rather than colour alone: green-is-target only works for a reader who can tell
+       * these greens from these reds, and the chip has room for one more glyph.
+       *
+       * PLACEMENT. The chip sits inside the band at its left edge, which is where the plan
+       * begins and therefore where it is already being read. When the band is too narrow to hold
+       * it — the ordinary case, since a call made on the newest bar spans only the few pixels
+       * left before the axis — it flips to the OUTSIDE of that edge, over the bars the plan
+       * predates, rather than spilling across the price axis. Clamped at 0 so a plan anchored
+       * off the left of the window still states its numbers.
+       */
+      ctx.font = this.theme.monoFont;
+      for (const [label, y, col] of [
+        [`T ${fmtPrice(plan.target, this.decimals)}`, yT, this.theme.up],
+        [`S ${fmtPrice(plan.stop, this.decimals)}`, yS, this.theme.down],
+      ] as const) {
+        if (y < p.top + 2 || y > p.top + p.height - 2) continue;
+        const w = Math.ceil(ctx.measureText(label).width) + 12;
+        const inside = x0 + w <= x1;
+        const x = Math.max(0, Math.min(inside ? x0 : x0 - w, pw - w));
+        this.levelChip(ctx, x, y, w, label, col, this.onFill(col));
+      }
     }
     ctx.restore();
   }
@@ -1811,9 +1880,12 @@ export class Chart {
       // study panes below.
       this.clipPane(ctx, price, () => {
         // band fills go UNDER the candles (Ichimoku's cloud, Bollinger/Keltner envelopes)
-        this.drawPlan(ctx, price);
+        this.drawPlanFills(ctx, price);
         for (const o of this.overlays) for (const fl of o.fills ?? []) this.drawBandFill(ctx, price, fl);
         this.drawSeries(ctx, price, f, l);
+        // ...but the plan's RULES go over them. Under the series they were painted out by the
+        // very bars they are there to be judged against.
+        this.drawPlanLevels(ctx, price);
         for (const o of this.overlays) {
           for (const ln of o.lines) if (ln.width > 0) this.drawLine(ctx, price, ln, f, l);
           for (const sl of o.shiftLines ?? []) this.drawShiftedLine(ctx, price, sl);

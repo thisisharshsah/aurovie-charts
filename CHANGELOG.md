@@ -4,6 +4,39 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.14.0] - 2026-09-21
+
+### Fixed
+
+- **A trade plan never said what its levels were worth.** `TradePlan.label` has been documented
+  since it was introduced as naming the plan's author "on the entry chip". There was no entry
+  chip. The plan renderer emitted two fills and three 1px rules and no text of any kind, and the
+  field was read nowhere in the library — so a host handed the chart a target and a stop and got
+  back two anonymous hairlines.
+
+  That is worse than a missing feature, because the documentation made it invisible: a host that
+  believed the plan labelled itself had every reason to stop labelling those levels anywhere
+  else. One did exactly that, suppressing its own target and stop price lines with a comment
+  explaining that the plan already drew them. The reader got a green band, a red band, a labelled
+  entry, and no way to learn either number from the chart.
+
+  A live plan now labels its target and its stop with a chip on the line — `T 283.40`, `S 274.10`
+  — in the same pill every other level on the chart uses. The letter is not decoration: green
+  target and red stop is not a distinction every reader can make, and the chip has room.
+
+  The ENTRY is deliberately still bare. It is the level a host attributes for itself, and
+  "Entry · Suggested" is a sentence built from `label` plus wording this library has no business
+  inventing; drawing it here would print the same price twice on the same row.
+
+  Closed plans stay unlabelled, for the reason they are already outlined rather than filled — a
+  season of resolved calls each carrying two priced chips buries the one being carried.
+
+- **The plan was drawn under the candles, including its rules.** Only the FILL wants to be under
+  the series; a translucent zone over the bars would tint the very bars the plan is judged
+  against. A 1px target line under them is just hidden by them, which is the other half of why
+  those levels could not be read. Fills still go down before the series (`drawPlanFills`), the
+  rules and labels now go on after it (`drawPlanLevels`).
+
 ## [0.13.9] - 2026-09-21
 
 ### Added

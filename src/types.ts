@@ -87,7 +87,20 @@ export interface TradePlan {
    * the same strength as the one you are carrying buries the live one in its own track record.
    */
   to?: number;
-  /** Names the plan's author on the entry chip — a model, a strategy. */
+  /**
+   * Names the plan's author — a model, a strategy.
+   *
+   * NOT DRAWN BY THE CHART, and this comment used to claim it was ("on the entry chip"). No chip
+   * existed: the plan renderer emitted three lines and two fills and no text of any kind, so a
+   * host reading this description could reasonably conclude the plan already stated its own
+   * levels and stop labelling them anywhere else. One did, and its target and stop were
+   * unreadable for a month.
+   *
+   * The chart now labels the target and the stop itself (`drawPlanLevels`) and still leaves the
+   * ENTRY bare, because entry is the level a host attributes for itself — "Entry · Suggested" is
+   * the host's sentence, built from this field plus wording the library has no business
+   * inventing. Kept so attribution has one agreed name; draw it yourself.
+   */
   label?: string;
 }
 
