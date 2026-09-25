@@ -10,7 +10,7 @@ import { parseScriptDraw, type ScriptRender } from "../src/script";
 import { DARK, LIGHT, THEMES, THEME_NAMES, SERIES_PALETTE as IND_PALETTE, SWATCHES, CMP_COLORS, CHIP_INK } from "../src/util";
 import { CONTROL, DEPTH, ELEV, RADIUS, SHEET, SPACE, TYPE, WEIGHT, Z, cx, themeVars } from "./ui";
 import type { Drawing } from "../src/drawings";
-import type { Bar, DataFeed, IndicatorInstance, LegendValue, PriceLine, Projection, ScaleMode, SeriesType, SessionSpec, Theme, ChartMarker, TradePlan } from "../src/types";
+import type { Bar, DataFeed, IndicatorInstance, LegendValue, PriceLine, Projection, ScaleMode, SeriesType, SessionSpec, Theme, ChartMarker, TradePlan, Zone } from "../src/types";
 
 // Drawings persist per symbol in localStorage, so they survive reloads + symbol switches.
 const drawKey = (s: string) => `aurovie-chart-drawings:${s.toUpperCase()}`;
@@ -116,6 +116,8 @@ export interface TradingChartProps {
   priceLines?: PriceLine[]; // host-supplied horizontal lines (alerts/orders/targets)
   /** Bar-anchored events (backtest fills, real executions), drawn at the price they happened. */
   markers?: ChartMarker[];
+  /** Host annotation ZONES — price bands drawn as boxes under the series (ICT FVG / order blocks). */
+  zones?: Zone[];
   onAxisClickPrice?: (price: number) => void; // click the price axis → create at that price
   onPriceLineRemove?: (id: string) => void; // click a price line's ✕ → remove it
   // Run a user script against the CURRENT symbol/resolution and return the host's reply. The
@@ -678,6 +680,7 @@ export function TradingChart({
   overlay,
   priceLines,
   markers,
+  zones,
   onAxisClickPrice,
   onPriceLineRemove,
   onRunScript,
@@ -1214,6 +1217,11 @@ export function TradingChart({
     () => chartRef.current?.setMarkers([...(markers ?? []), ...backtestMarkers]),
     [markers, backtestMarkers],
   );
+
+  // Host annotation zones flow through to the engine's dedicated channel.
+  useEffect(() => {
+    chartRef.current?.setHostZones(zones ?? []);
+  }, [zones]);
   // After `symbol`/`resolution` too: setData clears any projection, so re-applying only on the
   // prop's own identity would drop it on every interval change.
   useEffect(() => {

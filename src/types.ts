@@ -1,3 +1,4 @@
+import type { ScriptColor } from "./script";
 // Public types for the charting engine. The engine is data-source-agnostic: you feed it Bars
 // (via a DataFeed) and it renders. Times are UNIX SECONDS (the financial convention); the engine
 // never invents a bar it wasn't given.
@@ -102,6 +103,34 @@ export interface TradePlan {
    * inventing. Kept so attribution has one agreed name; draw it yourself.
    */
   label?: string;
+}
+
+/**
+ * A host-supplied ANNOTATION ZONE: a price band over a span of bars, drawn as a translucent box
+ * UNDER the series so it never tints the candles a reader is judging it against. This is the
+ * primitive an ICT Fair Value Gap or order block is drawn with — a rectangle in price and time,
+ * with an optional 50% line (the Consequent Encroachment or Mean Threshold) and a label.
+ *
+ * Unlike a `TradePlan` (a bracket with an entry that splits reward from risk) a zone makes no
+ * claim about direction or outcome; it marks a region. Host-supplied and read-only — the user's
+ * own drawings are a separate channel that the drawing tools own.
+ */
+export interface Zone {
+  /** The band's two price bounds, in either order. */
+  price1: number;
+  price2: number;
+  /** Bar time of the zone's left edge. Omitted spans from the left of the plot. */
+  from?: number;
+  /** Bar time of the right edge. Omitted runs to the right edge of the plot. */
+  to?: number;
+  /** An optional 50% line drawn dashed across the zone — the FVG's CE or the block's MT. */
+  mid?: number;
+  /** The zone's colour, from the script palette. Defaults to `accent`. */
+  color?: ScriptColor;
+  /** A short label drawn at the zone's left edge, above the band. */
+  label?: string;
+  /** Draw the zone faded — an FVG or block price has since traded back through. */
+  faded?: boolean;
 }
 
 export interface PriceLine {

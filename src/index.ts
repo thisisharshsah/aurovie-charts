@@ -9,7 +9,7 @@ export { US_EQUITIES_SESSION } from "./types";
 // mounting the widget, and so the ticket and the chart can never disagree about one calculation.
 export { deriveTicketRisk, bracketCoherent, EMPTY_ORDER, HAS_LIMIT, HAS_TRIGGER, HAS_TIF } from "./ticket";
 export type { TicketOrder, TicketQuote, TicketAccount, TicketRisk, OrderSide, OrderType, TimeInForce, SizeMode } from "./ticket";
-export type { Bar, SeriesType, Resolution, Theme, DataFeed, DataFeedResult, ChartOptions, IndicatorInstance, LegendValue, PriceLine, ChartMarker, Projection, ScaleMode, SessionSpec, TradePlan } from "./types";
+export type { Bar, SeriesType, Resolution, Theme, DataFeed, DataFeedResult, ChartOptions, IndicatorInstance, LegendValue, PriceLine, ChartMarker, Projection, ScaleMode, SessionSpec, TradePlan, Zone } from "./types";
 
 export type { Drawing } from "./drawings";
 

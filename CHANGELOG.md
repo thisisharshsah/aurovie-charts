@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.15.0] - 2026-09-25
+
+### Added
+
+- **Host annotation zones.** A new `Zone` type and a `zones` prop on `TradingChart` (backed by
+  `Chart.setHostZones`) draw host-supplied price bands as translucent boxes UNDER the series — the
+  same layer as the trade-plan fills, so a zone never tints the candles a reader is judging it
+  against. A zone carries its two price bounds, an optional bar-time span, an optional dashed 50%
+  line, a palette colour, a label, and a `faded` flag. It is the primitive an ICT Fair Value Gap
+  or order block is drawn with: a rectangle in price and time that marks a region without claiming
+  a direction or an outcome. Read-only and host-owned — the user's own drawing tools remain a
+  separate channel, so a host box and a user rectangle never contend for one list.
+
 ## [0.14.0] - 2026-09-21
 
 ### Fixed

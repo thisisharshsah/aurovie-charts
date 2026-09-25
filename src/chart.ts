@@ -1,4 +1,4 @@
-import { US_EQUITIES_SESSION, type Bar, type ChartMarker, type ChartOptions, type IndicatorInstance, type LegendValue, type PriceLine, type Projection, type ScaleMode, type SeriesType, type SessionSpec, type Theme, type TradePlan } from "./types";
+import { US_EQUITIES_SESSION, type Bar, type ChartMarker, type ChartOptions, type IndicatorInstance, type LegendValue, type PriceLine, type Projection, type ScaleMode, type SeriesType, type SessionSpec, type Theme, type TradePlan, type Zone } from "./types";
 import { DRAW_SPECS, type Drawing, type DrawCtx, type Point } from "./drawings";
 import { autoBox, computeRenko, computePnf, computeKagi, type PnfCol, type KagiSeg } from "./resample";
 import { scriptColor, type ScriptRender } from "./script";
@@ -155,6 +155,7 @@ export class Chart {
   private priceLines: PriceLine[] = []; // host-supplied horizontal lines (alerts/orders/targets)
   private plans: TradePlan[] = []; // host-supplied trade plans, drawn as risk/reward zones
   private markers: ChartMarker[] = []; // host-supplied bar-anchored events (fills)
+  private hostZones: Zone[] = []; // host-supplied annotation boxes (ICT FVG / order blocks)
   // Right-axis pill slots claimed this frame, so opaque tags can't bury one another. Cleared per draw.
   private axisSlots: { y0: number; y1: number }[] = [];
   // Separate from `axisSlots`: the left chips and the right pills are two independent
@@ -580,6 +581,73 @@ export class Chart {
     const list = plan == null ? [] : Array.isArray(plan) ? plan : [plan];
     this.plans = list.filter((x) => [x.entry, x.target, x.stop].every((v) => Number.isFinite(v) && v > 0));
     this.requestDraw();
+  }
+
+  /**
+   * Host annotation ZONES — price bands over a span of bars, drawn as translucent boxes under the
+   * series (an ICT Fair Value Gap or order block). Read-only and host-owned; the user's drawing
+   * tools are a separate channel, so a host box and a user rectangle never fight over one list.
+   */
+  setHostZones(list: Zone[] | null) {
+    this.hostZones = (list ?? []).filter(
+      (z) => [z.price1, z.price2].every((v) => Number.isFinite(v) && v > 0),
+    );
+    this.requestDraw();
+  }
+
+  // The fill, UNDER the series (like the plan fills) so it never tints the candles being judged.
+  private drawHostZoneFills(ctx: CanvasRenderingContext2D, p: Pane) {
+    if (!this.hostZones.length || this.comparing || this.scaleMode === "percent") return;
+    const pw = this.plotW();
+    ctx.save();
+    for (const z of this.hostZones) {
+      const yHi = this.priceToY(p, Math.max(z.price1, z.price2));
+      const yLo = this.priceToY(p, Math.min(z.price1, z.price2));
+      const x0 = z.from != null ? Math.max(0, this.xAtTime(z.from)) : 0;
+      const x1 = z.to != null ? Math.min(pw, this.xAtTime(z.to)) : pw;
+      if (!(x1 > x0)) continue;
+      const base = scriptColor(this.theme, z.color ?? "accent");
+      ctx.fillStyle = alpha(base, z.faded ? 0.05 : 0.13);
+      ctx.fillRect(x0, yHi, x1 - x0, Math.max(1, yLo - yHi));
+      if (z.mid != null) {
+        const ym = this.priceToY(p, z.mid);
+        ctx.strokeStyle = alpha(base, z.faded ? 0.3 : 0.6);
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(x0, ym);
+        ctx.lineTo(x1, ym);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+    ctx.restore();
+  }
+
+  // The border + label, AFTER the series, so a 1px edge and its text are not painted over by the
+  // candles the way an under-series line would be.
+  private drawHostZoneLabels(ctx: CanvasRenderingContext2D, p: Pane) {
+    if (!this.hostZones.length || this.comparing || this.scaleMode === "percent") return;
+    const pw = this.plotW();
+    ctx.save();
+    ctx.font = "10px ui-monospace, monospace";
+    ctx.textBaseline = "bottom";
+    for (const z of this.hostZones) {
+      const yHi = this.priceToY(p, Math.max(z.price1, z.price2));
+      const yLo = this.priceToY(p, Math.min(z.price1, z.price2));
+      const x0 = z.from != null ? Math.max(0, this.xAtTime(z.from)) : 0;
+      const x1 = z.to != null ? Math.min(pw, this.xAtTime(z.to)) : pw;
+      if (!(x1 > x0)) continue;
+      const base = scriptColor(this.theme, z.color ?? "accent");
+      ctx.strokeStyle = alpha(base, z.faded ? 0.35 : 0.7);
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x0 + 0.5, yHi + 0.5, x1 - x0 - 1, Math.max(1, yLo - yHi) - 1);
+      if (z.label) {
+        ctx.fillStyle = alpha(base, z.faded ? 0.6 : 1);
+        ctx.fillText(z.label, x0 + 4, yHi - 2);
+      }
+    }
+    ctx.restore();
   }
   /**
    * The trade plan's ZONES: reward and risk as areas, not arithmetic.
@@ -1881,11 +1949,13 @@ export class Chart {
       this.clipPane(ctx, price, () => {
         // band fills go UNDER the candles (Ichimoku's cloud, Bollinger/Keltner envelopes)
         this.drawPlanFills(ctx, price);
+        this.drawHostZoneFills(ctx, price);
         for (const o of this.overlays) for (const fl of o.fills ?? []) this.drawBandFill(ctx, price, fl);
         this.drawSeries(ctx, price, f, l);
         // ...but the plan's RULES go over them. Under the series they were painted out by the
         // very bars they are there to be judged against.
         this.drawPlanLevels(ctx, price);
+        this.drawHostZoneLabels(ctx, price);
         for (const o of this.overlays) {
           for (const ln of o.lines) if (ln.width > 0) this.drawLine(ctx, price, ln, f, l);
           for (const sl of o.shiftLines ?? []) this.drawShiftedLine(ctx, price, sl);
