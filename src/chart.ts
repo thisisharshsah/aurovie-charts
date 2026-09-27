@@ -15,6 +15,10 @@ import {
   fmtCrosshairTime,
   fmtCountdown,
   isTimeBoundary,
+  minorGridAlpha,
+  sectionKey,
+  SECTION_STEPS,
+  timeGridMarks,
   rightMarginBars,
   panFloorBars,
   fitBarCount,
@@ -2155,6 +2159,28 @@ export class Chart {
     ctx.font = t.monoFont;
     ctx.textBaseline = "middle";
     const ticks = p.kind === "volume" ? [p.max] : niceTicks(p.min, p.max, Math.max(2, Math.floor(p.height / 44)));
+    // Half-step lines, faded by how far apart the majors are — see `minorGridAlpha`. Drawn first
+    // and fainter, so a major always reads over a minor.
+    if (this.gridOn && p.kind !== "volume" && ticks.length >= 2) {
+      const step = ticks[1] - ticks[0];
+      const gap = Math.abs(this.priceToY(p, ticks[1]) - this.priceToY(p, ticks[0]));
+      const a = minorGridAlpha(gap);
+      if (a > 0.02) {
+        ctx.save();
+        ctx.globalAlpha = 0.55 * a;
+        ctx.strokeStyle = t.grid;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let v = ticks[0] - step / 2; v <= ticks[ticks.length - 1] + step; v += step) {
+          const y = this.priceToY(p, v);
+          if (y < p.top || y > p.top + p.height) continue;
+          ctx.moveTo(0, crisp(y));
+          ctx.lineTo(pw, crisp(y));
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
     for (const tick of ticks) {
       const y = p.kind === "volume" ? this.priceToY(p, tick) : this.priceToY(p, tick);
       if (y < p.top - 1 || y > p.top + p.height + 1) continue;
@@ -2198,32 +2224,55 @@ export class Chart {
   private drawTimeAxis(ctx: CanvasRenderingContext2D, f: number, l: number, pw: number) {
     const t = this.theme;
     ctx.font = t.monoFont;
-    ctx.fillStyle = t.text;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     const y = this.plotH() + BOTTOM_AXIS_H / 2;
-    let lastLabelX = -Infinity;
-    for (let i = f; i <= l; i++) {
-      const boundary = isTimeBoundary(this.bars[i - 1], this.bars[i], this.intraday, this.utc);
-      const px = this.x(i);
-      if (px < 0 || px > pw) continue;
-      // Gridlines mark section breaks only, but labels also land BETWEEN them — an intraday chart
-      // zoomed inside one day would otherwise carry a single label, or none at all.
-      if (boundary && this.gridOn) {
-        ctx.strokeStyle = t.grid;
-        ctx.lineWidth = 1;
+    // Scan one stride past each edge so a mark half off-screen still fades and labels correctly.
+    const lo = Math.max(0, f - 1);
+    const hi = Math.min(this.n() - 1, l + 1);
+    const marks = timeGridMarks(
+      lo,
+      hi,
+      this.barSpacing,
+      (i) => isTimeBoundary(this.bars[i - 1], this.bars[i], this.intraday, this.utc),
+      (i) => sectionKey(this.bars[i].time, this.intraday, this.utc),
+      this.intraday ? SECTION_STEPS.intraday : SECTION_STEPS.daily,
+    );
+    // Gridlines: majors at full grid strength, minors lighter and scaled by their fade.
+    if (this.gridOn) {
+      ctx.save();
+      ctx.strokeStyle = t.grid;
+      ctx.lineWidth = 1;
+      for (const m of marks) {
+        const px = this.x(m.i);
+        if (px < 0 || px > pw) continue;
+        ctx.globalAlpha = m.major ? 1 : 0.55 * m.alpha;
         ctx.beginPath();
         ctx.moveTo(crisp(px), 0);
         ctx.lineTo(crisp(px), this.plotH());
         ctx.stroke();
       }
-      if (px - lastLabelX > 54) {
-        // The date that opens a section reads stronger than the times within it.
-        ctx.fillStyle = boundary ? t.textStrong : t.text;
-        ctx.fillText(fmtAxisTime(this.bars[i].time, this.intraday, boundary, this.utc), px, y);
-        lastLabelX = px;
-      }
+      ctx.restore();
     }
+    // Labels: majors claim their room first, so a faint in-between time can never crowd out the
+    // date that opens a section. A label only appears once its mark is most of the way in.
+    const taken: [number, number][] = [];
+    const place = (m: { i: number; major: boolean; alpha: number }) => {
+      const px = this.x(m.i);
+      if (px < 0 || px > pw) return;
+      const text = fmtAxisTime(this.bars[m.i].time, this.intraday, m.major, this.utc);
+      const half = ctx.measureText(text).width / 2 + 4;
+      if (px - half < 0 || px + half > pw) return; // a label sliced by the plot edge reads as a different time
+      if (taken.some(([a, b]) => px + half > a && px - half < b)) return;
+      taken.push([px - half, px + half]);
+      ctx.globalAlpha = m.major ? 1 : clamp((m.alpha - 0.3) / 0.5, 0, 1);
+      ctx.fillStyle = m.major ? t.textStrong : t.text;
+      ctx.fillText(text, px, y);
+    };
+    ctx.save();
+    for (const m of marks) if (m.major) place(m);
+    for (const m of marks) if (!m.major && m.alpha >= 0.35) place(m);
+    ctx.restore();
   }
 
   private drawSeries(ctx: CanvasRenderingContext2D, p: Pane, f: number, l: number) {

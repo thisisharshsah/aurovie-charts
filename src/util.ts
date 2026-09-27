@@ -372,6 +372,109 @@ export function isTimeBoundary(prev: Bar | undefined, cur: Bar, intraday: boolea
   return intraday ? a.day !== b.day : a.mo !== b.mo || a.y !== b.y;
 }
 
+/**
+ * An ordinal for the section a bar opens — consecutive days (intraday) or consecutive months
+ * (daily and slower). Used only to thin section breaks by a stride, so a zoomed-out chart keeps
+ * every 3rd month rather than whichever ones a left-to-right sweep happened to reach first.
+ */
+export function sectionKey(sec: number, intraday: boolean, utc = false): number {
+  const p = parts(sec, utc);
+  return intraday ? Math.floor(Date.UTC(p.y, p.mo, p.day) / 86400000) : p.y * 12 + p.mo;
+}
+
+/** Section strides a zoomed-out time axis may thin to: calendar-friendly for each cadence. */
+export const SECTION_STEPS = {
+  intraday: [1, 2, 5, 10, 15, 30, 60, 90, 180, 365] as const,
+  daily: [1, 2, 3, 6, 12, 24, 60, 120] as const,
+};
+
+/** One vertical gridline / time label. `alpha` is how far it has faded in (0–1). */
+export interface TimeMark {
+  i: number;
+  major: boolean;
+  alpha: number;
+}
+
+/**
+ * Where the time axis puts its gridlines, as a pure function of the visible bars and the zoom.
+ *
+ * The axis used to draw a line at every section break (every day intraday, every month on a
+ * daily chart) and nothing else, while its labels were placed by a greedy left-to-right sweep. So
+ * the grid and the labels disagreed about what the axis measured, and zoom exposed it both ways:
+ * zoomed in, a whole screen of one session had no vertical rule at all; zoomed out, twenty day
+ * breaks crowded into a hatch pattern. The sweep also started at the first visible bar, which
+ * meant PANNING re-picked which labels survived — the axis shimmered under a drag.
+ *
+ * Now both come from here, and every mark sits at a position that does not depend on where the
+ * view starts:
+ *
+ *  - MAJORS are section breaks, thinned by a calendar stride (`sectionKey % k`) when they crowd.
+ *  - MINORS sit on bar indices that are multiples of a power-of-two stride. Powers of two NEST —
+ *    the marks at stride 8 are a subset of those at stride 4 — so zooming never moves a line, it
+ *    only adds or removes the in-between ones. Those in-between ones fade in from nothing as the
+ *    gap opens, and fade out the same way, so the grid densifies continuously instead of popping.
+ *  - A minor also fades as it approaches a major, so the two never collide.
+ */
+export function timeGridMarks(
+  f: number,
+  l: number,
+  barSpacing: number,
+  isBoundary: (i: number) => boolean,
+  keyOf: (i: number) => number,
+  steps: readonly number[],
+  minGap = 54,
+): TimeMark[] {
+  if (l < f || !(barSpacing > 0)) return [];
+  const bounds: number[] = [];
+  for (let i = f; i <= l; i++) if (isBoundary(i)) bounds.push(i);
+
+  let k = 1;
+  if (bounds.length > 1) {
+    const gapPx = ((bounds[bounds.length - 1] - bounds[0]) / (bounds.length - 1)) * barSpacing;
+    k = steps.find((s) => gapPx * s >= minGap) ?? steps[steps.length - 1];
+  }
+  const majors: number[] = [];
+  for (const i of bounds) {
+    if (k > 1 && ((keyOf(i) % k) + k) % k !== 0) continue;
+    // A short section (a half day, a data gap) can still land two breaks on top of each other.
+    if (majors.length && (i - majors[majors.length - 1]) * barSpacing < minGap * 0.6) continue;
+    majors.push(i);
+  }
+  const out: TimeMark[] = majors.map((i) => ({ i, major: true, alpha: 1 }));
+
+  // Between thinned sections there is nothing sensible to put: a "Mar 14" between "Jan" and "Apr".
+  if (k === 1) {
+    let s = 1;
+    while (s * barSpacing < minGap) s *= 2;
+    const fadeIn = clamp((s * barSpacing - minGap) / (minGap * 0.5), 0, 1);
+    let m = 0;
+    for (let i = Math.ceil(f / s) * s; i <= l; i += s) {
+      while (m < majors.length && majors[m] < i) m++;
+      if (majors[m] === i) continue;
+      const prev = m > 0 ? majors[m - 1] : -Infinity;
+      const next = m < majors.length ? majors[m] : Infinity;
+      const d = Math.min(i - prev, next - i) * barSpacing;
+      let a = clamp((d - minGap * 0.5) / (minGap * 0.5), 0, 1);
+      if (i % (2 * s) !== 0) a *= fadeIn;
+      if (a > 0.02) out.push({ i, major: false, alpha: a });
+    }
+    out.sort((x, y) => x.i - y.i);
+  }
+  return out;
+}
+
+/**
+ * How visible the half-step price gridlines are, 0–1, given the pixel gap between two majors.
+ *
+ * `niceTicks` changes its step in jumps (…, 10, 5, 2.5, 2, 1, …), which made the horizontal grid
+ * snap to a new density mid-zoom. The half-step line fades in as the major gap widens past
+ * `from`, and is fully drawn just before the step halves — at which point those same lines BECOME
+ * the majors, so the grid a reader sees is continuous through the change.
+ */
+export function minorGridAlpha(majorGapPx: number, from = 44, to = 80): number {
+  return clamp((majorGapPx - from) / (to - from), 0, 1);
+}
+
 // ---- indicator maths (pure) ----------------------------------------------
 // NaN-padded so index i of the output aligns with bar i.
 export function sma(src: number[], p: number): number[] {

@@ -3,7 +3,7 @@
 // definitions: NaN padding, the exact formulas, and the invariants each family must hold.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange, fitBarCount, visibleIndexRange, THEMES } from "./util.ts";
+import { ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange, fitBarCount, visibleIndexRange, THEMES, timeGridMarks, minorGridAlpha, sectionKey, SECTION_STEPS } from "./util.ts";
 import type { AxisSlot } from "./util.ts";
 import type { Bar } from "./types.ts";
 
@@ -320,4 +320,51 @@ test("every theme's grid and border are actually visible on their own background
     assert.ok(grid <= 2.2, `${name}: grid is ${grid.toFixed(2)}:1 — loud enough to compete with the bars`);
     assert.ok(border >= grid, `${name}: chrome hairlines must not be fainter than the grid`);
   }
+});
+
+test("timeGridMarks: a zoomed-in session with no section breaks still gets vertical rules", () => {
+  const marks = timeGridMarks(100, 160, 12, () => false, () => 0, SECTION_STEPS.intraday);
+  assert.ok(marks.length >= 5, `got ${marks.length}`);
+  assert.ok(marks.every((m) => !m.major));
+});
+
+test("timeGridMarks: panning never moves a mark — positions do not depend on the first visible bar", () => {
+  const isB = (i: number) => i % 78 === 0;
+  const key = (i: number) => Math.floor(i / 78);
+  const a = timeGridMarks(100, 400, 3, isB, key, SECTION_STEPS.intraday).map((m) => m.i);
+  const b = timeGridMarks(137, 437, 3, isB, key, SECTION_STEPS.intraday).map((m) => m.i);
+  const overlap = (xs: number[]) => xs.filter((i) => i >= 137 && i <= 400);
+  assert.deepEqual(overlap(a), overlap(b));
+});
+
+test("timeGridMarks: zooming out thins crowded section breaks by a calendar stride", () => {
+  // Monthly breaks every 21 bars at 1px/bar = 21px apart: needs every 3rd month to clear 54px.
+  const isB = (i: number) => i % 21 === 0;
+  const key = (i: number) => i / 21;
+  const marks = timeGridMarks(0, 500, 1, isB, key, SECTION_STEPS.daily);
+  assert.ok(marks.every((m) => m.major), "no minors between thinned sections");
+  for (const m of marks) assert.equal((m.i / 21) % 3, 0);
+});
+
+test("timeGridMarks: in-between marks fade in continuously as the gap opens", () => {
+  const at = (bs: number) => timeGridMarks(0, 400, bs, () => false, () => 0, SECTION_STEPS.intraday);
+  // Either side of the stride change (8 bars × 6.75px = 54px) the visible set is identical:
+  // the new odd multiples of 8 exist, but at ~zero alpha — nothing pops in.
+  assert.deepEqual(at(6.74).map((m) => m.i), at(6.76).map((m) => m.i));
+  const wide = at(10);
+  assert.ok(wide.length > at(6.76).length);
+  assert.ok(wide.every((m) => m.alpha > 0.9));
+});
+
+test("minorGridAlpha ramps from invisible to full across one nice-step interval", () => {
+  assert.equal(minorGridAlpha(44), 0);
+  assert.equal(minorGridAlpha(80), 1);
+  assert.ok(minorGridAlpha(60) > 0 && minorGridAlpha(60) < 1);
+});
+
+test("sectionKey counts consecutive days and months", () => {
+  const d1 = Date.UTC(2026, 0, 31, 15) / 1000;
+  const d2 = Date.UTC(2026, 1, 1, 15) / 1000;
+  assert.equal(sectionKey(d2, true, true) - sectionKey(d1, true, true), 1);
+  assert.equal(sectionKey(d2, false, true) - sectionKey(d1, false, true), 1);
 });

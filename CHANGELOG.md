@@ -4,6 +4,37 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- **The grid follows the zoom instead of fighting it.** Vertical gridlines used to be drawn only
+  at section breaks (each day intraday, each month on a daily chart), with labels placed by a
+  separate greedy pass. The two disagreed about what the axis measured. Zoomed into one session
+  there was no vertical rule at all; zoomed out, day breaks crowded into hatching; and because
+  the pass started from the first visible bar, panning reshuffled which labels survived.
+  Gridlines and labels now come from one pure function (`timeGridMarks`):
+  - Section breaks are majors, thinned by a calendar stride (every 2nd/3rd/6th month, every
+    5th/10th day) when they crowd.
+  - Minors sit on power-of-two bar strides. These nest, so zooming never moves a line; it only
+    fades in-between lines in or out.
+  - Labels on a major always win the room over labels on a minor.
+- **Half-step price gridlines fade in as you zoom** (`minorGridAlpha`). They reach full strength
+  just before `niceTicks` halves its step, at which point the same lines become the majors. The
+  horizontal grid no longer snaps to a new density mid-zoom.
+- **Every inline button now uses the shared button system.** Close, hide, remove, favourite,
+  period ±, the drawing list, the replay bar, the selection toolbar and the ticket's stepper
+  were hand-styled inline, with no hover, press or focus state. They now use `.ac-btn` with a
+  new `--mini` size (20px square) for glyphs inside rows. The characters they used (★ ◉ ◌ ⌫ ✕
+  ⏮ ▶ ⏸ ⏭ − +) are replaced by stroked icons that match the rest of the chrome.
+- `.ac-btn--outline` and `.ac-btn--danger` are now scoped to the trade ticket as well. The
+  ticket's quote chips already carried the outline class, but it had no effect there.
+
+### Added
+
+- **Zoom controls in the bottom bar**: zoom out, fit all bars, zoom in. Wheel, pinch and +/−
+  already zoomed, but none of them could be seen.
+
 ## [0.15.0] - 2026-09-25
 
 ### Added

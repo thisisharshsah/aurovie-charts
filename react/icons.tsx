@@ -354,6 +354,42 @@ const ICONS: Record<string, ReactNode> = {
       <path d="m6 6 12 12" />
     </>
   ),
+  // ---- inline glyphs that were characters (★ ◉ ◌ ⌫ ⏮ ▶ ⏸ ⏭ − +) ----
+  //
+  // Same reason as `check` / `close`: a character renders at the reader's font's weight and
+  // baseline, so a row of them never lined up with the stroked icons beside it.
+  plus: <path d="M12 5v14M5 12h14" />,
+  minus: <path d="M5 12h14" />,
+  zoomin: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M20 20l-4.4-4.4M11 8v6M8 11h6" />
+    </>
+  ),
+  zoomout: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M20 20l-4.4-4.4M8 11h6" />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+      <circle cx="12" cy="12" r="2.6" />
+    </>
+  ),
+  eyeoff: (
+    <>
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+      <path d="M4 20 20 4" />
+    </>
+  ),
+  star: <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />,
+  starfill: <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" fill="currentColor" />,
+  play: <path d="M8 5 L19 12 L8 19 Z" fill="currentColor" stroke="none" />,
+  pause: <path d="M8 5v14M16 5v14" strokeWidth={2.4} />,
+  stepback: <path d="M6 5v14M19 5l-9 7 9 7z" fill="currentColor" />,
+  stepfwd: <path d="M18 5v14M5 5l9 7-9 7z" fill="currentColor" />,
   expand: (
     <>
       <path d="M14 4h6v6" />

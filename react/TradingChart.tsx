@@ -1653,8 +1653,12 @@ export function TradingChart({
   const surface: CSSProperties = {}; // colour + elevation now live on the `ac-surface` class
   const menuBox: CSSProperties = { position: "absolute", top: CONTROL.lg + SPACE[1], zIndex: Z.menu, minWidth: 160 };
   const item = (on = false, style?: CSSProperties): P => ({ className: cx("ac-item", on && "is-on"), style });
-  /** The 15px square on a legend chip (hide / remove an indicator). */
-  const legBtn: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, padding: 0, border: "none", borderRadius: RADIUS.xs, cursor: "pointer", fontSize: TYPE.xs, lineHeight: 1, background: "var(--ac-press)", color: "var(--ac-ink)", fontFamily: "var(--ac-font)" };
+  /**
+   * An inline glyph button — close, hide, remove, favourite, ± — wherever it appears: a legend
+   * chip, a menu row, a panel header, the replay bar. One shape and the shared state model, where
+   * there used to be a dozen inline styles with no hover between them.
+   */
+  const miniBtn = (on = false, role?: "danger", style?: CSSProperties): P => ({ className: cx("ac-btn", "ac-btn--mini", role && "ac-btn--danger", on && "is-on"), style });
   /** The bottom bar's small switches (Auto / Log / % / realtime / settings). */
   const clusterBtn = (on = false, style?: CSSProperties): P => ({ className: cx("ac-btn", "ac-btn--xs", "ac-btn--outline", on && "is-on"), style });
   /**
@@ -1848,8 +1852,8 @@ export function TradingChart({
                       {g.items.map((it) => (
                         <div key={it.v} style={{ display: "flex", alignItems: "center" }}>
                           <button {...item(it.v === resolution, { flex: 1 })} onClick={() => { pickRes(it.v); setMenu(null); }}>{it.l}</button>
-                          <button title={favTf.includes(it.v) ? "Remove from favourites" : "Add to favourites"} onClick={() => toggleFav(it.v)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 13, padding: "2px 6px", color: favTf.includes(it.v) ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>
-                            {favTf.includes(it.v) ? "★" : "☆"}
+                          <button {...miniBtn(favTf.includes(it.v))} title={favTf.includes(it.v) ? "Remove from favourites" : "Add to favourites"} aria-pressed={favTf.includes(it.v)} onClick={() => toggleFav(it.v)}>
+                            <Icon name={favTf.includes(it.v) ? "starfill" : "star"} size={13} />
                           </button>
                         </div>
                       ))}
@@ -1948,8 +1952,8 @@ export function TradingChart({
                   <div key={c.symbol} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 2px", fontSize: 12, color: "var(--ac-ink)" }}>
                     <span style={{ width: 10, height: 10, borderRadius: 2, background: c.color }} />
                     <span style={{ flex: 1 }}>{c.symbol}</span>
-                    <button onClick={() => removeCompare(c.symbol)} title="Remove" style={{ border: "none", background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 13 }}>
-                      ✕
+                    <button {...miniBtn()} onClick={() => removeCompare(c.symbol)} title="Remove" aria-label={`Remove ${c.symbol}`}>
+                      <Icon name="close" size={13} />
                     </button>
                   </div>
                 ))}
@@ -2043,7 +2047,7 @@ export function TradingChart({
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "2px 4px 6px" }}>
                     <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ac-text)" }}>Objects · {objects.length}</span>
                     {objects.length > 0 && (
-                      <button style={{ border: "none", background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 11, fontFamily: "var(--ac-font)" }} onClick={() => chartRef.current?.clearDrawings()}>Clear all</button>
+                      <button className="ac-btn ac-btn--xs ac-btn--danger" onClick={() => chartRef.current?.clearDrawings()}>Clear all</button>
                     )}
                   </div>
                   {objects.length === 0 && <div style={{ color: "var(--ac-text)", padding: "6px 4px", fontFamily: "var(--ac-font)", fontSize: 12 }}>No drawings yet — pick a tool above.</div>}
@@ -2051,8 +2055,8 @@ export function TradingChart({
                     <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 4px", borderRadius: 6, fontFamily: "var(--ac-font)", fontSize: 12 }}>
                       <span style={{ color: d.color ?? "var(--ac-accent)", display: "inline-flex", flex: "none" }}><Icon name={d.type} size={14} /></span>
                       <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: d.hidden ? "var(--ac-text)" : "var(--ac-ink)", textDecoration: d.hidden ? "line-through" : "none" }}>{TOOL_LABEL[d.type] ?? d.type}</span>
-                      <button title={d.hidden ? "Show" : "Hide"} onClick={() => chartRef.current?.setDrawingHidden(d.id, !d.hidden)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 13, color: d.hidden ? "var(--ac-text)" : "var(--ac-accent-ink)", padding: "0 2px" }}>{d.hidden ? "◌" : "◉"}</button>
-                      <button title="Delete" onClick={() => chartRef.current?.deleteDrawing(d.id)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 13, color: "var(--ac-down-ink)", padding: "0 2px" }}><Icon name="close" size={13} /></button>
+                      <button {...miniBtn()} title={d.hidden ? "Show" : "Hide"} aria-pressed={!d.hidden} onClick={() => chartRef.current?.setDrawingHidden(d.id, !d.hidden)}><Icon name={d.hidden ? "eyeoff" : "eye"} size={13} /></button>
+                      <button {...miniBtn(false, "danger")} title="Delete" aria-label="Delete drawing" onClick={() => chartRef.current?.deleteDrawing(d.id)}><Icon name="close" size={13} /></button>
                     </div>
                   ))}
                 </div>
@@ -2325,15 +2329,15 @@ export function TradingChart({
                   {!d.hidden && val && val.value != null && <span style={{ color: d.color, fontWeight: 700 }}>{val.value.toFixed(2)}</span>}
                   {hov && d.adjustable && !d.hidden && (
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                      <button style={legBtn} title="Shorter period" aria-label={`${d.label} shorter period`} onClick={() => stepPeriod(d.id, d.period as number, -1)}>−</button>
-                      <button style={legBtn} title="Longer period" aria-label={`${d.label} longer period`} onClick={() => stepPeriod(d.id, d.period as number, 1)}>+</button>
+                      <button {...miniBtn()} title="Shorter period" aria-label={`${d.label} shorter period`} onClick={() => stepPeriod(d.id, d.period as number, -1)}><Icon name="minus" size={12} /></button>
+                      <button {...miniBtn()} title="Longer period" aria-label={`${d.label} longer period`} onClick={() => stepPeriod(d.id, d.period as number, 1)}><Icon name="plus" size={12} /></button>
                     </span>
                   )}
                   {hov && (
-                    <button style={legBtn} title={d.hidden ? "Show indicator" : "Hide indicator"} aria-label={`${d.hidden ? "Show" : "Hide"} ${d.label}`} onClick={() => toggleHide(d.id)}>{d.hidden ? "◌" : "◉"}</button>
+                    <button {...miniBtn()} title={d.hidden ? "Show indicator" : "Hide indicator"} aria-label={`${d.hidden ? "Show" : "Hide"} ${d.label}`} onClick={() => toggleHide(d.id)}><Icon name={d.hidden ? "eyeoff" : "eye"} size={13} /></button>
                   )}
                   {hov && (
-                    <button style={legBtn} title="Remove indicator" aria-label={`Remove ${d.label}`} onClick={() => toggleInd(d.id)}><Icon name="close" size={13} /></button>
+                    <button {...miniBtn(false, "danger")} title="Remove indicator" aria-label={`Remove ${d.label}`} onClick={() => toggleInd(d.id)}><Icon name="close" size={13} /></button>
                   )}
                 </div>
               );
@@ -2427,7 +2431,7 @@ export function TradingChart({
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 9px", borderBottom: "1px solid var(--ac-line)" }}>
                 <span style={{ fontFamily: "var(--ac-font)", fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--ac-text)" }}>Data window</span>
-                <button onClick={() => setDataWindow(false)} aria-label="Close data window" style={{ border: "none", background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 13, lineHeight: 1 }}><Icon name="close" size={13} /></button>
+                <button {...miniBtn()} onClick={() => setDataWindow(false)} aria-label="Close data window"><Icon name="close" size={13} /></button>
               </div>
               <div style={{ padding: "6px 9px 8px" }}>
                 {!legend.bar && <div style={{ color: "var(--ac-text)", padding: "6px 0" }}>Hover the chart to read a bar.</div>}
@@ -2476,7 +2480,7 @@ export function TradingChart({
               <div className="ac-surface" style={{ position: "absolute", zIndex: Z.modal, top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 320, borderRadius: RADIUS.lg, overflow: "hidden" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 13px", borderBottom: "1px solid var(--ac-line)" }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: "var(--ac-ink)" }}>Keyboard &amp; mouse</span>
-                  <button onClick={() => setShortcuts(false)} style={{ border: "none", background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 17, lineHeight: 1 }}><Icon name="close" size={13} /></button>
+                  <button {...miniBtn()} onClick={() => setShortcuts(false)} aria-label="Close shortcuts"><Icon name="close" size={13} /></button>
                 </div>
                 <div style={{ padding: "8px 13px 13px" }}>
                   {(
@@ -2548,9 +2552,10 @@ export function TradingChart({
                     key={w}
                     title={`Line width ${w}`}
                     onClick={() => chartRef.current?.setDrawingWidth(selection.id, w)}
-                    style={{ width: 22, height: 18, display: "flex", alignItems: "center", justifyContent: "center", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, background: on ? `color-mix(in srgb, var(--ac-accent) 20%, transparent)` : "transparent" }}
+                    aria-pressed={on}
+                    {...miniBtn(on, undefined, { width: 24 })}
                   >
-                    <span style={{ display: "block", width: 14, height: w, borderRadius: 2, background: on ? "var(--ac-accent-ink)" : "var(--ac-text)" }} />
+                    <span style={{ display: "block", width: 14, height: w, borderRadius: 2, background: "currentColor" }} />
                   </button>
                 );
               })}
@@ -2563,17 +2568,18 @@ export function TradingChart({
                     key={st}
                     title={`Line style: ${st}`}
                     onClick={() => chartRef.current?.setDrawingStyle(selection.id, st)}
-                    style={{ width: 26, height: 18, display: "flex", alignItems: "center", justifyContent: "center", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, background: on ? `color-mix(in srgb, var(--ac-accent) 20%, transparent)` : "transparent" }}
+                    aria-pressed={on}
+                    {...miniBtn(on, undefined, { width: 26 })}
                   >
                     <svg width="18" height="8" style={{ display: "block" }}>
-                      <line x1="1" y1="4" x2="17" y2="4" stroke={on ? "var(--ac-accent-ink)" : "var(--ac-text)"} strokeWidth="1.6" strokeDasharray={dash} strokeLinecap="round" />
+                      <line x1="1" y1="4" x2="17" y2="4" stroke="currentColor" strokeWidth="1.6" strokeDasharray={dash} strokeLinecap="round" />
                     </svg>
                   </button>
                 );
               })}
               <span style={{ width: 1, height: 16, background: "var(--ac-line)", margin: "0 2px" }} />
-              <button title="Delete drawing" onClick={() => chartRef.current?.deleteSelected()} style={{ width: 20, height: 18, border: "none", borderRadius: 6, background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 13 }}>
-                ⌫
+              <button {...miniBtn(false, "danger")} title="Delete drawing" aria-label="Delete drawing" onClick={() => chartRef.current?.deleteSelected()}>
+                <Icon name="trash" size={13} />
               </button>
             </div>
           )}
@@ -2588,8 +2594,8 @@ export function TradingChart({
               <div className="ac-surface" style={{ position: "absolute", zIndex: 31, ...(compact ? { left: 0, right: 0, bottom: 0, maxHeight: "76%", borderRadius: "16px 16px 0 0" } : { top: 12, right: 12, width: 326, maxHeight: "82%", borderRadius: 10 }), display: "flex", flexDirection: "column", overflow: "hidden" }} >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderBottom: "1px solid var(--ac-line)" }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: "var(--ac-ink)", fontFamily: "var(--ac-font)" }}>Indicators</span>
-                  <button onClick={() => setIndModal(false)} style={{ border: "none", background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 17, lineHeight: 1 }}>
-                    ✕
+                  <button {...miniBtn()} onClick={() => setIndModal(false)} aria-label="Close indicators">
+                    <Icon name="close" size={13} />
                   </button>
                 </div>
                 <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--ac-line)" }}>
@@ -2658,18 +2664,18 @@ export function TradingChart({
                 // other control in the widget, and the play/pause/step marks that are still
                 // characters keep working through the same parameter.
                 const cbtn = (glyph: ReactNode, title: string, onClick: () => void, on = false) => (
-                  <button title={title} onClick={onClick} style={{ width: 30, height: 26, border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13, background: on ? `color-mix(in srgb, var(--ac-accent) 18%, transparent)` : "transparent", color: on ? "var(--ac-accent-ink)" : "var(--ac-ink)" }}>
+                  <button title={title} aria-label={title} onClick={onClick} className={cx("ac-btn", "ac-btn--sm", "ac-btn--icon", on && "is-on")}>
                     {glyph}
                   </button>
                 );
                 return (
                   <>
-                    {cbtn("⏮", "Step back", () => chartRef.current?.replayBack())}
-                    {cbtn(playing ? "⏸" : "▶", playing ? "Pause" : "Play", () => setPlaying((p) => !p), playing)}
-                    {cbtn("⏭", "Step forward", () => chartRef.current?.replayForward())}
+                    {cbtn(<Icon name="stepback" size={13} />, "Step back", () => chartRef.current?.replayBack())}
+                    {cbtn(<Icon name={playing ? "pause" : "play"} size={13} />, playing ? "Pause" : "Play", () => setPlaying((p) => !p), playing)}
+                    {cbtn(<Icon name="stepfwd" size={13} />, "Step forward", () => chartRef.current?.replayForward())}
                     <span style={{ width: 1, height: 16, background: "var(--ac-line)", margin: "0 3px" }} />
                     {[1, 2, 4].map((s) => (
-                      <button key={s} onClick={() => setSpeed(s)} style={{ height: 24, padding: "0 7px", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600, background: speed === s ? `color-mix(in srgb, var(--ac-accent) 18%, transparent)` : "transparent", color: speed === s ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>
+                      <button key={s} onClick={() => setSpeed(s)} aria-pressed={speed === s} className={cx("ac-btn", "ac-btn--xs", "ac-num", speed === s && "is-on")}>
                         {s}×
                       </button>
                     ))}
@@ -2794,6 +2800,17 @@ export function TradingChart({
         {footer}
         </div>
         <span style={{ marginLeft: "auto", flexShrink: 0 }} />
+            {/* ZOOM. Wheel, pinch and +/− already zoom, but none of them is visible — a reader
+                with a trackpad and no keyboard habit had no way to discover the chart zooms at
+                all. Same shape as every other switch in this bar; the fit button returns to the
+                default view. */}
+            {controls && !compact && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 2, flexShrink: 0, marginRight: SPACE[1] }}>
+                <button {...clusterBtn(false, { width: CONTROL.sm, padding: 0 })} title="Zoom out (−)" aria-label="Zoom out" onClick={() => chartRef.current?.zoomBy(-1)}><Icon name="zoomout" size={13} /></button>
+                <button {...clusterBtn(false, { width: CONTROL.sm, padding: 0 })} title="Fit all bars (F)" aria-label="Fit all bars" onClick={() => chartRef.current?.fit()}><Icon name="fit" size={13} /></button>
+                <button {...clusterBtn(false, { width: CONTROL.sm, padding: 0 })} title="Zoom in (+)" aria-label="Zoom in" onClick={() => chartRef.current?.zoomBy(1)}><Icon name="zoomin" size={13} /></button>
+              </span>
+            )}
             {controls && !view.atRealtime && (
               <button {...clusterBtn(false, { height: compact ? 28 : 23, flexShrink: 0 })} title="Scroll to the latest bar" aria-label="Go to realtime" onClick={() => chartRef.current?.scrollToRealtime()}><Icon name="realtime" size={13} /></button>
             )}
@@ -2998,7 +3015,7 @@ export function TradingChart({
                 goes back down", which is the whole grammar of a sheet. */}
             <div style={{ display: "flex", alignItems: "center", padding: "6px 4px 2px" }}>
               <span style={{ width: 34, height: 4, borderRadius: 999, background: "var(--ac-text)", margin: "0 auto" }} />
-              <button onClick={() => setSheet(null)} aria-label="Close" style={{ position: "absolute", right: 10, top: 8, width: 30, height: 30, border: "none", borderRadius: 8, background: "var(--ac-hover)", color: "var(--ac-ink)", cursor: "pointer", fontSize: 14 }}><Icon name="close" size={13} /></button>
+              <button className="ac-btn ac-btn--outline ac-btn--icon" onClick={() => setSheet(null)} aria-label="Close" style={{ position: "absolute", right: 10, top: 8, width: CONTROL.lg, height: CONTROL.lg }}><Icon name="close" size={13} /></button>
             </div>
 
             {/* INTERVAL — the width of a BAR. */}
@@ -3056,7 +3073,7 @@ export function TradingChart({
                       <span style={{ width: 10, height: 10, borderRadius: 2, background: c.color }} />
                       {c.symbol}
                     </span>
-                    <button onClick={() => removeCompare(c.symbol)} aria-label={`Remove ${c.symbol}`} style={{ border: "none", background: "transparent", color: "var(--ac-text)", cursor: "pointer", fontSize: 17, padding: "0 6px" }}><Icon name="close" size={13} /></button>
+                    <button {...miniBtn()} onClick={() => removeCompare(c.symbol)} aria-label={`Remove ${c.symbol}`} style={{ width: CONTROL.lg, height: CONTROL.lg }}><Icon name="close" size={13} /></button>
                   </div>
                 ))}
               </>

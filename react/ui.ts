@@ -272,18 +272,26 @@ export const SHEET = `
 [data-aurovie-chart] .ac-btn:disabled, [data-aurovie-ticket] .ac-btn:disabled { opacity: 0.42; cursor: not-allowed; }
 
 /* Destructive — a delete gets a ROLE, not an inline colour that would outrank its own hover. */
-[data-aurovie-chart] .ac-btn--danger { color: var(--ac-down-ink); }
-[data-aurovie-chart] .ac-btn--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--ac-down) 14%, transparent); color: var(--ac-down-ink); }
+[data-aurovie-chart] .ac-btn--danger, [data-aurovie-ticket] .ac-btn--danger { color: var(--ac-down-ink); }
+[data-aurovie-chart] .ac-btn--danger:hover:not(:disabled), [data-aurovie-ticket] .ac-btn--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--ac-down) 14%, transparent); color: var(--ac-down-ink); }
 
 /* Outlined variant — for controls that must read as objects at rest (the toolbar's own row). */
-[data-aurovie-chart] .ac-btn--outline { border-color: var(--ac-line-soft); background: var(--ac-sunken); }
-[data-aurovie-chart] .ac-btn--outline:hover:not(:disabled) { border-color: var(--ac-line); }
+[data-aurovie-chart] .ac-btn--outline, [data-aurovie-ticket] .ac-btn--outline { border-color: var(--ac-line-soft); background: var(--ac-sunken); }
+[data-aurovie-chart] .ac-btn--outline:hover:not(:disabled), [data-aurovie-ticket] .ac-btn--outline:hover:not(:disabled) { border-color: var(--ac-line); }
 
 /* Sizes. Nothing may invent a fourth. */
 [data-aurovie-chart] .ac-btn--sm, [data-aurovie-ticket] .ac-btn--sm { height: ${CONTROL.md}px; padding: 0 ${SPACE[2]}px; font-size: ${TYPE.xs}px; }
 [data-aurovie-chart] .ac-btn--xs, [data-aurovie-ticket] .ac-btn--xs { height: ${CONTROL.sm}px; padding: 0 ${SPACE[2]}px; font-size: ${TYPE.xs}px; border-radius: var(--ac-r-sm); }
 [data-aurovie-chart] .ac-btn--icon, [data-aurovie-ticket] .ac-btn--icon { width: ${CONTROL.lg}px; padding: 0; }
 [data-aurovie-chart] .ac-btn--icon.ac-btn--sm { width: ${CONTROL.md}px; }
+/* Inline glyph button — the close ✕, hide, remove, favourite and ± that live INSIDE a row, a
+   legend chip or a panel header. They were a dozen hand-rolled inline styles (15px, 18px, 20px,
+   30px; radius 6 or 8; some with a wash, most with none) and therefore had no hover at all. One
+   square, one radius, the base button's state model. */
+[data-aurovie-chart] .ac-btn--mini, [data-aurovie-ticket] .ac-btn--mini {
+  width: 20px; height: 20px; padding: 0; flex-shrink: 0;
+  border-radius: var(--ac-r-xs); font-size: ${TYPE.xs}px; line-height: 1;
+}
 [data-aurovie-chart] .ac-btn--block, [data-aurovie-ticket] .ac-btn--block { width: 100%; }
 
 /* Mono-numeral variant, for anything that is a figure rather than a word. */

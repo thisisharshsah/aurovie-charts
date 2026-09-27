@@ -596,12 +596,14 @@ function Stepper({
     setDraft(null);
     onChange(next);
   };
-  const stepBtn: CSSProperties = { width: 32, height: 32, flexShrink: 0, borderRadius: 8, border: "1px solid var(--ac-line)", background: "transparent", color: "var(--ac-ink)", cursor: disabled ? "not-allowed" : "pointer", fontSize: 14, fontWeight: 700, lineHeight: 1 };
+  // The chart's own outlined icon button, so the stepper wears the same hover, press and focus
+  // as every other control — it was the one hand-styled button left on the ticket.
+  const stepBtn = { className: "ac-btn ac-btn--outline ac-btn--icon", style: { flexShrink: 0 } as CSSProperties };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       <span className="ac-cap">{label}</span>
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-        <button style={stepBtn} disabled={disabled} aria-label={`Decrease ${label}`} onClick={() => bump(-1)}>−</button>
+        <button {...stepBtn} disabled={disabled} aria-label={`Decrease ${label}`} onClick={() => bump(-1)}><Icon name="minus" size={14} /></button>
         <span style={{ position: "relative", flex: 1, minWidth: 0, display: "flex", alignItems: "center" }}>
           <input
             type="number"
@@ -622,7 +624,7 @@ function Stepper({
           />
           {suffix && <span className="ac-num" style={{ position: "absolute", right: SPACE[3], fontSize: TYPE.sm, color: "var(--ac-text)", pointerEvents: "none" }}>{suffix}</span>}
         </span>
-        <button style={stepBtn} disabled={disabled} aria-label={`Increase ${label}`} onClick={() => bump(1)}>+</button>
+        <button {...stepBtn} disabled={disabled} aria-label={`Increase ${label}`} onClick={() => bump(1)}><Icon name="plus" size={14} /></button>
         {(presets ?? []).map((p) => (
           <button key={p.label} className="ac-btn ac-btn--xs ac-btn--outline ac-num" disabled={disabled} onClick={() => { setDraft(null); onChange(p.value); }}>
             {p.label}
