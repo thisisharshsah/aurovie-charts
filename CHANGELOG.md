@@ -32,6 +32,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Zoom in to a single candle.** Wheel, pinch, +/− and the zoom buttons used to stop at 64px per
+  bar, which on a wide chart still left a dozen candles on screen. The zoom-in limit is now 90% of
+  the plot width, so one candle can fill the chart. Fit-all and `showSince` still stop at 64px.
+  Once bars are wider than 64px:
+  - The right margin is capped at half the plot, so "go to realtime" centres the newest candle
+    instead of parking it off-screen.
+  - Panning stops once the first or last candle reaches the middle of the plot.
 - **Zoom controls in the bottom bar**: zoom out, fit all bars, zoom in. Wheel, pinch and +/−
   already zoomed, but none of them could be seen.
 

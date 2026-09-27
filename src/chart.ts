@@ -71,7 +71,12 @@ const RIGHT_AXIS_W = 64;
 const MAX_CHIP_OFFSET = 28;
 const BOTTOM_AXIS_H = 22;
 const MIN_BAR_SPACING = 1.5;
+/// The widest a bar gets from a FIT (fit-all, `showSince`), and the point past which the
+/// chart is in "close-up" territory. Interactive zoom may go further — see `maxBarSpacing`.
 const MAX_BAR_SPACING = 64;
+/// How much of the plot one bar may occupy at full zoom: a single candle, nearly edge to edge,
+/// with its neighbours just past the edges rather than half-drawn inside them.
+const CLOSE_UP_FILL = 0.9;
 
 type PlotLine = { values: number[]; color: string; width: number; dash?: number[] };
 // A two-line band the renderer fills between (Ichimoku's kumo, a Keltner/Bollinger envelope). `shift`
@@ -884,7 +889,7 @@ export class Chart {
     this.tBarSpacing = this.barSpacing;
     this.zoomAnchor = null;
     this.momentum = 0;
-    this.offset = pw - this.barSpacing * this.rightMarginBars() - (this.n() - 1) * this.barSpacing;
+    this.offset = pw - this.rightMarginPx() - (this.n() - 1) * this.barSpacing;
     this.decimals = this.deriveDecimals();
     this.requestDraw();
   }
@@ -1089,7 +1094,7 @@ export class Chart {
   // Scroll the newest bar back to its default parking spot at the right edge (keeps the zoom level).
   scrollToRealtime() {
     const pw = this.plotW();
-    this.offset = pw - this.barSpacing * this.rightMarginBars() - (this.n() - 1) * this.barSpacing;
+    this.offset = pw - this.rightMarginPx() - (this.n() - 1) * this.barSpacing;
     this.momentum = 0;
     this.requestDraw();
     this.emitViewChange();
@@ -1099,7 +1104,7 @@ export class Chart {
   zoomBy(dir: number, centerX?: number) {
     const x = centerX ?? this.plotW() / 2;
     const base = this.zoomAnchor ? this.tBarSpacing : this.barSpacing;
-    this.tBarSpacing = clamp(base * Math.exp(dir * 0.32), MIN_BAR_SPACING, MAX_BAR_SPACING);
+    this.tBarSpacing = clamp(base * Math.exp(dir * 0.32), MIN_BAR_SPACING, this.maxBarSpacing());
     this.zoomAnchor = { x, index: this.indexAt(x) };
     this.momentum = 0;
     this.requestDraw();
@@ -1122,8 +1127,9 @@ export class Chart {
   private emitViewChange() {
     const pw = this.plotW();
     if (pw <= 0 || !this.n()) return;
-    const realtimeOffset = pw - this.barSpacing * this.rightMarginBars() - (this.n() - 1) * this.barSpacing;
-    const at = Math.abs(this.offset - realtimeOffset) < this.barSpacing * 3;
+    const realtimeOffset = pw - this.rightMarginPx() - (this.n() - 1) * this.barSpacing;
+    const tol = this.barSpacing > MAX_BAR_SPACING ? Math.min(this.barSpacing * 3, pw / 4) : this.barSpacing * 3;
+    const at = Math.abs(this.offset - realtimeOffset) < tol;
     const auto = this.priceZoom === 1;
     // Only notify the host when a button state actually FLIPS — otherwise a pan/zoom would re-render
     // the whole React widget on every pointer move / wheel event and visibly stutter the gesture.
@@ -1249,6 +1255,27 @@ export class Chart {
    * this gap, so it widens the margin to hold its columns plus breathing room — otherwise "go to
    * realtime" would park the newest bar at the edge with the forecast off-screen.
    */
+  /**
+   * The widest a bar may be zoomed to: one candle filling the plot.
+   *
+   * The ceiling used to be a fixed 64px, which on a wide chart stopped zooming with a dozen
+   * candles still on screen — a reader could never get close enough to read one bar's wicks
+   * against the grid. Fits still stop at `MAX_BAR_SPACING`; only the reader's own zoom goes on.
+   */
+  private maxBarSpacing(): number {
+    return Math.max(MAX_BAR_SPACING, this.plotW() * CLOSE_UP_FILL);
+  }
+  /**
+   * The empty space right of the newest bar, in pixels.
+   *
+   * Counted in BARS it is right until a bar is a large fraction of the plot — six bars of margin
+   * at single-candle zoom would park the newest bar several screens off to the left. Past the
+   * fit ceiling it is capped at half the plot, so "go to realtime" centres the newest candle.
+   */
+  private rightMarginPx(): number {
+    const px = this.barSpacing * this.rightMarginBars();
+    return this.barSpacing > MAX_BAR_SPACING ? Math.min(px, this.plotW() / 2) : px;
+  }
   private rightMarginBars(): number {
     return rightMarginBars(this.projLen());
   }
@@ -1308,7 +1335,7 @@ export class Chart {
     this.tBarSpacing = this.barSpacing;
     this.zoomAnchor = null;
     this.momentum = 0;
-    const rightMargin = this.barSpacing * this.rightMarginBars();
+    const rightMargin = this.rightMarginPx();
     this.offset = pw - rightMargin - (this.n() - 1) * this.barSpacing;
     this.decimals = this.deriveDecimals();
   }
@@ -3720,7 +3747,7 @@ export class Chart {
       const [a, b] = [...this.pointers.values()];
       const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
       const midX = (a.x + b.x) / 2;
-      const spacing = clamp((this.pinch.startSpacing * dist) / this.pinch.startDist, MIN_BAR_SPACING, MAX_BAR_SPACING);
+      const spacing = clamp((this.pinch.startSpacing * dist) / this.pinch.startDist, MIN_BAR_SPACING, this.maxBarSpacing());
       this.barSpacing = spacing;
       this.tBarSpacing = spacing;
       this.zoomAnchor = null;
@@ -3957,7 +3984,7 @@ export class Chart {
     // tick loop eases barSpacing toward the target, compounding across a fast scroll.
     const base = this.zoomAnchor ? this.tBarSpacing : this.barSpacing;
     const factor = Math.exp(-clamp(dy, -240, 240) * 0.0022);
-    this.tBarSpacing = clamp(base * factor, MIN_BAR_SPACING, MAX_BAR_SPACING);
+    this.tBarSpacing = clamp(base * factor, MIN_BAR_SPACING, this.maxBarSpacing());
     this.zoomAnchor = { x, index: this.indexAt(x) };
     this.momentum = 0;
     this.cross = { x, y: this.localY(e) };
@@ -3975,8 +4002,14 @@ export class Chart {
     const n = this.n();
     // keep at least a few bars on screen at each edge
     // The floor has to clear the right margin, else a long projection cannot be panned into view.
-    const minOff = pw - (n - 1) * this.barSpacing - this.barSpacing * panFloorBars(this.projLen());
-    const maxOff = pw - this.barSpacing * 3;
+    // Both edges are counted in bars, which past the fit ceiling would let the data be dragged
+    // clean off the plot: there they are capped at half the plot, so a close-up can pan until the
+    // first or last candle reaches the middle and no further.
+    const closeUp = this.barSpacing > MAX_BAR_SPACING;
+    const floorPx = this.barSpacing * panFloorBars(this.projLen());
+    const headPx = this.barSpacing * 3;
+    const minOff = pw - (n - 1) * this.barSpacing - (closeUp ? Math.min(floorPx, pw / 2) : floorPx);
+    const maxOff = pw - (closeUp ? Math.min(headPx, pw / 2) : headPx);
     return clamp(off, Math.min(minOff, maxOff), maxOff);
   }
 }
