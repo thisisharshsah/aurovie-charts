@@ -174,7 +174,10 @@ export function TradeTicket({
 
   const money = useMemo(() => makeMoney(locale, currency), [locale, currency]);
   const price = useMemo(() => makeNumber(locale, 2), [locale]);
-  const whole = useMemo(() => makeNumber(locale, 0), [locale]);
+  // A SIZE, which may be a fraction: a host that places fractional shares sizes $5 of a $189 name at
+  // 0.0264, and a whole-number format printed that "→ 0 shares" above a review that bought 0.0264.
+  // Whole counts print exactly as before; a fraction keeps up to four places.
+  const units = useMemo(() => makeNumber(locale, 0, 4), [locale]);
 
   const risk = riskProp !== undefined && riskProp !== null ? riskProp : deriveTicketRisk(order, { quote, account });
   const cost = estimatedCost !== undefined ? num(estimatedCost) : risk.notional;
@@ -359,7 +362,7 @@ export function TradeTicket({
                   m === "shares"
                     ? "Size by number of shares"
                     : m === "amount"
-                      ? "Size by cash budget — rounds DOWN to whole shares"
+                      ? "Size by cash budget — rounds DOWN to the size the host can place"
                       : "Size by percent of equity risked to your stop"
                 }
                 {...seg(order.sizeMode === m)}
@@ -416,7 +419,7 @@ export function TradeTicket({
             the number that will actually be sent — not to discover it on the fill. */}
         {order.sizeMode !== "shares" && (
           <span style={{ ...cap }}>
-            {num(risk.qty) != null ? `→ ${whole(risk.qty!)} share${risk.qty === 1 ? "" : "s"}` : "→ size needs a price" + (order.sizeMode === "risk" ? " and a stop" : "")}
+            {num(risk.qty) != null ? `→ ${units(risk.qty!)} share${risk.qty === 1 ? "" : "s"}` : "→ size needs a price" + (order.sizeMode === "risk" ? " and a stop" : "")}
           </span>
         )}
       </div>
@@ -490,7 +493,7 @@ export function TradeTicket({
           )}
           {num(account?.position) != null && account!.position !== 0 && (
             <span style={{ ...mono, fontSize: 11, marginLeft: "auto", color: "var(--ac-text)" }}>
-              holding {whole(account!.position!)}
+              holding {units(account!.position!)}
             </span>
           )}
         </div>
@@ -551,7 +554,7 @@ export function TradeTicket({
             : gated
               ? `Blocked · ${failed[0].label}`
               : (submitLabel ??
-                `Review · ${buying ? "BUY" : "SELL"}${num(risk.qty) != null ? ` ${whole(risk.qty!)}` : ""} ${symbol} @ ${
+                `Review · ${buying ? "BUY" : "SELL"}${num(risk.qty) != null ? ` ${units(risk.qty!)}` : ""} ${symbol} @ ${
                   order.type === "market" ? "market" : num(order.limit) != null ? price(order.limit!) : ORDER_TYPE_LABEL[order.type].toLowerCase()
                 }`)}
         </button>
@@ -727,7 +730,7 @@ function makeMoney(locale: string | undefined, currency: string | undefined) {
   const fmt = new Intl.NumberFormat(locale, currency ? { style: "currency", currency, maximumFractionDigits: 2 } : { maximumFractionDigits: 2 });
   return (v: number) => fmt.format(v);
 }
-function makeNumber(locale: string | undefined, decimals: number) {
-  const fmt = new Intl.NumberFormat(locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+function makeNumber(locale: string | undefined, decimals: number, maxDecimals = decimals) {
+  const fmt = new Intl.NumberFormat(locale, { minimumFractionDigits: decimals, maximumFractionDigits: maxDecimals });
   return (v: number) => fmt.format(v);
 }
