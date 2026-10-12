@@ -56,6 +56,8 @@ import {
   stochRsi,
   momentum,
   trix,
+  permEntropy,
+  phasor,
   pivotPoints,
   volumeProfile,
   type VolumeProfile,
@@ -79,7 +81,8 @@ const MAX_BAR_SPACING = 64;
 /// with its neighbours just past the edges rather than half-drawn inside them.
 const CLOSE_UP_FILL = 0.9;
 
-type PlotLine = { values: number[]; color: string; width: number; dash?: number[] };
+// `wrap`: a cyclic series (phase in degrees wraps at 360): a jump over half of it breaks the line.
+type PlotLine = { values: number[]; color: string; width: number; dash?: number[]; wrap?: number };
 // A two-line band the renderer fills between (Ichimoku's kumo, a Keltner/Bollinger envelope). `shift`
 // displaces it forward in bars — the Ichimoku cloud is plotted 26 bars AHEAD of the bar it was
 // computed from, which is the whole point of a leading study.
@@ -113,6 +116,8 @@ interface Study {
     levels?: number[]; // dashed reference levels
     srange?: [number, number]; // fixed y-range (else autoscale)
     symmetric?: boolean; // autoscale symmetric about zero
+    band?: { values: number[]; lo: string; hi: string }; // per-bar background, colour mixed lo→hi by the 0..1 value
+    dial?: { i: number[]; q: number[] }; // phasor dial on the overlay canvas: arrow at the last I+iQ
   };
   legend(i: number): LegendValue[];
 }
@@ -1888,6 +1893,22 @@ export class Chart {
           { label: `TRIX${p}`, value: valAt(tx.line, i), color: s.color },
           { label: "sig", value: valAt(sig, i), color: SIGNAL_COLOR },
         ];
+      } else if (s.kind === "ENTROPY") {
+        // Opt-in. Order (accent) vs noise (muted text) shades the pane behind the line.
+        const [m, win] = [s.inputs[0] ?? 3, s.inputs[1] ?? 30];
+        const v = permEntropy(closes, m, win);
+        s.data = { line: v, srange: [0, 1], band: { values: v, lo: this.theme.line, hi: this.theme.text } };
+        s.legend = (i) => [{ label: `Entropy ${m}·${win}`, value: valAt(v, i), color: s.color }];
+      } else if (s.kind === "PHASOR") {
+        // Opt-in. The pane plots phase in degrees; the dial (drawOverlay) shows the same z = I + iQ.
+        const [per, eP] = [s.inputs[0] ?? 20, s.inputs[1] ?? 20];
+        const z = phasor(closes, per, eP);
+        const deg = z.phase.map((r) => (r * 180) / Math.PI);
+        s.data = { lines: [{ values: deg, color: s.color, width: 1.3, wrap: 360 }], levels: [-90, 0, 90], srange: [-180, 180], dial: { i: z.i, q: z.q } };
+        s.legend = (i) => [
+          { label: `Phasor ${per}`, value: valAt(deg, i), color: s.color },
+          { label: "amp", value: valAt(z.amp, i), color: this.theme.text },
+        ];
       }
     }
   }
@@ -2676,6 +2697,7 @@ export class Chart {
         started = false;
         continue;
       }
+      if (ln.wrap && Math.abs(v - ln.values[i - 1]) > ln.wrap / 2) started = false;
       const px = this.x(i);
       const py = this.priceToY(p, v);
       if (!started) {
@@ -3001,7 +3023,19 @@ export class Chart {
       this.drawLine(ctx, p, { values: m.line, color: s.color, width: 1.3 }, f, l);
       this.drawLine(ctx, p, { values: m.signal, color: SIGNAL_COLOR, width: 1.3 }, f, l);
     } else if (s.data.line || s.data.lines) {
-      // generic study: dashed reference levels, then one or more lines
+      // generic study: an optional shaded band, dashed reference levels, then one or more lines
+      if (s.data.band) {
+        const { values, lo, hi } = s.data.band;
+        const bw = this.barSpacing;
+        for (let i = f; i <= l; i++) {
+          const v = values[i];
+          if (isNaN(v)) continue;
+          ctx.fillStyle = mix(lo, hi, clamp(v, 0, 1));
+          ctx.globalAlpha = 0.14;
+          ctx.fillRect(this.x(i) - bw / 2, p.top, bw, p.height);
+        }
+        ctx.globalAlpha = 1;
+      }
       if (s.data.levels) {
         ctx.strokeStyle = this.theme.border;
         ctx.setLineDash([2, 3]);
@@ -3455,10 +3489,66 @@ export class Chart {
     return lo;
   }
 
+  // The phasor dial, on the OVERLAY canvas so a forming candle's tick redraws it with the crosshair:
+  // a circle at the pane's right edge, the arrow at the latest I+iQ, and a fading trail of the 30
+  // before it. Scaled so the largest |z| in the trail touches the circle (the shape is the point;
+  // the pane legend carries the amplitude).
+  private drawPhasorDial(ctx: CanvasRenderingContext2D, p: Pane, s: Study) {
+    const { i: I, q: Q } = s.data.dial!;
+    const r = Math.min(30, (p.height - 24) / 2);
+    const last = this.n() - 1;
+    if (r < 10 || last < 0 || isNaN(I[last])) return;
+    const pts: [number, number][] = [];
+    for (let k = Math.max(0, last - 30); k <= last; k++) if (!isNaN(I[k]) && !isNaN(Q[k])) pts.push([I[k], Q[k]]);
+    const scale = Math.max(...pts.map(([a, b]) => Math.hypot(a, b))) || 1;
+    const cx = this.plotW() - r - 10;
+    const cy = p.top + p.height / 2;
+    const at = ([a, b]: [number, number]): [number, number] => [cx + (a / scale) * r, cy - (b / scale) * r];
+    ctx.save();
+    ctx.fillStyle = alpha(this.theme.paneBackground, 0.85);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = this.theme.border;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.moveTo(cx - r, cy);
+    ctx.lineTo(cx + r, cy);
+    ctx.moveTo(cx, cy - r);
+    ctx.lineTo(cx, cy + r);
+    ctx.stroke();
+    ctx.strokeStyle = s.color;
+    for (let k = 1; k < pts.length; k++) {
+      ctx.globalAlpha = 0.08 + 0.6 * (k / pts.length);
+      ctx.beginPath();
+      ctx.moveTo(...at(pts[k - 1]));
+      ctx.lineTo(...at(pts[k]));
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    const [tx, ty] = at(pts[pts.length - 1]);
+    const ang = Math.atan2(ty - cy, tx - cx);
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(tx, ty);
+    ctx.stroke();
+    ctx.fillStyle = s.color;
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(tx - 6 * Math.cos(ang - 0.45), ty - 6 * Math.sin(ang - 0.45));
+    ctx.lineTo(tx - 6 * Math.cos(ang + 0.45), ty - 6 * Math.sin(ang + 0.45));
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
   // ---- crosshair overlay --------------------------------------------------
   private drawOverlay() {
     const ctx = this.octx;
     this.setup(ctx);
+    for (const p of this.panes) if (p.study?.data.dial) this.drawPhasorDial(ctx, p, p.study);
     // price-axis alert hint: a "＋" tag + faint guide when hovering the axis (no crosshair then)
     if (this.axisHoverY != null && this.bars.length) {
       const y = this.axisHoverY;

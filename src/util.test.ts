@@ -3,7 +3,7 @@
 // definitions: NaN padding, the exact formulas, and the invariants each family must hold.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange, fitBarCount, visibleIndexRange, offsetAfterAppend, THEMES, timeGridMarks, minorGridAlpha, sectionKey, SECTION_STEPS } from "./util.ts";
+import { permEntropy, phasor, ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange, fitBarCount, visibleIndexRange, offsetAfterAppend, THEMES, timeGridMarks, minorGridAlpha, sectionKey, SECTION_STEPS } from "./util.ts";
 import type { AxisSlot } from "./util.ts";
 import type { Bar } from "./types.ts";
 
@@ -401,4 +401,91 @@ test("Chart.update follows a new bar at the right edge, and leaves a scrolled-ba
   const held = chartAt(edge, { startOffset: edge });
   held.update(b(3));
   assert.equal(held.offset, edge, "mid-drag: the drag owns the offset");
+});
+
+// ---- permutation entropy + phasor (0.18.0) ---------------------------------------------------
+// A deterministic noisy walk (LCG), so the no-repaint tests run on data with every pattern in it.
+function walk(n: number): number[] {
+  let s = 12345;
+  let p = 100;
+  return Array.from({ length: n }, (_, i) => {
+    s = (s * 1103515245 + 12345) % 2147483648;
+    p += (s / 2147483648 - 0.5) * 2 + Math.sin(i / 4);
+    return p;
+  });
+}
+const same = (a: number, b: number) => Object.is(a, b) || a === b;
+
+test("permEntropy: a monotone or flat series is 0, and there is no value before window+m-1 closes", () => {
+  const up = Array.from({ length: 50 }, (_, i) => 100 + i);
+  const e = permEntropy(up, 3, 30);
+  assert.ok(Number.isNaN(e[30]), "31 closes < 30+3-1: a gap, never 0");
+  assert.equal(e[31], 0);
+  assert.ok(e.slice(31).every((v) => v === 0));
+  const down = permEntropy(up.map((v) => -v), 3, 30);
+  assert.equal(down[49], 0);
+  // ties rank by time: a flat run is the rising pattern, one pattern only → 0
+  assert.equal(permEntropy(new Array(40).fill(7), 3, 30)[39], 0);
+  // 5,5,6 and 5,6,6 are both "rising" under the time rule; ranking ties the other way splits them
+  assert.equal(permEntropy([5, 5, 6, 6], 3, 2)[3], 0);
+});
+
+test("permEntropy: all six order-3 patterns equally often is exactly 1", () => {
+  // the cyclic triples of 0,1,4,3,2,5 are the six distinct orderings, so any 30 consecutive
+  // patterns hold each one five times
+  const cyc = [0, 1, 4, 3, 2, 5];
+  const src = Array.from({ length: 60 }, (_, i) => cyc[i % 6]);
+  const e = permEntropy(src, 3, 30);
+  for (let i = 31; i < 60; i++) assert.ok(Math.abs(e[i] - 1) < 1e-12, `bar ${i}: ${e[i]}`);
+  // a window of 3 sees 3 of 6 patterns once each: log 3 / log 6
+  assert.ok(Math.abs(permEntropy(src, 3, 3)[10] - Math.log(3) / Math.log(6)) < 1e-12);
+});
+
+test("NO REPAINT: entropy and phasor on bars[0..n] equal the same indices on bars[0..n+k]", () => {
+  const full = walk(260);
+  const n = 200;
+  const short = full.slice(0, n);
+  const eA = permEntropy(short, 3, 30);
+  const eB = permEntropy(full, 3, 30);
+  const pA = phasor(short, 20, 20);
+  const pB = phasor(full, 20, 20);
+  for (let i = 0; i < n; i++) {
+    assert.ok(same(eA[i], eB[i]), `entropy repainted bar ${i}`);
+    for (const k of ["i", "q", "amp", "phase"] as const) assert.ok(same(pA[k][i], pB[k][i]), `phasor ${k} repainted bar ${i}`);
+  }
+  assert.ok(!Number.isNaN(eA[n - 1]) && !Number.isNaN(pA.phase[n - 1]), "the compared tail is real values, not gaps");
+});
+
+test("phasor recovers the phase of a pure cosine within 0.05 rad after warm-up", () => {
+  // close = 100 + cos(wt), period 20. The EMA detrend leaves x = Re((1 - H(w)) e^{iwt}) with
+  // H(w) = k / (1 - (1-k) e^{-iw}), a fixed phase lead arg(1 - H); the FIR's lag puts z at t-3.
+  const T = 20, w = (2 * Math.PI) / T, k = 2 / (20 + 1);
+  const src = Array.from({ length: 400 }, (_, t) => 100 + Math.cos(w * t));
+  const ph = phasor(src, 20, 20).phase;
+  assert.ok(Number.isNaN(ph[24]) && !Number.isNaN(ph[25]), "first value at t = emaP + 5");
+  const dr = 1 - (1 - k) * Math.cos(w), di = (1 - k) * Math.sin(w), d2 = dr * dr + di * di;
+  const lead = Math.atan2(k * di / d2, 1 - (k * dr) / d2);
+  let worst = 0;
+  for (let t = 100; t < 400; t++) {
+    const exp = w * (t - 3) + lead;
+    worst = Math.max(worst, Math.abs(Math.atan2(Math.sin(ph[t] - exp), Math.cos(ph[t] - exp))));
+  }
+  assert.ok(worst < 0.05, `worst phase error ${worst} rad`);
+});
+
+test("a forming-candle tick changes only the last value of entropy and phasor", () => {
+  // the same forming bar ticks from above its two predecessors to below them, so its pattern changes
+  const base = walk(120);
+  const hi = Math.max(base[117], base[118]);
+  const lo = Math.min(base[117], base[118]);
+  const src = [...base.slice(0, -1), hi + 2];
+  const ticked = [...base.slice(0, -1), lo - 2];
+  const [eA, eB] = [permEntropy(src, 3, 30), permEntropy(ticked, 3, 30)];
+  const [pA, pB] = [phasor(src, 20, 20), phasor(ticked, 20, 20)];
+  for (let i = 0; i < 119; i++) {
+    assert.ok(same(eA[i], eB[i]), `entropy bar ${i} moved`);
+    assert.ok(same(pA.phase[i], pB.phase[i]) && same(pA.amp[i], pB.amp[i]), `phasor bar ${i} moved`);
+  }
+  assert.notEqual(eA[119], eB[119], "the tick reaches the last entropy value");
+  assert.notEqual(pA.phase[119], pB.phase[119], "the tick reaches the last phase");
 });

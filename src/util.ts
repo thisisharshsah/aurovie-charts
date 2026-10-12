@@ -1128,6 +1128,88 @@ export function trix(src: number[], p: number): { line: number[]; signal: (sigP:
   return { line, signal };
 }
 
+// Permutation entropy (Bandt & Pompe 2002), normalised to 0..1: how evenly the last `window`
+// ordinal patterns of `m` consecutive closes spread over the m! possible orderings. 0 = one
+// pattern only (a clean trend), 1 = every ordering equally often (noise). It describes order vs
+// noise; it is not a signal.
+//
+// CAUSAL. The value at bar i counts the `window` patterns ENDING at bars i-window+1 … i, each over
+// closes j-m+1 … j, so it reads closes i-window-m+2 … i and nothing later. Fewer than
+// window+m-1 closes (or any NaN among them) → NaN, never 0.
+// TIES rank by time: of two equal closes the earlier one counts as the smaller (the usual
+// Bandt–Pompe rule), so a flat run reads as the rising pattern and a flat series scores 0.
+export function permEntropy(src: number[], m = 3, window = 30): number[] {
+  const n = src.length;
+  const out = new Array(n).fill(NaN);
+  if (!Number.isInteger(m) || !Number.isInteger(window) || m < 2 || m > 7 || window < 1) return out;
+  const fact = [1];
+  for (let k = 1; k <= m; k++) fact[k] = fact[k - 1] * k;
+  // Lehmer code of the pattern ending at j: for each slot, how many LATER slots hold a strictly
+  // smaller close (a later equal close is not smaller — the tie rule above). -1 = holds a NaN.
+  const code = new Int32Array(n).fill(-1);
+  for (let j = m - 1; j < n; j++) {
+    let c = 0;
+    let ok = true;
+    for (let a = 0; a < m; a++) {
+      const va = src[j - m + 1 + a];
+      if (!Number.isFinite(va)) ok = false;
+      let less = 0;
+      for (let b = a + 1; b < m; b++) if (src[j - m + 1 + b] < va) less++;
+      c += less * fact[m - 1 - a];
+    }
+    if (ok) code[j] = c;
+  }
+  const counts = new Float64Array(fact[m]);
+  const norm = Math.log(fact[m]);
+  let bad = 0;
+  for (let j = m - 1; j < n; j++) {
+    if (code[j] < 0) bad++;
+    else counts[code[j]]++;
+    const drop = j - window;
+    if (drop >= m - 1) {
+      if (code[drop] < 0) bad--;
+      else counts[code[drop]]--;
+    }
+    if (j - m + 2 < window || bad) continue;
+    let h = 0;
+    for (const c of counts) if (c > 0) h -= (c / window) * Math.log(c / window);
+    out[j] = h / norm;
+  }
+  return out;
+}
+
+// Phasor: a CAUSAL analytic signal z = I + iQ = A·e^{iθ} (Euler) of detrended price.
+//   x[t] = close[t] − EMA(close, emaP)[t]                         (the engine's `ema`)
+//   I[t] = x[t−3]
+//   Q[t] = −(0.0962·x[t] + 0.5769·x[t−2] − 0.5769·x[t−4] − 0.0962·x[t−6]) · (0.075·period + 0.54)
+// Q is Ehlers' 7-tap Hilbert FIR (Rocket Science for Traders, MAMA), FIXED-period variant: the
+// gain factor uses `period` as given, not his adaptive homodyne period estimate. The FIR is
+// antisymmetric about lag 3, so I is x delayed 3 bars to match: z describes x three bars ago. The
+// leading minus makes θ advance counter-clockwise. Every input is at t or earlier; NaN until
+// t = emaP + 5. On a cycle far from `period` the FIR gain is off 1 and the circle flattens to an
+// ellipse (±0.021 rad on a period-20 cycle at period 20). ponytail: fixed period — Ehlers'
+// homodyne discriminator is the upgrade if an adaptive period is ever wanted.
+export function phasor(src: number[], period = 20, emaP = 20): { i: number[]; q: number[]; amp: number[]; phase: number[] } {
+  const n = src.length;
+  const e = ema(src, emaP);
+  const x = src.map((v, t) => v - e[t]);
+  const g = 0.075 * period + 0.54;
+  const I = new Array(n).fill(NaN);
+  const Q = new Array(n).fill(NaN);
+  const amp = new Array(n).fill(NaN);
+  const phase = new Array(n).fill(NaN);
+  for (let t = 6; t < n; t++) {
+    const q = -(0.0962 * x[t] + 0.5769 * x[t - 2] - 0.5769 * x[t - 4] - 0.0962 * x[t - 6]) * g;
+    const r = x[t - 3];
+    if (!Number.isFinite(q) || !Number.isFinite(r)) continue;
+    I[t] = r;
+    Q[t] = q;
+    amp[t] = Math.hypot(r, q);
+    phase[t] = Math.atan2(q, r);
+  }
+  return { i: I, q: Q, amp, phase };
+}
+
 // Daily pivot points (classic floor-trader formula) for intraday bars. Each calendar day's bars
 // get the PREVIOUS day's H/L/C-derived levels. The last bar of each day is NaN'd so drawLine
 // does not draw a diagonal to the next session's level.

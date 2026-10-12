@@ -523,7 +523,7 @@ const TYPE_GROUPS: { label: string; ts: SeriesType[] }[] = [
 const RESAMPLED: SeriesType[] = ["renko", "pnf", "kagi"];
 // Swatch palette for the per-drawing colour editor.
 // Line colours assigned to compared symbols, in order.
-const INDS: { id: string; kind: string; inputs: number[]; pane: "price" | "separate"; label: string }[] = [
+const INDS: { id: string; kind: string; inputs: number[]; pane: "price" | "separate"; label: string; desc?: string }[] = [
   { id: "ma50", kind: "MA", inputs: [50], pane: "price", label: "MA 50" },
   { id: "ma200", kind: "MA", inputs: [200], pane: "price", label: "MA 200" },
   { id: "ema21", kind: "EMA", inputs: [21], pane: "price", label: "EMA 21" },
@@ -555,6 +555,9 @@ const INDS: { id: string; kind: string; inputs: number[]; pane: "price" | "separ
   { id: "stochrsi", kind: "STOCHRSI", inputs: [14, 14, 3], pane: "separate", label: "Stochastic RSI" },
   { id: "mom", kind: "MOM", inputs: [10], pane: "separate", label: "Momentum" },
   { id: "trix", kind: "TRIX", inputs: [14, 9], pane: "separate", label: "TRIX" },
+  // Opt-in descriptive studies (0.18.0): inputs are [order m, window] and [Hilbert period, detrend EMA].
+  { id: "entropy", kind: "ENTROPY", inputs: [3, 30], pane: "separate", label: "Permutation Entropy", desc: "Describes order vs noise; not a signal." },
+  { id: "phasor", kind: "PHASOR", inputs: [20, 20], pane: "separate", label: "Phasor (Euler e^iθ)", desc: "Describes cycle phase, with a live dial; not a signal." },
 ];
 /** Series that actually DRAW a high and a low; everything else is a close-derived path. */
 const OHLC_SERIES: SeriesType[] = ["candles", "bars", "hollow", "heikin", "renko", "pnf", "kagi"];
@@ -570,6 +573,7 @@ const IND_GROUPS: { label: string; ids: string[] }[] = [
   { label: "Trend", ids: ["super", "psar", "adx", "macd", "aroon", "pivot"] },
   { label: "Momentum", ids: ["rsi", "stoch", "stochrsi", "cci", "willr", "roc", "mom", "trix"] },
   { label: "Volume & volatility", ids: ["mfi", "cmf", "obv", "atr"] },
+  { label: "Order & cycles", ids: ["entropy", "phasor"] },
 ];
 // The drawing rail as GROUPED categories (the TradingView model): each rail icon is a group
 // whose fly-out lists its tools; the icon becomes the last tool used in that group.
@@ -2680,7 +2684,10 @@ export function TradingChart({
                                 style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", border: "none", borderRadius: R.sm, cursor: "pointer", textAlign: "left", fontFamily: "var(--ac-font)", fontSize: 13, color: locked ? "var(--ac-text)" : "var(--ac-ink)", background: on ? `color-mix(in srgb, var(--ac-accent) 12%, transparent)` : "transparent" }}
                               >
                                 <span style={{ width: 14, textAlign: "center", color: on ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{locked ? "🔒" : on ? <Icon name="check" size={12} /> : "＋"}</span>
-                                {d.label}
+                                <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                                  {d.label}
+                                  {d.desc && <span style={{ fontSize: 11, color: "var(--ac-text)" }}>{d.desc}</span>}
+                                </span>
                               </button>
                             );
                           })}

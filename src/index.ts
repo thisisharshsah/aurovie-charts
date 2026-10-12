@@ -20,5 +20,5 @@ export {
   rsi, stochRsi, stochastic, williamsR, cci, roc, momentum, aroon,
   macd, bollinger, atr, adx, keltner, donchian, supertrend, psar, ichimoku,
   obv, mfi, cmf, vwap, vwapAnchored, vwapAnchoredBands, vwma, volumeProfile,
-  pivotPoints, stddev,
+  pivotPoints, stddev, permEntropy, phasor,
 } from "./util";
