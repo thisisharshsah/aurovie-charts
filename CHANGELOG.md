@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.16.1] - 2026-10-12
+
+### Fixed
+
+- **A live chart follows new bars.** `update()` appended a bar but never moved the view, so new
+  bars walked off the right edge. A view parked at the right edge now stays there after an
+  append; a scrolled-back view stays put, and a drag or zoom in progress keeps the view it owns.
+- **Ticks no longer bleed across a symbol switch.** The React binding subscribed to the new symbol
+  at once, so a tick that arrived before its bars merged onto the old symbol's series. Ticks are
+  now ignored until the new symbol's `setData` (`feedSession`).
+- **The trade ticket prints fractional sizes.** "→ N shares" and "holding N" keep up to four
+  decimal places for a fractional size, instead of rounding $5 of a $189 name to "0 shares".
+  Whole counts print exactly as before.
+
 ## [0.16.0] - 2026-09-27
 
 ### Changed
