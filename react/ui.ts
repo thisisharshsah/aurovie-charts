@@ -77,6 +77,33 @@ export const WEIGHT = { regular: 400, medium: 500, semibold: 600, bold: 700 } as
 export const CONTROL = { sm: 24, md: 28, lg: 32, xl: 40 } as const;
 
 /**
+ * SIZE VARIABLES — what the stylesheet and the inline styles actually read for control heights
+ * and radii. Each is a CSS variable whose fallback is the px above, so a host that passes no
+ * `Theme.radii` / `Theme.controlHeights` gets exactly these sizes, and one that does can put the
+ * widget on its own scale (`var(--control-sm)`, `var(--radius-0)`) without `!important`.
+ * Heights are named by ROLE, not size, because a host's scale may merge or split them:
+ *   mini — inline glyph buttons (✕, hide, ±);  xs — the bottom bar and its clusters;
+ *   sm — `--sm` buttons, segments, menu rows;  btn — the toolbar's default button;
+ *   md — fields and the drawing rail.
+ * The touch hit area is `--ac-hit-touch` (fallback 0: no growth), see the coarse-pointer block.
+ */
+export const R = {
+  xs: `var(--ac-r-xs, ${RADIUS.xs}px)`,
+  sm: `var(--ac-r-sm, ${RADIUS.sm}px)`,
+  md: `var(--ac-r-md, ${RADIUS.md}px)`,
+  lg: `var(--ac-r-lg, ${RADIUS.lg}px)`,
+  xl: `var(--ac-r-xl, ${RADIUS.xl}px)`,
+  pill: `var(--ac-r-pill, ${RADIUS.pill}px)`,
+} as const;
+export const H = {
+  mini: "var(--ac-h-mini, 20px)",
+  xs: `var(--ac-h-xs, ${CONTROL.sm}px)`,
+  sm: `var(--ac-h-sm, ${CONTROL.md}px)`,
+  btn: `var(--ac-h-btn, ${CONTROL.lg}px)`,
+  md: `var(--ac-h-md, ${CONTROL.lg}px)`,
+} as const;
+
+/**
  * ELEVATION — reserved for surfaces that FLOAT. Every button used to carry
  * `0 1px 2px rgba(0,0,0,0.08)`, which is not depth, it is grime: forty shadowed rectangles in a
  * toolbar read as noise and leave nothing for a menu to rise above.
@@ -176,7 +203,7 @@ export function themeVars(th: Theme): CSSProperties {
   // Neutral overlays for hover / press. Derived from the theme's own ink so they sit correctly on
   // any background, rather than a hard-coded black or white that goes muddy on half the presets.
   const wash = (pct: number) => alpha(th.textStrong, pct / 100);
-  return {
+  const vars: Record<string, string> = {
     "--ac-bg": th.background,
     "--ac-pane": th.paneBackground,
     "--ac-grid": th.grid,
@@ -204,14 +231,16 @@ export function themeVars(th: Theme): CSSProperties {
     "--ac-elev-lg": ELEV.lg,
     "--ac-font": th.font,
     "--ac-mono": th.monoFont,
-    "--ac-r-xs": `${RADIUS.xs}px`,
-    "--ac-r-sm": `${RADIUS.sm}px`,
-    "--ac-r-md": `${RADIUS.md}px`,
-    "--ac-r-lg": `${RADIUS.lg}px`,
-    "--ac-r-xl": `${RADIUS.xl}px`,
     "--ac-motion": MOTION.base,
     "--ac-ease": MOTION.ease,
-  } as CSSProperties;
+  };
+  // Sizes are written ONLY when the theme names them: absent, the stylesheet's fallbacks (the
+  // engine's own px, `R` / `H` above) apply, and the widget looks exactly as it did in 0.16.
+  const len = (v: string | number) => (typeof v === "number" ? `${v}px` : v);
+  for (const [k, v] of Object.entries(th.radii ?? {})) if (v != null) vars[`--ac-r-${k}`] = len(v);
+  for (const [k, v] of Object.entries(th.controlHeights ?? {}))
+    if (v != null) vars[k === "touch" ? "--ac-hit-touch" : `--ac-h-${k}`] = len(v);
+  return vars as CSSProperties;
 }
 
 /**
@@ -238,16 +267,16 @@ export const SHEET = `
 [data-aurovie-ticket] :is(button,summary,input,textarea,select,[tabindex]):focus-visible {
   outline: 2px solid var(--ac-accent-ink);
   outline-offset: 2px;
-  border-radius: var(--ac-r-sm);
+  border-radius: ${R.sm};
 }
 [data-aurovie-chart] canvas:focus-visible { outline: 2px solid var(--ac-accent-ink); outline-offset: -2px; }
 
 /* ---- BUTTON — the template for every control's state model ---- */
 [data-aurovie-chart] .ac-btn, [data-aurovie-ticket] .ac-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: ${SPACE[1]}px;
-  height: ${CONTROL.lg}px; padding: 0 ${SPACE[3]}px;
+  height: ${H.btn}; padding: 0 ${SPACE[3]}px;
   border: 1px solid transparent;
-  border-radius: var(--ac-r-md);
+  border-radius: ${R.md};
   background: transparent;
   color: var(--ac-text);
   font: inherit; font-size: ${TYPE.sm}px; font-weight: ${WEIGHT.semibold}; letter-spacing: 0.01em;
@@ -280,17 +309,17 @@ export const SHEET = `
 [data-aurovie-chart] .ac-btn--outline:hover:not(:disabled), [data-aurovie-ticket] .ac-btn--outline:hover:not(:disabled) { border-color: var(--ac-line); }
 
 /* Sizes. Nothing may invent a fourth. */
-[data-aurovie-chart] .ac-btn--sm, [data-aurovie-ticket] .ac-btn--sm { height: ${CONTROL.md}px; padding: 0 ${SPACE[2]}px; font-size: ${TYPE.xs}px; }
-[data-aurovie-chart] .ac-btn--xs, [data-aurovie-ticket] .ac-btn--xs { height: ${CONTROL.sm}px; padding: 0 ${SPACE[2]}px; font-size: ${TYPE.xs}px; border-radius: var(--ac-r-sm); }
-[data-aurovie-chart] .ac-btn--icon, [data-aurovie-ticket] .ac-btn--icon { width: ${CONTROL.lg}px; padding: 0; }
-[data-aurovie-chart] .ac-btn--icon.ac-btn--sm { width: ${CONTROL.md}px; }
+[data-aurovie-chart] .ac-btn--sm, [data-aurovie-ticket] .ac-btn--sm { height: ${H.sm}; padding: 0 ${SPACE[2]}px; font-size: ${TYPE.xs}px; }
+[data-aurovie-chart] .ac-btn--xs, [data-aurovie-ticket] .ac-btn--xs { height: ${H.xs}; padding: 0 ${SPACE[2]}px; font-size: ${TYPE.xs}px; border-radius: ${R.sm}; }
+[data-aurovie-chart] .ac-btn--icon, [data-aurovie-ticket] .ac-btn--icon { width: ${H.btn}; padding: 0; }
+[data-aurovie-chart] .ac-btn--icon.ac-btn--sm { width: ${H.sm}; }
 /* Inline glyph button — the close ✕, hide, remove, favourite and ± that live INSIDE a row, a
    legend chip or a panel header. They were a dozen hand-rolled inline styles (15px, 18px, 20px,
    30px; radius 6 or 8; some with a wash, most with none) and therefore had no hover at all. One
    square, one radius, the base button's state model. */
 [data-aurovie-chart] .ac-btn--mini, [data-aurovie-ticket] .ac-btn--mini {
-  width: 20px; height: 20px; padding: 0; flex-shrink: 0;
-  border-radius: var(--ac-r-xs); font-size: ${TYPE.xs}px; line-height: 1;
+  width: ${H.mini}; height: ${H.mini}; padding: 0; flex-shrink: 0;
+  border-radius: ${R.xs}; font-size: ${TYPE.xs}px; line-height: 1;
 }
 [data-aurovie-chart] .ac-btn--block, [data-aurovie-ticket] .ac-btn--block { width: 100%; }
 
@@ -311,8 +340,8 @@ export const SHEET = `
 /* ---- MENU / SHEET ROW ---- */
 [data-aurovie-chart] .ac-item, [data-aurovie-ticket] .ac-item {
   display: flex; align-items: center; gap: ${SPACE[2]}px; width: 100%;
-  min-height: ${CONTROL.md}px; padding: ${SPACE[2]}px ${SPACE[2]}px;
-  border: none; border-radius: var(--ac-r-sm);
+  min-height: ${H.sm}; padding: ${SPACE[2]}px ${SPACE[2]}px;
+  border: none; border-radius: ${R.sm};
   background: transparent; color: var(--ac-ink);
   font: inherit; font-size: ${TYPE.base}px; text-align: left; cursor: pointer;
   transition: background var(--ac-motion) var(--ac-ease), color var(--ac-motion) var(--ac-ease);
@@ -321,7 +350,7 @@ export const SHEET = `
 [data-aurovie-chart] .ac-item:active:not(:disabled) { background: var(--ac-press); }
 [data-aurovie-chart] .ac-item.is-on { background: color-mix(in srgb, var(--ac-accent) 12%, transparent); color: var(--ac-accent-ink); }
 [data-aurovie-chart] .ac-item:disabled { opacity: 0.42; cursor: not-allowed; }
-[data-aurovie-chart] .ac-item--lg { min-height: ${CONTROL.xl}px; border-radius: var(--ac-r-md); }
+[data-aurovie-chart] .ac-item--lg { min-height: ${CONTROL.xl}px; border-radius: ${R.md}; }
 
 /* ---- SURFACES ---- */
 [data-aurovie-chart] .ac-surface, [data-aurovie-ticket] .ac-surface {
@@ -330,27 +359,27 @@ export const SHEET = `
   box-shadow: var(--ac-elev-md);
   -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
 }
-[data-aurovie-chart] .ac-menu { border-radius: var(--ac-r-lg); padding: ${SPACE[1]}px; }
-[data-aurovie-chart] .ac-sheet { border-radius: var(--ac-r-xl) var(--ac-r-xl) 0 0; box-shadow: var(--ac-elev-lg); }
+[data-aurovie-chart] .ac-menu { border-radius: ${R.lg}; padding: ${SPACE[1]}px; }
+[data-aurovie-chart] .ac-sheet { border-radius: ${R.xl} ${R.xl} 0 0; box-shadow: var(--ac-elev-lg); }
 [data-aurovie-chart] .ac-scrim { background: rgba(0,0,0,0.5); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
 [data-aurovie-chart] .ac-card, [data-aurovie-ticket] .ac-card {
-  background: var(--ac-pane); border: 1px solid var(--ac-line); border-radius: var(--ac-r-xl);
+  background: var(--ac-pane); border: 1px solid var(--ac-line); border-radius: ${R.xl};
 }
 
 /* ---- SEGMENTED CONTROL ---- */
 [data-aurovie-chart] .ac-seg, [data-aurovie-ticket] .ac-seg {
   display: inline-flex; align-items: center; gap: 2px;
-  padding: 2px; border: 1px solid var(--ac-line-soft); border-radius: var(--ac-r-md);
+  padding: 2px; border: 1px solid var(--ac-line-soft); border-radius: ${R.md};
   background: var(--ac-sunken);
 }
 [data-aurovie-chart] .ac-seg > .ac-btn, [data-aurovie-ticket] .ac-seg > .ac-btn {
-  height: ${CONTROL.md}px; border-radius: var(--ac-r-sm); border-color: transparent;
+  height: ${H.sm}; border-radius: ${R.sm}; border-color: transparent;
 }
 
 /* ---- FIELD ---- */
 [data-aurovie-chart] .ac-field, [data-aurovie-ticket] .ac-field {
-  height: ${CONTROL.lg}px; width: 100%; min-width: 0; padding: 0 ${SPACE[3]}px;
-  border: 1px solid var(--ac-line); border-radius: var(--ac-r-md);
+  height: ${H.md}; width: 100%; min-width: 0; padding: 0 ${SPACE[3]}px;
+  border: 1px solid var(--ac-line); border-radius: ${R.md};
   background: var(--ac-sunken); color: var(--ac-ink);
   font-family: var(--ac-mono); font-variant-numeric: tabular-nums;
   font-size: ${TYPE.base}px; font-weight: ${WEIGHT.semibold};
@@ -381,8 +410,19 @@ export const SHEET = `
 [data-aurovie-ticket] .ac-tile {
   display: flex; flex-direction: column; gap: ${SPACE[1]}px;
   padding: ${SPACE[2]}px ${SPACE[3]}px;
-  border: 1px solid var(--ac-line-soft); border-radius: var(--ac-r-sm);
+  border: 1px solid var(--ac-line-soft); border-radius: ${R.sm};
   background: var(--ac-sunken);
+}
+
+/* ---- TOUCH — under a coarse pointer a button's HIT AREA grows to --ac-hit-touch (a host sets
+       it to 44px); the painted size does not change. Without the variable the area is the
+       button's own box, as before. ---- */
+@media (pointer: coarse) {
+  [data-aurovie-chart] .ac-btn, [data-aurovie-ticket] .ac-btn { position: relative; }
+  [data-aurovie-chart] .ac-btn::after, [data-aurovie-ticket] .ac-btn::after {
+    content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: max(100%, var(--ac-hit-touch, 0px)); height: max(100%, var(--ac-hit-touch, 0px));
+  }
 }
 
 /* ---- MOTION ---- */

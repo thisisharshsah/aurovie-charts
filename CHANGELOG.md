@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.17.0] - 2026-10-12
+
+### Added
+
+- **Control heights and radii a host can set.** `Theme` takes two optional fields,
+  `controlHeights` (`mini`, `xs`, `sm`, `btn`, `md`, `touch`) and `radii` (`xs`, `sm`, `md`, `lg`,
+  `xl`, `pill`). Each value is a CSS length (a number is px), e.g. `"var(--control-sm)"`, and is
+  written on the widget root as `--ac-h-<role>`, `--ac-hit-touch` or `--ac-r-<step>`. The
+  stylesheet and the inline styles of the chart, the trade ticket and the script editor read
+  every control height and radius through these variables. Previously the radii were always
+  stamped from the engine's constants, so a host could only override them with `!important`.
+- **Touch hit areas.** Under `@media (pointer: coarse)` a button's hit area grows to
+  `--ac-hit-touch` (for example 44px). The painted size does not change.
+
+### Unchanged
+
+- **Without the new fields nothing changes.** No size variable is written, and every fallback is
+  the 0.16.1 px: heights mini 20, xs 24, sm 28, btn 32, md 32; radii xs 6, sm 8, md 10, lg 14,
+  xl 16, pill 999; no touch growth. Colours, icon sizes and type sizes are untouched.
+
 ## [0.16.1] - 2026-10-12
 
 ### Fixed

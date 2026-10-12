@@ -48,6 +48,19 @@ export interface Theme {
   line: string;
   font: string;
   monoFont: string;
+  /**
+   * Optional control heights for the React widget, each a CSS length (a number is px), e.g.
+   * `"var(--control-sm)"`. Written as `--ac-h-<role>` on the widget root (`touch` as
+   * `--ac-hit-touch`, the coarse-pointer hit area). Absent: the engine's own sizes.
+   * Roles: `mini` glyph buttons (20), `xs` bottom bar (24), `sm` small buttons, segments and menu
+   * rows (28), `btn` toolbar buttons (32), `md` fields and the drawing rail (32).
+   */
+  controlHeights?: Partial<Record<"mini" | "xs" | "sm" | "btn" | "md" | "touch", string | number>>;
+  /**
+   * Optional radii, the same way: written as `--ac-r-<step>`. Absent: xs 6, sm 8, md 10, lg 14,
+   * xl 16, pill 999.
+   */
+  radii?: Partial<Record<"xs" | "sm" | "md" | "lg" | "xl" | "pill", string | number>>;
 }
 
 // A value read at the crosshair (for the legend the host renders).

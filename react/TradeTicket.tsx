@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { Icon } from "./icons";
 import { DARK, LIGHT } from "../src/util";
 import type { Theme } from "../src/types";
-import { CONTROL, RADIUS, SHEET, SPACE, TYPE, WEIGHT, cx, readable, themeVars } from "./ui";
+import { CONTROL, R, SHEET, SPACE, TYPE, WEIGHT, cx, readable, themeVars } from "./ui";
 import { HAS_LIMIT, HAS_TIF, HAS_TRIGGER, bracketCoherent, deriveTicketRisk } from "../src/ticket";
 import type { OrderType, SizeMode, TicketAccount, TicketOrder, TicketQuote, TicketRisk, TimeInForce } from "../src/ticket";
 
@@ -226,7 +226,7 @@ export function TradeTicket({
         gap,
         width,
         padding: compact ? SPACE[3] : SPACE[4],
-        borderRadius: frame ? RADIUS.xl : 0,
+        borderRadius: frame ? R.xl : 0,
         border: frame ? "1px solid var(--ac-line)" : "none",
         background: "var(--ac-pane)",
         boxShadow: frame ? "0 1px 2px rgba(0,0,0,0.16), 0 8px 28px rgba(0,0,0,0.12)" : "none",
@@ -261,7 +261,7 @@ export function TradeTicket({
                   fontSize: 10,
                   fontWeight: 700,
                   padding: "2px 7px",
-                  borderRadius: 999,
+                  borderRadius: R.pill,
                   letterSpacing: "0.04em",
                   color: toneColor(s.tone, th),
                   background: soft(toneColor(s.tone, th), 14),
@@ -537,7 +537,7 @@ export function TradeTicket({
             height: CONTROL.xl,
             width: "100%",
             border: "none",
-            borderRadius: RADIUS.md,
+            borderRadius: R.md,
             cursor: disabled || busy || gated || !onSubmit ? "not-allowed" : "pointer",
             fontFamily: "var(--ac-font)",
             fontSize: 13,

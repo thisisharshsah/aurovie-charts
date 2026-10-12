@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CONTROL, DEPTH, RADIUS, SPACE, TYPE, contrast, cx, readable, themeVars } from "./ui";
+import { CONTROL, DEPTH, RADIUS, SHEET, SPACE, TYPE, contrast, cx, readable, themeVars } from "./ui";
 import { DARK, LIGHT, THEMES } from "../src/util";
 
 // The failure this exists to prevent: the widget paints every SELECTED control's label in
@@ -93,3 +93,47 @@ test("an explicit prop still wins over the mode", () => {
   assert.equal(resolve(true, DEPTH.simple.toolbar, true), true, "mode=simple toolbar -> toolbar back");
 });
 
+
+// ── Size variables (0.17) ───────────────────────────────────────────────────────────────────
+//
+// A host can put the widget on its own size scale through `Theme.radii` / `Theme.controlHeights`,
+// and a host that passes neither must see exactly the 0.16 sizes.
+
+test("theme radii and control heights reach the root element's style", () => {
+  const v = themeVars({
+    ...DARK,
+    radii: { xs: "var(--radius-0)", md: 8, pill: "var(--radius-pill)" },
+    controlHeights: { mini: 24, sm: "var(--control-sm)", btn: "var(--control-sm)", md: "var(--control-md)", touch: "var(--control-touch)" },
+  }) as Record<string, string>;
+  assert.equal(v["--ac-r-xs"], "var(--radius-0)");
+  assert.equal(v["--ac-r-md"], "8px", "a number is px");
+  assert.equal(v["--ac-r-pill"], "var(--radius-pill)");
+  assert.equal(v["--ac-h-mini"], "24px");
+  assert.equal(v["--ac-h-sm"], "var(--control-sm)");
+  assert.equal(v["--ac-h-btn"], "var(--control-sm)");
+  assert.equal(v["--ac-h-md"], "var(--control-md)");
+  assert.equal(v["--ac-hit-touch"], "var(--control-touch)");
+  assert.equal(v["--ac-r-sm"], undefined, "an entry the theme leaves out is not written");
+});
+
+test("without them no size variable is written", () => {
+  for (const t of Object.values(THEMES)) {
+    const keys = Object.keys(themeVars(t)).filter((k) => /^--ac-(r|h|hit)-/.test(k));
+    assert.deepEqual(keys, []);
+  }
+});
+
+test("every size variable in the stylesheet falls back to the 0.16 px", () => {
+  const want: Record<string, number> = {
+    "--ac-r-xs": 6, "--ac-r-sm": 8, "--ac-r-md": 10, "--ac-r-lg": 14, "--ac-r-xl": 16,
+    "--ac-h-mini": 20, "--ac-h-xs": 24, "--ac-h-sm": 28, "--ac-h-btn": 32, "--ac-h-md": 32,
+    "--ac-hit-touch": 0,
+  };
+  const seen = new Set<string>();
+  for (const [, name, px] of SHEET.matchAll(/var\((--ac-(?:r|h|hit)-[\w-]+),\s*(\d+)px\)/g)) {
+    assert.equal(Number(px), want[name], `${name} falls back to ${px}px`);
+    seen.add(name);
+  }
+  assert.deepEqual([...seen].sort(), Object.keys(want).sort(), "each variable is used in the sheet");
+  assert.doesNotMatch(SHEET, /var\(--ac-(?:r|h|hit)-[\w-]+\)/, "no size variable without a fallback");
+});

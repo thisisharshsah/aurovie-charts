@@ -8,7 +8,7 @@ import { Icon, hasIcon } from "./icons";
 import { ScriptEditor, type ScriptError, type ScriptPreset, type ScriptScorecard, type ScriptSweep, type SavedStrategy } from "./ScriptEditor";
 import { parseScriptDraw, type ScriptRender } from "../src/script";
 import { DARK, LIGHT, THEMES, THEME_NAMES, SERIES_PALETTE as IND_PALETTE, SWATCHES, CMP_COLORS, CHIP_INK } from "../src/util";
-import { CONTROL, DEPTH, ELEV, RADIUS, SHEET, SPACE, TYPE, WEIGHT, Z, cx, themeVars } from "./ui";
+import { CONTROL, DEPTH, ELEV, H, R, SHEET, SPACE, TYPE, WEIGHT, Z, cx, themeVars } from "./ui";
 import type { Drawing } from "../src/drawings";
 import type { Bar, DataFeed, DataFeedResult, Resolution, IndicatorInstance, LegendValue, PriceLine, Projection, ScaleMode, SeriesType, SessionSpec, Theme, ChartMarker, TradePlan, Zone } from "../src/types";
 
@@ -1682,9 +1682,9 @@ export function TradingChart({
   };
   /** The toolbar control. `--sm` in compact is 28px; the compact row overrides to 32 for thumbs. */
   const btn = (on = false, style?: CSSProperties): P => ({ className: cx("ac-btn", "ac-btn--outline", on && "is-on"), style });
-  const railBtn = (on = false, style?: CSSProperties): P => ({ className: cx("ac-btn", "ac-btn--outline", "ac-btn--icon", on && "is-on"), style });
+  const railBtn = (on = false, style?: CSSProperties): P => ({ className: cx("ac-btn", "ac-btn--outline", "ac-btn--icon", on && "is-on"), style: { width: H.md, height: H.md, ...style } });
   const surface: CSSProperties = {}; // colour + elevation now live on the `ac-surface` class
-  const menuBox: CSSProperties = { position: "absolute", top: CONTROL.lg + SPACE[1], zIndex: Z.menu, minWidth: 160 };
+  const menuBox: CSSProperties = { position: "absolute", top: `calc(${H.btn} + ${SPACE[1]}px)`, zIndex: Z.menu, minWidth: 160 };
   const item = (on = false, style?: CSSProperties): P => ({ className: cx("ac-item", on && "is-on"), style });
   /**
    * An inline glyph button — close, hide, remove, favourite, ± — wherever it appears: a legend
@@ -1702,13 +1702,13 @@ export function TradingChart({
    */
   const barBtn = (on = false, style?: CSSProperties): P => ({
     className: cx("ac-btn", "ac-btn--xs", "ac-btn--outline", "ac-num", on && "is-on"),
-    style: { minWidth: compact ? 40 : 36, height: compact ? CONTROL.md : CONTROL.sm, ...style },
+    style: { minWidth: compact ? 40 : 36, height: compact ? H.sm : H.xs, ...style },
   });
   /** A muted fact printed after a group — an option's `note`. */
   const barNote: CSSProperties = { fontSize: TYPE.micro, fontFamily: "var(--ac-mono)", color: "var(--ac-text)", whiteSpace: "nowrap", flexShrink: 0 };
   /** A bottom-bar menu. Opens UPWARD: this bar is the last row of the widget, and a menu
       dropping below it lands outside a host that clips its own corners. */
-  const barMenuBox: CSSProperties = { position: "absolute", bottom: CONTROL.md + SPACE[1], left: 0, zIndex: Z.menu + 4, minWidth: 180 };
+  const barMenuBox: CSSProperties = { position: "absolute", bottom: `calc(${H.sm} + ${SPACE[1]}px)`, left: 0, zIndex: Z.menu + 4, minWidth: 180 };
   const barDivider = <span style={{ width: 1, height: SPACE[4], background: "var(--ac-line)", margin: `0 ${SPACE[1]}px`, flexShrink: 0 }} />;
 
   /**
@@ -1743,7 +1743,7 @@ export function TradingChart({
         height,
         background: "var(--ac-bg)",
         border: frame ? "1px solid var(--ac-line)" : "none",
-        borderRadius: frame ? RADIUS.xl : 0,
+        borderRadius: frame ? R.xl : 0,
         overflow: "hidden",
         boxShadow: frame ? "0 1px 2px rgba(0,0,0,0.16), 0 8px 28px rgba(0,0,0,0.12)" : "none",
         transition: "background 220ms ease, border-color 220ms ease",
@@ -1959,7 +1959,7 @@ export function TradingChart({
                     }}
                     placeholder="Symbol…"
                     autoFocus
-                    style={{ flex: 1, minWidth: 0, fontFamily: "var(--ac-font)", fontSize: 12, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--ac-line)", background: "var(--ac-bg)", color: "var(--ac-ink)" }}
+                    style={{ flex: 1, minWidth: 0, fontFamily: "var(--ac-font)", fontSize: 12, padding: "4px 6px", borderRadius: R.xs, border: "1px solid var(--ac-line)", background: "var(--ac-bg)", color: "var(--ac-ink)" }}
                   />
                   <button onClick={() => addCompare()} {...btn(false, { background: `color-mix(in srgb, var(--ac-accent) 18%, transparent)`, color: "var(--ac-accent-ink)" })}>
                     Add
@@ -1971,7 +1971,7 @@ export function TradingChart({
                       <button
                         key={h.symbol}
                         onClick={() => addCompare(h.symbol)}
-                        style={{ display: "flex", alignItems: "baseline", gap: 8, width: "100%", padding: "4px 6px", border: "none", borderRadius: 6, cursor: "pointer", textAlign: "left", background: "transparent", fontFamily: "var(--ac-font)", fontSize: 12, color: "var(--ac-ink)" }}
+                        style={{ display: "flex", alignItems: "baseline", gap: 8, width: "100%", padding: "4px 6px", border: "none", borderRadius: R.xs, cursor: "pointer", textAlign: "left", background: "transparent", fontFamily: "var(--ac-font)", fontSize: 12, color: "var(--ac-ink)" }}
                       >
                         <span style={{ fontWeight: 700 }}>{h.symbol}</span>
                         <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: "var(--ac-text)" }}>
@@ -2038,7 +2038,7 @@ export function TradingChart({
                     {multi && <span style={{ position: "absolute", right: 2, bottom: 2, fontSize: 8, lineHeight: 1, color: "var(--ac-text)" }}>▸</span>}
                   </button>
                   {railMenu === g.id && (
-                    <div className="ac-surface" style={{ position: "absolute", left: 36, top: 0, zIndex: 25, borderRadius: 14, padding: 6, minWidth: 208 }} >
+                    <div className="ac-surface" style={{ position: "absolute", left: 36, top: 0, zIndex: 25, borderRadius: R.lg, padding: 6, minWidth: 208 }} >
                       <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ac-text)", padding: "2px 8px 6px" }}>{g.label}</div>
                       {g.tools.map((t) => (
                         <button
@@ -2076,7 +2076,7 @@ export function TradingChart({
                 {objects.length > 0 && <span style={{ position: "absolute", right: 2, top: 2, fontSize: TYPE.micro, lineHeight: 1, fontWeight: WEIGHT.bold, color: "var(--ac-accent-ink)" }}>{objects.length}</span>}
               </button>
               {objectsOpen && (
-                <div className="ac-surface" style={{ position: "absolute", left: 36, bottom: 0, zIndex: 25, borderRadius: 14, padding: 6, minWidth: 218, maxHeight: 320, overflowY: "auto" }} >
+                <div className="ac-surface" style={{ position: "absolute", left: 36, bottom: 0, zIndex: 25, borderRadius: R.lg, padding: 6, minWidth: 218, maxHeight: 320, overflowY: "auto" }} >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "2px 4px 6px" }}>
                     <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ac-text)" }}>Objects · {objects.length}</span>
                     {objects.length > 0 && (
@@ -2085,7 +2085,7 @@ export function TradingChart({
                   </div>
                   {objects.length === 0 && <div style={{ color: "var(--ac-text)", padding: "6px 4px", fontFamily: "var(--ac-font)", fontSize: 12 }}>No drawings yet — pick a tool above.</div>}
                   {objects.slice().reverse().map((d) => (
-                    <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 4px", borderRadius: 6, fontFamily: "var(--ac-font)", fontSize: 12 }}>
+                    <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 4px", borderRadius: R.xs, fontFamily: "var(--ac-font)", fontSize: 12 }}>
                       <span style={{ color: d.color ?? "var(--ac-accent)", display: "inline-flex", flex: "none" }}><Icon name={d.type} size={14} /></span>
                       <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: d.hidden ? "var(--ac-text)" : "var(--ac-ink)", textDecoration: d.hidden ? "line-through" : "none" }}>{TOOL_LABEL[d.type] ?? d.type}</span>
                       <button {...miniBtn()} title={d.hidden ? "Show" : "Hide"} aria-pressed={!d.hidden} onClick={() => chartRef.current?.setDrawingHidden(d.id, !d.hidden)}><Icon name={d.hidden ? "eyeoff" : "eye"} size={13} /></button>
@@ -2132,19 +2132,19 @@ export function TradingChart({
               plot it is explaining. Switching to advanced brings it back, once, if this browser
               has not been onboarded yet. */}
           {tipsOpen && mode !== "simple" && (
-            <div className="ac-surface" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 10, right: 10, zIndex: 36, width: 290, borderRadius: 10, padding: 10 }} >
+            <div className="ac-surface" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 10, right: 10, zIndex: 36, width: 290, borderRadius: R.md, padding: 10 }} >
               <div style={{ color: "var(--ac-ink)", fontFamily: "var(--ac-font)", fontWeight: 700, fontSize: 13 }}>Quick start</div>
               <div style={{ color: "var(--ac-text)", fontFamily: "var(--ac-font)", fontSize: 12, marginTop: 6, lineHeight: 1.35 }}>Press K to launch commands, ? for shortcuts, and right-click price axis to create alerts quickly.</div>
               <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                <button {...btn(true, { height: 26 })} onClick={() => finishOnboarding(true)}>Use Guided mode</button>
-                <button {...btn(false, { height: 26 })} onClick={() => finishOnboarding(false)}>Dismiss</button>
+                <button {...btn(true, { height: "var(--ac-h-sm, 26px)" })} onClick={() => finishOnboarding(true)}>Use Guided mode</button>
+                <button {...btn(false, { height: "var(--ac-h-sm, 26px)" })} onClick={() => finishOnboarding(false)}>Dismiss</button>
               </div>
             </div>
           )}
           {cmdOpen && (
             <>
               <div onClick={() => setCmdOpen(false)} className="ac-scrim" style={{ position: "absolute", inset: 0, zIndex: Z.scrim + 4 }} />
-              <div className="ac-surface" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", left: "50%", top: 52, transform: "translateX(-50%)", zIndex: 35, width: 420, maxWidth: "calc(100% - 24px)", borderRadius: 10, padding: 8 }} >
+              <div className="ac-surface" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", left: "50%", top: 52, transform: "translateX(-50%)", zIndex: 35, width: 420, maxWidth: "calc(100% - 24px)", borderRadius: R.md, padding: 8 }} >
                 <input
                   autoFocus
                   value={cmdQuery}
@@ -2185,7 +2185,7 @@ export function TradingChart({
                     }
                   }}
                   placeholder="Run action… (type: replay, fit, compare, script). Use ↑/↓ + Enter."
-                  style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 10, border: "1px solid var(--ac-line)", background: "var(--ac-bg)", color: "var(--ac-ink)", fontSize: 13, fontFamily: "var(--ac-font)" }}
+                  style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: R.md, border: "1px solid var(--ac-line)", background: "var(--ac-bg)", color: "var(--ac-ink)", fontSize: 13, fontFamily: "var(--ac-font)" }}
                 />
                 <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
                   {([
@@ -2193,7 +2193,7 @@ export function TradingChart({
                     ["fav", `Favorites (${cmdFav.length})`],
                     ["recent", `Recent (${cmdRecent.length})`],
                   ] as const).map(([id, label]) => (
-                    <button key={id} {...btn(cmdFilter === id, { height: 24, padding: "0 8px", fontSize: 11 })} onClick={() => setCmdFilter(id)}>{label}</button>
+                    <button key={id} {...btn(cmdFilter === id, { height: H.xs, padding: "0 8px", fontSize: 11 })} onClick={() => setCmdFilter(id)}>{label}</button>
                   ))}
                 </div>
                 <div ref={cmdListRef} style={{ marginTop: 8, maxHeight: 280, overflowY: "auto" }}>
@@ -2228,7 +2228,7 @@ export function TradingChart({
                   left: Math.min(ctxMenu.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 214),
                   top: Math.min(ctxMenu.y, (typeof window !== "undefined" ? window.innerHeight : 9999) - 320),
                   zIndex: 41,
-                  borderRadius: 14,
+                  borderRadius: R.lg,
                   padding: 5,
                   minWidth: 204,
                   fontFamily: "var(--ac-font)",
@@ -2266,7 +2266,7 @@ export function TradingChart({
                 flexWrap: "wrap",
                 pointerEvents: "none",
                 padding: legend.bar ? "3px 9px 3px 7px" : "2px 4px",
-                borderRadius: 10,
+                borderRadius: R.md,
                 background: legend.bar ? `color-mix(in srgb, var(--ac-pane) 78%, transparent)` : "transparent",
                 backdropFilter: legend.bar ? "blur(7px)" : undefined,
                 WebkitBackdropFilter: legend.bar ? "blur(7px)" : undefined,
@@ -2275,7 +2275,7 @@ export function TradingChart({
             }}
             >
               <span style={{ color: "var(--ac-ink)", fontWeight: 700, fontFamily: "var(--ac-font)", fontSize: 12, letterSpacing: "0.01em" }}>{symbol}</span>
-              <span style={{ fontFamily: "var(--ac-font)", fontSize: 10, fontWeight: 600, color: "var(--ac-text)", background: "var(--ac-hover)", borderRadius: 6, padding: "1px 5px" }}>{TF_SHORT[resolution] ?? resolution}</span>
+              <span style={{ fontFamily: "var(--ac-font)", fontSize: 10, fontWeight: 600, color: "var(--ac-text)", background: "var(--ac-hover)", borderRadius: R.xs, padding: "1px 5px" }}>{TF_SHORT[resolution] ?? resolution}</span>
               {legendBar && (
                 <>
                   {legendShows === "ohlc" ? (
@@ -2317,7 +2317,7 @@ export function TradingChart({
                   marginTop: 1,
                   padding: "2px 7px",
                   border: "1px solid var(--ac-line-soft)",
-                  borderRadius: 6,
+                  borderRadius: R.xs,
                   cursor: "pointer",
                   fontFamily: "var(--ac-font)",
                   fontSize: 10,
@@ -2348,7 +2348,7 @@ export function TradingChart({
                     pointerEvents: "auto",
                     width: "fit-content",
                     padding: "2px 6px",
-                    borderRadius: 6,
+                    borderRadius: R.xs,
                     background: hov ? `color-mix(in srgb, var(--ac-pane) 86%, transparent)` : "transparent",
                     backdropFilter: hov ? "blur(7px)" : undefined,
                     WebkitBackdropFilter: hov ? "blur(7px)" : undefined,
@@ -2388,14 +2388,14 @@ export function TradingChart({
             <button
               onClick={(e) => { e.stopPropagation(); applyTool("cross"); }}
               title="Back to the crosshair"
-              style={{ position: "absolute", left: 8, top: 8, zIndex: 8, display: "inline-flex", alignItems: "center", gap: 8, height: 28, padding: "0 10px", borderRadius: 999, border: "1px solid color-mix(in srgb, var(--ac-accent) 45%, transparent)", background: `color-mix(in srgb, var(--ac-accent) 18%, var(--ac-pane))`, color: "var(--ac-accent-ink)", fontFamily: "var(--ac-font)", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+              style={{ position: "absolute", left: 8, top: 8, zIndex: 8, display: "inline-flex", alignItems: "center", gap: 8, height: H.sm, padding: "0 10px", borderRadius: R.pill, border: "1px solid color-mix(in srgb, var(--ac-accent) 45%, transparent)", background: `color-mix(in srgb, var(--ac-accent) 18%, var(--ac-pane))`, color: "var(--ac-accent-ink)", fontFamily: "var(--ac-font)", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
             >
               {hasIcon(tool) && <Icon name={tool} size={13} />}
               {TOOL_LABEL[tool] ?? tool} ✕
             </button>
           )}
           {guided && !compact && (
-            <div className="ac-surface" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", left: 8, bottom: 28, zIndex: 7, display: "flex", alignItems: "center", gap: 4, padding: "5px 6px", borderRadius: 14 }} >
+            <div className="ac-surface" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", left: 8, bottom: 28, zIndex: 7, display: "flex", alignItems: "center", gap: 4, padding: "5px 6px", borderRadius: R.lg }} >
               {quickActions
                 .slice()
                 .sort((a, b) => (cmdUsage[b.id] ?? 0) - (cmdUsage[a.id] ?? 0))
@@ -2415,7 +2415,7 @@ export function TradingChart({
             </div>
           )}
           {guided && dockEditOpen && (
-            <div className="ac-surface" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", left: 8, bottom: 68, zIndex: 21, width: 250, maxHeight: 280, overflowY: "auto", borderRadius: 14, padding: 6 }} >
+            <div className="ac-surface" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", left: 8, bottom: 68, zIndex: 21, width: 250, maxHeight: 280, overflowY: "auto", borderRadius: R.lg, padding: 6 }} >
               <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ac-text)", padding: "2px 8px 6px" }}>Quick dock buttons</div>
               {GUIDED_PIN_CHOICES.map((id) => {
                 const a = quickById[id];
@@ -2455,7 +2455,7 @@ export function TradingChart({
                 backdropFilter: "blur(8px)",
                 WebkitBackdropFilter: "blur(8px)",
                 border: "1px solid var(--ac-line)",
-                borderRadius: 14,
+                borderRadius: R.lg,
                 boxShadow: ELEV.md,
                 fontFamily: "var(--ac-mono)",
                 fontSize: 11,
@@ -2510,7 +2510,7 @@ export function TradingChart({
           {shortcuts && (
             <>
               <div onClick={() => setShortcuts(false)} className="ac-scrim" style={{ position: "absolute", inset: 0, zIndex: Z.scrim + 2 }} />
-              <div className="ac-surface" style={{ position: "absolute", zIndex: Z.modal, top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 320, borderRadius: RADIUS.lg, overflow: "hidden" }}>
+              <div className="ac-surface" style={{ position: "absolute", zIndex: Z.modal, top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 320, borderRadius: R.lg, overflow: "hidden" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 13px", borderBottom: "1px solid var(--ac-line)" }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: "var(--ac-ink)" }}>Keyboard &amp; mouse</span>
                   <button {...miniBtn()} onClick={() => setShortcuts(false)} aria-label="Close shortcuts"><Icon name="close" size={13} /></button>
@@ -2538,7 +2538,7 @@ export function TradingChart({
                     ] as const
                   ).map(([k, v]) => (
                     <div key={k} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0", fontSize: 12 }}>
-                      <span style={{ minWidth: 128, fontFamily: "var(--ac-mono)", fontSize: 11, color: "var(--ac-accent-ink)", background: `color-mix(in srgb, var(--ac-accent) 12%, transparent)`, borderRadius: 6, padding: "3px 6px", textAlign: "center" }}>{k}</span>
+                      <span style={{ minWidth: 128, fontFamily: "var(--ac-mono)", fontSize: 11, color: "var(--ac-accent-ink)", background: `color-mix(in srgb, var(--ac-accent) 12%, transparent)`, borderRadius: R.xs, padding: "3px 6px", textAlign: "center" }}>{k}</span>
                       <span style={{ color: "var(--ac-ink)" }}>{v}</span>
                     </div>
                   ))}
@@ -2558,7 +2558,7 @@ export function TradingChart({
                 alignItems: "center",
                 gap: 4,
                 padding: "5px 7px",
-                borderRadius: 14,
+                borderRadius: R.lg,
             }}
             >
               {SWATCHES.map((c) => (
@@ -2569,7 +2569,7 @@ export function TradingChart({
                   style={{
                     width: 16,
                     height: 16,
-                    borderRadius: 6,
+                    borderRadius: R.xs,
                     padding: 0,
                     cursor: "pointer",
                     background: c,
@@ -2624,7 +2624,7 @@ export function TradingChart({
                   326px panel pinned to a 360px screen's top-right corner with 12px of margin —
                   which reads as a window that failed to fit rather than a designed one, and puts
                   a scrolling list under the reader's reach instead of over their thumb. */}
-              <div className="ac-surface" style={{ position: "absolute", zIndex: 31, ...(compact ? { left: 0, right: 0, bottom: 0, maxHeight: "76%", borderRadius: "16px 16px 0 0" } : { top: 12, right: 12, width: 326, maxHeight: "82%", borderRadius: 10 }), display: "flex", flexDirection: "column", overflow: "hidden" }} >
+              <div className="ac-surface" style={{ position: "absolute", zIndex: 31, ...(compact ? { left: 0, right: 0, bottom: 0, maxHeight: "76%", borderRadius: `${R.xl} ${R.xl} 0 0` } : { top: 12, right: 12, width: 326, maxHeight: "82%", borderRadius: R.md }), display: "flex", flexDirection: "column", overflow: "hidden" }} >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderBottom: "1px solid var(--ac-line)" }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: "var(--ac-ink)", fontFamily: "var(--ac-font)" }}>Indicators</span>
                   <button {...miniBtn()} onClick={() => setIndModal(false)} aria-label="Close indicators">
@@ -2637,7 +2637,7 @@ export function TradingChart({
                     onChange={(e) => setIndSearch(e.target.value)}
                     placeholder="Search…"
                     autoFocus
-                    style={{ width: "100%", boxSizing: "border-box", padding: "7px 10px", borderRadius: 6, border: "1px solid var(--ac-line)", background: "var(--ac-bg)", color: "var(--ac-ink)", fontSize: 13, fontFamily: "var(--ac-font)" }}
+                    style={{ width: "100%", boxSizing: "border-box", padding: "7px 10px", borderRadius: R.xs, border: "1px solid var(--ac-line)", background: "var(--ac-bg)", color: "var(--ac-ink)", fontSize: 13, fontFamily: "var(--ac-font)" }}
                   />
                 </div>
                 <div style={{ overflowY: "auto", padding: 6 }}>
@@ -2668,7 +2668,7 @@ export function TradingChart({
                                 onClick={() => toggleInd(d.id)}
                                 aria-disabled={locked}
                                 title={locked ? `${d.label} — not included in your plan` : undefined}
-                                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", border: "none", borderRadius: 8, cursor: "pointer", textAlign: "left", fontFamily: "var(--ac-font)", fontSize: 13, color: locked ? "var(--ac-text)" : "var(--ac-ink)", background: on ? `color-mix(in srgb, var(--ac-accent) 12%, transparent)` : "transparent" }}
+                                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", border: "none", borderRadius: R.sm, cursor: "pointer", textAlign: "left", fontFamily: "var(--ac-font)", fontSize: 13, color: locked ? "var(--ac-text)" : "var(--ac-ink)", background: on ? `color-mix(in srgb, var(--ac-accent) 12%, transparent)` : "transparent" }}
                               >
                                 <span style={{ width: 14, textAlign: "center", color: on ? "var(--ac-accent-ink)" : "var(--ac-text)" }}>{locked ? "🔒" : on ? <Icon name="check" size={12} /> : "＋"}</span>
                                 {d.label}
@@ -2686,12 +2686,12 @@ export function TradingChart({
           )}
           {/* Bar-replay: a "click a bar" hint while arming, then a play/step control bar */}
           {replay?.arming && (
-            <div style={{ position: "absolute", top: 40, left: "50%", transform: "translateX(-50%)", zIndex: 9, padding: "6px 12px", background: "var(--ac-accent)", color: CHIP_INK, borderRadius: 10, fontSize: 12, fontWeight: 700, boxShadow: ELEV.md }}>
+            <div style={{ position: "absolute", top: 40, left: "50%", transform: "translateX(-50%)", zIndex: 9, padding: "6px 12px", background: "var(--ac-accent)", color: CHIP_INK, borderRadius: R.md, fontSize: 12, fontWeight: 700, boxShadow: ELEV.md }}>
               Click a bar to start replay
             </div>
           )}
           {replay?.active && (
-            <div className="ac-surface" style={{ position: "absolute", bottom: 14, left: "50%", transform: "translateX(-50%)", zIndex: 9, display: "flex", alignItems: "center", gap: 4, padding: "5px 7px", borderRadius: 10 }} >
+            <div className="ac-surface" style={{ position: "absolute", bottom: 14, left: "50%", transform: "translateX(-50%)", zIndex: 9, display: "flex", alignItems: "center", gap: 4, padding: "5px 7px", borderRadius: R.md }} >
               {(() => {
                 // `ReactNode`, not `string`: the replay bar's controls are icons now like every
                 // other control in the widget, and the play/pause/step marks that are still
@@ -2839,13 +2839,13 @@ export function TradingChart({
                 default view. */}
             {controls && !compact && (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 2, flexShrink: 0, marginRight: SPACE[1] }}>
-                <button {...clusterBtn(false, { width: CONTROL.sm, padding: 0 })} title="Zoom out (−)" aria-label="Zoom out" onClick={() => chartRef.current?.zoomBy(-1)}><Icon name="zoomout" size={13} /></button>
-                <button {...clusterBtn(false, { width: CONTROL.sm, padding: 0 })} title="Fit all bars (F)" aria-label="Fit all bars" onClick={() => chartRef.current?.fit()}><Icon name="fit" size={13} /></button>
-                <button {...clusterBtn(false, { width: CONTROL.sm, padding: 0 })} title="Zoom in (+)" aria-label="Zoom in" onClick={() => chartRef.current?.zoomBy(1)}><Icon name="zoomin" size={13} /></button>
+                <button {...clusterBtn(false, { width: H.xs, padding: 0 })} title="Zoom out (−)" aria-label="Zoom out" onClick={() => chartRef.current?.zoomBy(-1)}><Icon name="zoomout" size={13} /></button>
+                <button {...clusterBtn(false, { width: H.xs, padding: 0 })} title="Fit all bars (F)" aria-label="Fit all bars" onClick={() => chartRef.current?.fit()}><Icon name="fit" size={13} /></button>
+                <button {...clusterBtn(false, { width: H.xs, padding: 0 })} title="Zoom in (+)" aria-label="Zoom in" onClick={() => chartRef.current?.zoomBy(1)}><Icon name="zoomin" size={13} /></button>
               </span>
             )}
             {controls && !view.atRealtime && (
-              <button {...clusterBtn(false, { height: compact ? 28 : 23, flexShrink: 0 })} title="Scroll to the latest bar" aria-label="Go to realtime" onClick={() => chartRef.current?.scrollToRealtime()}><Icon name="realtime" size={13} /></button>
+              <button {...clusterBtn(false, { height: compact ? H.sm : "var(--ac-h-xs, 23px)", flexShrink: 0 })} title="Scroll to the latest bar" aria-label="Go to realtime" onClick={() => chartRef.current?.scrollToRealtime()}><Icon name="realtime" size={13} /></button>
             )}
             {/* The host's own panel controls, with the "how is it drawn" group rather than with
                 the period strip at the other end. */}
@@ -2854,7 +2854,7 @@ export function TradingChart({
                 and every display toggle live in the sheet, and this is the way in — which also
                 means a host that hides the toolbar still leaves all of them reachable. */}
             {!controls ? null : compact ? (
-              <button {...clusterBtn(sheetIs("menu"), { height: 28, minWidth: 30, flexShrink: 0 })} title="Chart settings" aria-label="Chart settings" aria-expanded={sheetIs("menu")} onClick={() => setSheet(sheetIs("menu") ? null : "menu")}><Icon name="settings" size={13} /></button>
+              <button {...clusterBtn(sheetIs("menu"), { height: H.sm, minWidth: 30, flexShrink: 0 })} title="Chart settings" aria-label="Chart settings" aria-expanded={sheetIs("menu")} onClick={() => setSheet(sheetIs("menu") ? null : "menu")}><Icon name="settings" size={13} /></button>
             ) : (
               <>
             <button {...clusterBtn(vpvr)} title="Visible-range volume profile" aria-label="Visible-range volume profile" onClick={() => setVpvr((v) => !v)}>
@@ -2869,7 +2869,7 @@ export function TradingChart({
             <span style={{ position: "relative" }}>
               <button {...clusterBtn(settingsOpen)} title="Chart settings" aria-label="Chart settings" onClick={() => setSettingsOpen((o) => !o)}><Icon name="settings" size={13} /></button>
               {settingsOpen && (
-                <div className="ac-surface ac-menu" style={{ position: "absolute", right: 0, bottom: CONTROL.md + SPACE[1], zIndex: Z.menu, borderRadius: RADIUS.lg, padding: SPACE[1], minWidth: 232, maxHeight: 340, overflowY: "auto" }}>
+                <div className="ac-surface ac-menu" style={{ position: "absolute", right: 0, bottom: `calc(${H.sm} + ${SPACE[1]}px)`, zIndex: Z.menu, borderRadius: R.lg, padding: SPACE[1], minWidth: 232, maxHeight: 340, overflowY: "auto" }}>
                   <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ac-text)", padding: "2px 8px 6px" }}>Appearance</div>
                   {(
                     [
@@ -3048,7 +3048,7 @@ export function TradingChart({
                 goes back down", which is the whole grammar of a sheet. */}
             <div style={{ display: "flex", alignItems: "center", padding: "6px 4px 2px" }}>
               <span style={{ width: 34, height: 4, borderRadius: 999, background: "var(--ac-text)", margin: "0 auto" }} />
-              <button className="ac-btn ac-btn--outline ac-btn--icon" onClick={() => setSheet(null)} aria-label="Close" style={{ position: "absolute", right: 10, top: 8, width: CONTROL.lg, height: CONTROL.lg }}><Icon name="close" size={13} /></button>
+              <button className="ac-btn ac-btn--outline ac-btn--icon" onClick={() => setSheet(null)} aria-label="Close" style={{ position: "absolute", right: 10, top: 8, width: H.btn, height: H.btn }}><Icon name="close" size={13} /></button>
             </div>
 
             {/* INTERVAL — the width of a BAR. */}
@@ -3090,7 +3090,7 @@ export function TradingChart({
                     onKeyDown={(e) => { if (e.key === "Enter") addCompare(); }}
                     placeholder="Symbol…"
                     autoFocus
-                    style={{ flex: 1, minWidth: 0, fontFamily: "var(--ac-font)", fontSize: 14, height: 38, padding: "0 10px", borderRadius: 8, border: "1px solid var(--ac-line)", background: "var(--ac-bg)", color: "var(--ac-ink)" }}
+                    style={{ flex: 1, minWidth: 0, fontFamily: "var(--ac-font)", fontSize: 14, height: 38, padding: "0 10px", borderRadius: R.sm, border: "1px solid var(--ac-line)", background: "var(--ac-bg)", color: "var(--ac-ink)" }}
                   />
                   <button onClick={() => addCompare()} {...btn(true, { height: 38, padding: "0 14px" })}>Add</button>
                 </div>
@@ -3106,7 +3106,7 @@ export function TradingChart({
                       <span style={{ width: 10, height: 10, borderRadius: 2, background: c.color }} />
                       {c.symbol}
                     </span>
-                    <button {...miniBtn()} onClick={() => removeCompare(c.symbol)} aria-label={`Remove ${c.symbol}`} style={{ width: CONTROL.lg, height: CONTROL.lg }}><Icon name="close" size={13} /></button>
+                    <button {...miniBtn()} onClick={() => removeCompare(c.symbol)} aria-label={`Remove ${c.symbol}`} style={{ width: H.btn, height: H.btn }}><Icon name="close" size={13} /></button>
                   </div>
                 ))}
               </>

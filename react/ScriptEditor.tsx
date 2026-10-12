@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Icon } from "./icons";
 import type { Theme } from "../src/types";
-import { CONTROL, RADIUS, SPACE, TYPE, WEIGHT, cx } from "./ui";
+import { CONTROL, R, RADIUS, SPACE, TYPE, WEIGHT, cx } from "./ui";
 
 export interface ScriptError {
   message: string;
@@ -392,7 +392,7 @@ export function ScriptEditor({
               flex: 1,
               height: 24,
               border: "1px solid var(--ac-line)",
-              borderRadius: 8,
+              borderRadius: R.sm,
               background: "var(--ac-pane)",
               color: "var(--ac-ink)",
               fontFamily: "var(--ac-font)",
@@ -665,7 +665,7 @@ export function ScriptEditor({
                         color: tone,
                         border: `1px solid ${soft(tone, 45)}`,
                         background: soft(tone, 12),
-                        borderRadius: 6,
+                        borderRadius: R.xs,
                         padding: "2px 7px",
                       }}
                     >
@@ -699,7 +699,7 @@ export function ScriptEditor({
                         {showRows ? "Hide instruments" : `Show all ${rows.length} instruments`}
                       </button>
                       {showRows && (
-                        <div style={{ maxHeight: 150, overflowY: "auto", border: `1px solid ${soft(th.border, 70)}`, borderRadius: 6 }}>
+                        <div style={{ maxHeight: 150, overflowY: "auto", border: `1px solid ${soft(th.border, 70)}`, borderRadius: R.xs }}>
                           {rows.map((r, i) => (
                             <div
                               key={r.symbol}
@@ -797,7 +797,7 @@ export function ScriptEditor({
                         color: verdict.tone,
                         border: `1px solid ${soft(verdict.tone, 45)}`,
                         background: soft(verdict.tone, 12),
-                        borderRadius: 6,
+                        borderRadius: R.xs,
                         padding: "2px 7px",
                       }}
                     >
