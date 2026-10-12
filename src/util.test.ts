@@ -473,6 +473,26 @@ test("phasor recovers the phase of a pure cosine within 0.05 rad after warm-up",
   assert.ok(worst < 0.05, `worst phase error ${worst} rad`);
 });
 
+test("phasor off its tuned period (cycle 30, period 20, EMA 10) still advances by w per bar", () => {
+  // off period the FIR gain is not 1 and the circle flattens to an ellipse, so a single step may
+  // be off w (measured worst 0.079 rad), but every step still advances and the mean step is w
+  const w = (2 * Math.PI) / 30;
+  const ph = phasor(Array.from({ length: 400 }, (_, t) => 100 + Math.cos(w * t)), 20, 10).phase;
+  let sum = 0;
+  for (let t = 100; t < 400; t++) {
+    const d = Math.atan2(Math.sin(ph[t] - ph[t - 1]), Math.cos(ph[t] - ph[t - 1]));
+    assert.ok(Math.abs(d - w) < 0.1, `bar ${t}: step ${d}`);
+    sum += d;
+  }
+  assert.ok(Math.abs(sum / 300 - w) < 1e-6, `mean step ${sum / 300}`);
+});
+
+test("phasor and permEntropy refuse invalid inputs with gaps, never numbers", () => {
+  const src = walk(80);
+  for (const [per, eP] of [[20, 2.5], [0, 20], [-3, 20], [20, 1], [20.5, 20]]) assert.ok(phasor(src, per, eP).phase.every(Number.isNaN), `phasor(${per}, ${eP})`);
+  for (const [m, win] of [[6, 30], [1, 30], [3, 0], [3, 2.5]]) assert.ok(permEntropy(src, m, win).every(Number.isNaN), `permEntropy(${m}, ${win})`);
+});
+
 test("a forming-candle tick changes only the last value of entropy and phasor", () => {
   // the same forming bar ticks from above its two predecessors to below them, so its pattern changes
   const base = walk(120);

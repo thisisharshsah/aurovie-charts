@@ -1141,7 +1141,10 @@ export function trix(src: number[], p: number): { line: number[]; signal: (sigP:
 export function permEntropy(src: number[], m = 3, window = 30): number[] {
   const n = src.length;
   const out = new Array(n).fill(NaN);
-  if (!Number.isInteger(m) || !Number.isInteger(window) || m < 2 || m > 7 || window < 1) return out;
+  // ponytail: m ≤ 5 (120 orderings) because h is re-summed over all m! counts at every bar on
+  // every tick (120·n per tick); a running Σ c·log c updated for the two counts that change is
+  // the upgrade path if a larger m is ever wanted.
+  if (!Number.isInteger(m) || !Number.isInteger(window) || m < 2 || m > 5 || window < 1) return out;
   const fact = [1];
   for (let k = 1; k <= m; k++) fact[k] = fact[k - 1] * k;
   // Lehmer code of the pattern ending at j: for each slot, how many LATER slots hold a strictly
@@ -1191,13 +1194,14 @@ export function permEntropy(src: number[], m = 3, window = 30): number[] {
 // homodyne discriminator is the upgrade if an adaptive period is ever wanted.
 export function phasor(src: number[], period = 20, emaP = 20): { i: number[]; q: number[]; amp: number[]; phase: number[] } {
   const n = src.length;
-  const e = ema(src, emaP);
-  const x = src.map((v, t) => v - e[t]);
-  const g = 0.075 * period + 0.54;
   const I = new Array(n).fill(NaN);
   const Q = new Array(n).fill(NaN);
   const amp = new Array(n).fill(NaN);
   const phase = new Array(n).fill(NaN);
+  if (!Number.isInteger(period) || !Number.isInteger(emaP) || period < 1 || emaP < 2) return { i: I, q: Q, amp, phase };
+  const e = ema(src, emaP);
+  const x = src.map((v, t) => v - e[t]);
+  const g = 0.075 * period + 0.54;
   for (let t = 6; t < n; t++) {
     const q = -(0.0962 * x[t] + 0.5769 * x[t - 2] - 0.5769 * x[t - 4] - 0.0962 * x[t - 6]) * g;
     const r = x[t - 3];

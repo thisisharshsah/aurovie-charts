@@ -17,16 +17,19 @@ new bar never redraws history and a forming candle's tick changes only the last 
   patterns, Shannon entropy divided by log(m!), so 0 = one ordering only (a clean trend) and 1 =
   all m! orderings equally often (noise). Ties rank by time: the earlier of two equal closes is
   the smaller, so a flat run is the rising pattern. Fewer than window+m-1 closes, or a NaN among
-  them, is a gap, never 0. Drawn as a 0..1 line over a per-bar band shaded from the theme accent
+  them, is a gap, never 0. `m` is 2 … 5 (120 orderings at most, so the per-bar re-sum stays
+  cheap on every tick); any other `m` or `window` is all gaps. Drawn as a 0..1 line over a per-bar band shaded from the theme accent
   (`line`, orderly) to muted text (`text`, noisy).
 - **Phasor (Euler e^iθ)** (`kind: "PHASOR"`, `inputs: [period = 20, detrend EMA = 20]`, `phasor`
-  in util). x = close − EMA(close); I[t] = x[t−3]; Q[t] = −(0.0962·x[t] + 0.5769·x[t−2] −
+  in util; a non-integer or out-of-range period (< 1) or EMA (< 2) is all gaps). x = close − EMA(close); I[t] = x[t−3]; Q[t] = −(0.0962·x[t] + 0.5769·x[t−2] −
   0.5769·x[t−4] − 0.0962·x[t−6])·(0.075·period + 0.54), Ehlers' Hilbert FIR with a FIXED period
   (not his adaptive homodyne period). Returns I, Q, amplitude |z| and phase arg z (radians). z
   describes x three bars ago (the FIR's lag), and the EMA detrend leads the raw cycle by a fixed
   arg(1 − H_EMA(ω)). The pane plots phase in degrees (−180 … 180, the line breaks at the wrap);
   a dial on the overlay canvas at the pane's right edge draws the unit circle, an arrow at the
-  latest I + iQ and a fading trail of the 30 bars before it, redrawn on every tick.
+  latest I + iQ and a fading trail of the 30 bars before it, redrawn on every tick. The dial always
+  shows the latest bar (the legend, labelled θ°, follows the crosshair), on a half see-through
+  backdrop so the live end of the phase line shows under it.
 
 ### Changed
 

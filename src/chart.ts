@@ -82,6 +82,7 @@ const MAX_BAR_SPACING = 64;
 const CLOSE_UP_FILL = 0.9;
 
 // `wrap`: a cyclic series (phase in degrees wraps at 360): a jump over half of it breaks the line.
+// A real turn of more than half a cycle in one bar (a cycle of about 2 bars) breaks it too: aliasing, accepted.
 type PlotLine = { values: number[]; color: string; width: number; dash?: number[]; wrap?: number };
 // A two-line band the renderer fills between (Ichimoku's kumo, a Keltner/Bollinger envelope). `shift`
 // displaces it forward in bars — the Ichimoku cloud is plotted 26 bars AHEAD of the bar it was
@@ -1906,7 +1907,7 @@ export class Chart {
         const deg = z.phase.map((r) => (r * 180) / Math.PI);
         s.data = { lines: [{ values: deg, color: s.color, width: 1.3, wrap: 360 }], levels: [-90, 0, 90], srange: [-180, 180], dial: { i: z.i, q: z.q } };
         s.legend = (i) => [
-          { label: `Phasor ${per}`, value: valAt(deg, i), color: s.color },
+          { label: `Phasor ${per} θ°`, value: valAt(deg, i), color: s.color },
           { label: "amp", value: valAt(z.amp, i), color: this.theme.text },
         ];
       }
@@ -3063,7 +3064,7 @@ export class Chart {
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     const w = ctx.measureText(label).width + 16;
-    ctx.fillStyle = alpha(this.theme.paneBackground, 0.85);
+    ctx.fillStyle = alpha(this.theme.paneBackground, 0.5);
     roundRectPath(ctx, 6, p.top + 5, w, 15, 4);
     ctx.fill();
     ctx.fillStyle = s.color;
@@ -3492,7 +3493,9 @@ export class Chart {
   // The phasor dial, on the OVERLAY canvas so a forming candle's tick redraws it with the crosshair:
   // a circle at the pane's right edge, the arrow at the latest I+iQ, and a fading trail of the 30
   // before it. Scaled so the largest |z| in the trail touches the circle (the shape is the point;
-  // the pane legend carries the amplitude).
+  // the pane legend carries the amplitude). It always shows the LATEST bar, not the crosshair bar
+  // the legend reads. The backdrop is half see-through so the phase line's live end, which the
+  // dial sits over at the live edge, still shows.
   private drawPhasorDial(ctx: CanvasRenderingContext2D, p: Pane, s: Study) {
     const { i: I, q: Q } = s.data.dial!;
     const r = Math.min(30, (p.height - 24) / 2);
@@ -3505,7 +3508,7 @@ export class Chart {
     const cy = p.top + p.height / 2;
     const at = ([a, b]: [number, number]): [number, number] => [cx + (a / scale) * r, cy - (b / scale) * r];
     ctx.save();
-    ctx.fillStyle = alpha(this.theme.paneBackground, 0.85);
+    ctx.fillStyle = alpha(this.theme.paneBackground, 0.5);
     ctx.beginPath();
     ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
     ctx.fill();
