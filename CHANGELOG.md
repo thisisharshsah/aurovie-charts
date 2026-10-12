@@ -16,7 +16,31 @@ All notable changes to this project are documented here. The format follows
   every control height and radius through these variables. Previously the radii were always
   stamped from the engine's constants, so a host could only override them with `!important`.
 - **Touch hit areas.** Under `@media (pointer: coarse)` a button's hit area grows to
-  `--ac-hit-touch` (for example 44px). The painted size does not change.
+  `--ac-hit-touch` (for example 44px). The painted size does not change. Where packed buttons'
+  grown areas overlap, a tap on a button's own painted box is always that button (its own box is
+  claimed one layer above every grown area); only a tap in the gap goes to a neighbour, and there
+  the later sibling wins. The own-box layer is `z-index: 1`, so a host overlay with no z-index
+  laid over the chart's buttons would lose taps to them on a touch screen.
+- **A host's size scale holds under every theme preset.** Picking a named preset (not Auto) keeps
+  `themeOverride.controlHeights` / `radii`; previously it fell back to the engine's sizes.
+
+### Changed
+
+- The trade ticket's number-stepper − / + buttons are field height (`--ac-h-md`) instead of
+  toolbar height (`--ac-h-btn`), so they stay level with the input when a host splits the two.
+  Standalone both are 32px, so nothing moves.
+- The drawing rail's flyouts sit at `--ac-h-md` + 4px instead of a fixed 36px (the same 36px
+  standalone).
+
+### Known limits
+
+- **The compact toolbar clips touch growth vertically.** It scrolls on x, which forces y to clip,
+  so its hit areas grow sideways only. Check on a phone.
+- **One radius role for segments, menu rows, xs buttons and tiles** (`--ac-r-sm`). A host cannot
+  put segment options and menu rows on a smaller radius than controls without a new role.
+- **Widths still in px:** the P&F box stepper (30px wide), the line-width / line-style mini
+  buttons (24 / 26px wide), the compare Add button (38px tall), and the script editor's 20 / 22 /
+  24px controls. They do not follow a host's scale.
 
 ### Unchanged
 

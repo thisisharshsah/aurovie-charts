@@ -1024,9 +1024,14 @@ export function TradingChart({
   });
 
   // "Auto" follows the host app (theme prop + design-token override, so it stays on-brand); a
-  // named preset from THEMES takes over entirely. Persisted, so the user's pick sticks.
+  // named preset from THEMES takes over the colours. Persisted, so the user's pick sticks.
   const th: Theme = useMemo(
-    () => (themeName === "Auto" ? { ...(theme === "light" ? LIGHT : DARK), ...(themeOverride ?? {}) } : THEMES[themeName] ?? DARK),
+    // The host's SIZE scale (controlHeights / radii) is not a look the preset owns, so it holds
+    // under every preset, not only Auto.
+    () =>
+      themeName === "Auto"
+        ? { ...(theme === "light" ? LIGHT : DARK), ...(themeOverride ?? {}) }
+        : { ...(THEMES[themeName] ?? DARK), controlHeights: themeOverride?.controlHeights, radii: themeOverride?.radii },
     [themeName, theme, themeOverride],
   );
 
@@ -1718,6 +1723,10 @@ export function TradingChart({
    * loses, silently, and the reader cannot get it back. Scrolling costs nothing vertically and
    * a phone user already knows how to swipe a strip of chips. The scrollbar itself is hidden
    * (`.ac-scroll` in the stylesheet) — on a touch screen it is decoration.
+   *
+   * ponytail: overflow-x: auto forces overflow-y to clip, so on the compact row the touch hit
+   * area (--ac-hit-touch) grows sideways only and is cut to the row's height. Upgrade: block
+   * padding of (touch - H.sm) / 2 with a matching negative margin, checked on a phone.
    */
   const scrollRow: CSSProperties = compact
     ? { display: "flex", alignItems: "center", flexWrap: "nowrap", overflowX: "auto", overflowY: "hidden", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }
@@ -2038,7 +2047,7 @@ export function TradingChart({
                     {multi && <span style={{ position: "absolute", right: 2, bottom: 2, fontSize: 8, lineHeight: 1, color: "var(--ac-text)" }}>▸</span>}
                   </button>
                   {railMenu === g.id && (
-                    <div className="ac-surface" style={{ position: "absolute", left: 36, top: 0, zIndex: 25, borderRadius: R.lg, padding: 6, minWidth: 208 }} >
+                    <div className="ac-surface" style={{ position: "absolute", left: `calc(${H.md} + ${SPACE[1]}px)`, top: 0, zIndex: 25, borderRadius: R.lg, padding: 6, minWidth: 208 }} >
                       <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ac-text)", padding: "2px 8px 6px" }}>{g.label}</div>
                       {g.tools.map((t) => (
                         <button
@@ -2076,7 +2085,7 @@ export function TradingChart({
                 {objects.length > 0 && <span style={{ position: "absolute", right: 2, top: 2, fontSize: TYPE.micro, lineHeight: 1, fontWeight: WEIGHT.bold, color: "var(--ac-accent-ink)" }}>{objects.length}</span>}
               </button>
               {objectsOpen && (
-                <div className="ac-surface" style={{ position: "absolute", left: 36, bottom: 0, zIndex: 25, borderRadius: R.lg, padding: 6, minWidth: 218, maxHeight: 320, overflowY: "auto" }} >
+                <div className="ac-surface" style={{ position: "absolute", left: `calc(${H.md} + ${SPACE[1]}px)`, bottom: 0, zIndex: 25, borderRadius: R.lg, padding: 6, minWidth: 218, maxHeight: 320, overflowY: "auto" }} >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "2px 4px 6px" }}>
                     <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ac-text)" }}>Objects · {objects.length}</span>
                     {objects.length > 0 && (

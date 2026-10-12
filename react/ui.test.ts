@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { CONTROL, DEPTH, RADIUS, SHEET, SPACE, TYPE, contrast, cx, readable, themeVars } from "./ui";
 import { DARK, LIGHT, THEMES } from "../src/util";
 
@@ -136,4 +137,24 @@ test("every size variable in the stylesheet falls back to the 0.16 px", () => {
   }
   assert.deepEqual([...seen].sort(), Object.keys(want).sort(), "each variable is used in the sheet");
   assert.doesNotMatch(SHEET, /var\(--ac-(?:r|h|hit)-[\w-]+\)/, "no size variable without a fallback");
+});
+
+// A grown touch area must never take a tap on a NEIGHBOUR's painted box: the own-box ::before
+// sits a layer above every ::after.
+test("under a coarse pointer each button's own box outranks a sibling's grown area", () => {
+  const coarse = SHEET.slice(SHEET.indexOf("@media (pointer: coarse)"));
+  assert.match(coarse, /\.ac-btn::before \{[^}]*inset: 0;[^}]*z-index: 1;/);
+  assert.doesNotMatch(coarse.match(/\.ac-btn::after \{[^}]*\}/)![0], /z-index/, "the grown area stays below");
+});
+
+// The inline styles carry their own fallbacks; a later edit must not move a standalone size.
+test("inline size fallbacks in the components stay on the 0.16 px", () => {
+  const want: Record<string, number> = { "--ac-r-xs": 6, "--ac-r-sm": 8, "--ac-r-md": 10, "--ac-r-lg": 14, "--ac-r-xl": 16, "--ac-h-mini": 20, "--ac-h-xs": 24, "--ac-h-sm": 28, "--ac-h-btn": 32, "--ac-h-md": 32 };
+  // Two sites kept their old off-scale px on purpose (onboarding pill, desktop realtime chip).
+  const offScale = new Set(["--ac-h-sm 26", "--ac-h-xs 23"]);
+  for (const f of ["TradingChart.tsx", "TradeTicket.tsx", "ScriptEditor.tsx"]) {
+    const src = readFileSync(new URL(f, import.meta.url), "utf8");
+    for (const [, name, px] of src.matchAll(/var\((--ac-(?:r|h|hit)-[\w-]+),\s*(\d+)px\)/g))
+      assert.ok(Number(px) === want[name] || offScale.has(`${name} ${px}`), `${f}: ${name} falls back to ${px}px`);
+  }
 });

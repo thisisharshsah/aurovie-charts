@@ -416,12 +416,19 @@ export const SHEET = `
 
 /* ---- TOUCH — under a coarse pointer a button's HIT AREA grows to --ac-hit-touch (a host sets
        it to 44px); the painted size does not change. Without the variable the area is the
-       button's own box, as before. ---- */
+       button's own box, as before. Packed buttons' grown areas overlap, and a later sibling's
+       ::after would take taps on the edge of the earlier one's painted box; so ::before re-claims
+       each button's OWN box one layer up (z 1 over the z-auto ::after): a tap on a visible button
+       is always that button, and only a tap in the gap goes to a neighbour's grown area.
+       ponytail: in a gap the later sibling wins, not the nearer one; nearest-wins needs JS. ---- */
 @media (pointer: coarse) {
   [data-aurovie-chart] .ac-btn, [data-aurovie-ticket] .ac-btn { position: relative; }
   [data-aurovie-chart] .ac-btn::after, [data-aurovie-ticket] .ac-btn::after {
     content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
     width: max(100%, var(--ac-hit-touch, 0px)); height: max(100%, var(--ac-hit-touch, 0px));
+  }
+  [data-aurovie-chart] .ac-btn::before, [data-aurovie-ticket] .ac-btn::before {
+    content: ""; position: absolute; inset: 0; z-index: 1;
   }
 }
 

@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { Icon } from "./icons";
 import { DARK, LIGHT } from "../src/util";
 import type { Theme } from "../src/types";
-import { CONTROL, R, SHEET, SPACE, TYPE, WEIGHT, cx, readable, themeVars } from "./ui";
+import { CONTROL, H, R, SHEET, SPACE, TYPE, WEIGHT, cx, readable, themeVars } from "./ui";
 import { HAS_LIMIT, HAS_TIF, HAS_TRIGGER, bracketCoherent, deriveTicketRisk } from "../src/ticket";
 import type { OrderType, SizeMode, TicketAccount, TicketOrder, TicketQuote, TicketRisk, TimeInForce } from "../src/ticket";
 
@@ -601,7 +601,9 @@ function Stepper({
   };
   // The chart's own outlined icon button, so the stepper wears the same hover, press and focus
   // as every other control — it was the one hand-styled button left on the ticket.
-  const stepBtn = { className: "ac-btn ac-btn--outline ac-btn--icon", style: { flexShrink: 0 } as CSSProperties };
+  // Field height (H.md), not the toolbar's H.btn, so the − and + stay level with the input
+  // beside them on a host that splits btn from md.
+  const stepBtn = { className: "ac-btn ac-btn--outline ac-btn--icon", style: { flexShrink: 0, width: H.md, height: H.md } as CSSProperties };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       <span className="ac-cap">{label}</span>
