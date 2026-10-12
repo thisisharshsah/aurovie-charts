@@ -3,7 +3,7 @@
 // definitions: NaN padding, the exact formulas, and the invariants each family must hold.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange, fitBarCount, visibleIndexRange, THEMES, timeGridMarks, minorGridAlpha, sectionKey, SECTION_STEPS } from "./util.ts";
+import { ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange, fitBarCount, visibleIndexRange, offsetAfterAppend, THEMES, timeGridMarks, minorGridAlpha, sectionKey, SECTION_STEPS } from "./util.ts";
 import type { AxisSlot } from "./util.ts";
 import type { Bar } from "./types.ts";
 
@@ -367,4 +367,38 @@ test("sectionKey counts consecutive days and months", () => {
   const d2 = Date.UTC(2026, 1, 1, 15) / 1000;
   assert.equal(sectionKey(d2, true, true) - sectionKey(d1, true, true), 1);
   assert.equal(sectionKey(d2, false, true) - sectionKey(d1, false, true), 1);
+});
+
+// A live chart parked at the right edge must follow a new bar; one scrolled into history must not jump.
+test("a new bar shifts a view at the right edge by one bar, and leaves a scrolled-back view put", () => {
+  const spacing = 8, tol = 24, edge = -400;
+  assert.equal(offsetAfterAppend(edge, edge, tol, 1, spacing), edge - spacing, "at the edge: follows");
+  assert.equal(offsetAfterAppend(edge + 10, edge, tol, 1, spacing), edge + 10 - spacing, "near the edge: follows");
+  assert.equal(offsetAfterAppend(edge + 200, edge, tol, 1, spacing), edge + 200, "scrolled back: stays put");
+  assert.equal(offsetAfterAppend(edge, edge, tol, 0, spacing), edge, "an in-place tick: no shift");
+});
+
+// The wiring: Chart.update must apply the shift. A bare Chart (no DOM) with layout and drawing stubbed.
+test("Chart.update follows a new bar at the right edge, and leaves a scrolled-back view put", async () => {
+  const { Chart } = await import("./chart.ts");
+  const b = (time: number): Bar => ({ time, open: 1, high: 1, low: 1, close: 1, volume: 1 });
+  const chartAt = (offset: number, dragging: object | null = null) => {
+    const c = Object.assign(Object.create(Chart.prototype), {
+      rawBars: [b(1), b(2)], bars: [] as Bar[], replayTo: null, barSpacing: 8, offset, dragging, zoomAnchor: null,
+      plotW: () => 800, rightMarginPx: () => 0, recompute() {}, requestDraw() {},
+      rebuildSeries() { this.bars = [...this.rawBars]; },
+    });
+    c.rebuildSeries();
+    return c as { update(bar: Bar): void; offset: number };
+  };
+  const edge = 800 - 8; // plotW - rightMargin - (n - 1) * spacing, with n = 2
+  const live = chartAt(edge);
+  live.update(b(3));
+  assert.equal(live.offset, edge - 8, "at the edge: follows");
+  const back = chartAt(edge + 200);
+  back.update(b(3));
+  assert.equal(back.offset, edge + 200, "scrolled back: stays put");
+  const held = chartAt(edge, { startOffset: edge });
+  held.update(b(3));
+  assert.equal(held.offset, edge, "mid-drag: the drag owns the offset");
 });

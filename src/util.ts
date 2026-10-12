@@ -1253,6 +1253,17 @@ const MIN_FIT_BARS = 30;
 const MAX_FIT_BARS = 160;
 
 /**
+ * The view offset (x of bar 0) after `added` bars append to a live series.
+ *
+ * A view parked at the right edge (within `tol` px of `edge`, the edge offset before the append)
+ * moves left by the new bars, so the newest bar stays in view as on any live chart. A view the
+ * user scrolled back into history stays put.
+ */
+export function offsetAfterAppend(offset: number, edge: number, tol: number, added: number, spacing: number): number {
+  return added > 0 && Math.abs(offset - edge) < tol ? offset - added * spacing : offset;
+}
+
+/**
  * How far left the viewport may be dragged, in bar widths past the newest bar.
  *
  * Must clear the right margin, or a projection longer than the old fixed ceiling could be drawn

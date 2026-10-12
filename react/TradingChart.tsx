@@ -10,7 +10,7 @@ import { parseScriptDraw, type ScriptRender } from "../src/script";
 import { DARK, LIGHT, THEMES, THEME_NAMES, SERIES_PALETTE as IND_PALETTE, SWATCHES, CMP_COLORS, CHIP_INK } from "../src/util";
 import { CONTROL, DEPTH, ELEV, RADIUS, SHEET, SPACE, TYPE, WEIGHT, Z, cx, themeVars } from "./ui";
 import type { Drawing } from "../src/drawings";
-import type { Bar, DataFeed, IndicatorInstance, LegendValue, PriceLine, Projection, ScaleMode, SeriesType, SessionSpec, Theme, ChartMarker, TradePlan, Zone } from "../src/types";
+import type { Bar, DataFeed, DataFeedResult, Resolution, IndicatorInstance, LegendValue, PriceLine, Projection, ScaleMode, SeriesType, SessionSpec, Theme, ChartMarker, TradePlan, Zone } from "../src/types";
 
 // Drawings persist per symbol in localStorage, so they survive reloads + symbol switches.
 const drawKey = (s: string) => `aurovie-chart-drawings:${s.toUpperCase()}`;
@@ -659,6 +659,48 @@ const GUIDED_PIN_CHOICES = ["cross", "trend", "indicators", "replay", "settings"
 
 type QuickAction = { id: string; label: string; glyph: string; section: "Navigation" | "Chart" | "Analysis" | "Tools"; active?: boolean };
 
+/**
+ * Load one symbol's bars into the chart and stream its ticks; returns the cleanup.
+ *
+ * Ticks are dropped until THIS symbol's bars are in: the subscription opens at once, while the
+ * chart still holds the previous symbol's bars, and an early tick would be merged onto them.
+ * Ticks after cleanup (an old subscription) are dropped by `alive`.
+ */
+export function feedSession(
+  chart: Pick<Chart, "setData" | "update">,
+  feed: DataFeed,
+  symbol: string,
+  resolution: Resolution,
+  onLoad: (res: DataFeedResult) => void,
+  onFail: () => void,
+  onTick: (bar: Bar) => void,
+): () => void {
+  let alive = true;
+  let loaded = false;
+  feed
+    .getBars(symbol, resolution)
+    .then((res) => {
+      if (!alive) return;
+      chart.setData(res.bars, res.dataVersion);
+      loaded = true;
+      onLoad(res);
+    })
+    .catch(() => {
+      if (!alive) return;
+      chart.setData([], undefined);
+      onFail();
+    });
+  const unsub = feed.subscribe?.(symbol, resolution, (bar) => {
+    if (!alive || !loaded) return;
+    chart.update(bar);
+    onTick(bar);
+  });
+  return () => {
+    alive = false;
+    unsub?.();
+  };
+}
+
 export function TradingChart({
   datafeed,
   symbol,
@@ -1090,14 +1132,14 @@ export function TradingChart({
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
-    let alive = true;
     setLoading(true);
-    datafeed
-      .getBars(symbol, resolution)
-      .then((res) => {
-        if (!alive) return;
+    return feedSession(
+      chart,
+      datafeed,
+      symbol,
+      resolution,
+      (res) => {
         setLoading(false);
-        chart.setData(res.bars, res.dataVersion);
         const newest = res.bars[res.bars.length - 1] ?? null;
         setLatest(newest);
         setBoxEff(chart.getBrickSize()); // auto box depends on the freshly loaded data
@@ -1105,24 +1147,15 @@ export function TradingChart({
         // `setData` fits the series afresh, which would silently discard the range the strip is
         // still showing as selected — so the active preset is re-asserted over the new bars.
         rangeApplyRef.current(activeRangeRef.current, newest?.time);
-      })
-      .catch(() => {
-        if (!alive) return;
+      },
+      () => {
         setLoading(false);
-        chart.setData([], undefined);
         setLatest(null);
-      });
-    const unsub = datafeed.subscribe?.(symbol, resolution, (bar) => {
-      if (!alive) return;
-      chart.update(bar);
+      },
       // A realtime tick moves the newest bar, so the at-rest legend has to follow it — otherwise
       // the resting readout freezes at the price the chart happened to load with.
-      setLatest((cur) => (cur && bar.time < cur.time ? cur : bar));
-    });
-    return () => {
-      alive = false;
-      unsub?.();
-    };
+      (bar) => setLatest((cur) => (cur && bar.time < cur.time ? cur : bar)),
+    );
   }, [datafeed, symbol, resolution]);
 
   // Honour a host-driven resolution change AFTER mount (e.g. an MC pane's range buttons, or a masthead

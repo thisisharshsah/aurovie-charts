@@ -62,6 +62,7 @@ import {
   SERIES_PALETTE as PALETTE,
   SIGNAL_COLOR,
   placeAxisTag,
+  offsetAfterAppend,
 } from "./util";
 
 const RIGHT_AXIS_W = 64;
@@ -360,8 +361,13 @@ export class Chart {
     if (bar.time === last.time) this.rawBars[n - 1] = bar;
     else if (bar.time > last.time) this.rawBars.push(bar);
     else return;
+    const before = this.n();
+    const edge = this.realtimeEdge();
     this.rebuildSeries();
     this.recompute();
+    // A view parked at the right edge follows the new bar; one scrolled back stays where it is. A drag
+    // or an eased zoom sets the offset itself every frame, so it owns the view until it ends.
+    if (!this.dragging && !this.zoomAnchor) this.offset = offsetAfterAppend(this.offset, edge.offset, edge.tol, this.n() - before, this.barSpacing);
     this.requestDraw();
   }
   // Derive the DISPLAY series from the raw time bars for the current type. Time-based types (candles,
@@ -1122,14 +1128,19 @@ export class Chart {
   priceAtY(y: number): number {
     return this.yToPrice(this.panes[0], y);
   }
+  // Where the offset sits when the newest bar is parked at the right, and how close counts as "there".
+  private realtimeEdge() {
+    const pw = this.plotW();
+    const offset = pw - this.rightMarginPx() - (this.n() - 1) * this.barSpacing;
+    const tol = this.barSpacing > MAX_BAR_SPACING ? Math.min(this.barSpacing * 3, pw / 4) : this.barSpacing * 3;
+    return { offset, tol };
+  }
   // Report view state (is the last bar parked at the right? is the price scale on auto?) to the host,
   // but only when `atRealtime` actually flips — so panning doesn't spam the host every frame.
   private emitViewChange() {
-    const pw = this.plotW();
-    if (pw <= 0 || !this.n()) return;
-    const realtimeOffset = pw - this.rightMarginPx() - (this.n() - 1) * this.barSpacing;
-    const tol = this.barSpacing > MAX_BAR_SPACING ? Math.min(this.barSpacing * 3, pw / 4) : this.barSpacing * 3;
-    const at = Math.abs(this.offset - realtimeOffset) < tol;
+    if (this.plotW() <= 0 || !this.n()) return;
+    const edge = this.realtimeEdge();
+    const at = Math.abs(this.offset - edge.offset) < edge.tol;
     const auto = this.priceZoom === 1;
     // Only notify the host when a button state actually FLIPS — otherwise a pan/zoom would re-render
     // the whole React widget on every pointer move / wheel event and visibly stutter the gesture.
