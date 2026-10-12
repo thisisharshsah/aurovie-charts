@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.18.1] - 2026-10-12
+
+### Fixed
+
+0.18.0 was published from the build before its review fixes. This release carries them:
+
+- **Permutation Entropy's order is capped at 5** (120 orderings). At 7 the per-tick
+  recompute could make live ticks stutter on long histories.
+- **Phasor refuses bad inputs:** a non-integer or non-positive period, or an EMA under 2,
+  gives gaps instead of meaningless values.
+- **The phasor dial's backdrop is half see-through,** so the live end of the phase line
+  under it still shows.
+- **The legend names the unit:** `Phasor 20 θ°`.
+
 ## [0.18.0] - 2026-10-12
 
 ### Added
