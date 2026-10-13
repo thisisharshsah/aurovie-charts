@@ -239,3 +239,15 @@ test("bottomBarParts: ranges keeps the strip and drops the tools; booleans uncha
   assert.deepEqual(bottomBarParts(false), { ranges: false, tools: false });
   assert.deepEqual(bottomBarParts("ranges"), { ranges: true, tools: false });
 });
+
+// Wiring, not just the helpers: reverting a call site must fail the suite.
+test("0.20 wiring: the bar gates its tools on barParts, presets keep minorGrid, chart.ts fades minors on both axes", () => {
+  const tc = readFileSync(new URL("TradingChart.tsx", import.meta.url), "utf8");
+  assert.match(tc, /const barParts = bottomBarParts\(controls\)/);
+  assert.match(tc, /\{barParts\.ranges && rangeList\.length > 0 && \(/);
+  assert.match(tc, /\{barParts\.tools && !compact && \(/);
+  assert.match(tc, /\{!barParts\.tools \? null : compact \?/);
+  assert.match(tc, /THEMES\[themeName\][^\n]*minorGrid: themeOverride\?\.minorGrid/);
+  const chart = readFileSync(new URL("../src/chart.ts", import.meta.url), "utf8");
+  assert.equal(chart.match(/minorLineAlpha\(t, /g)?.length, 2);
+});

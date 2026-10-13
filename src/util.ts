@@ -474,13 +474,13 @@ export function timeGridMarks(
  * `from`, and is fully drawn just before the step halves — at which point those same lines BECOME
  * the majors, so the grid a reader sees is continuous through the change.
  */
+export function minorGridAlpha(majorGapPx: number, from = 44, to = 80): number {
+  return clamp((majorGapPx - from) / (to - from), 0, 1);
+}
+
 /** Stroke alpha of a minor gridline from its fade (0–1): fainter than a major, or 0 when the theme turns minors off. */
 export function minorLineAlpha(t: Pick<Theme, "minorGrid">, fade: number): number {
   return t.minorGrid === false ? 0 : 0.55 * fade;
-}
-
-export function minorGridAlpha(majorGapPx: number, from = 44, to = 80): number {
-  return clamp((majorGapPx - from) / (to - from), 0, 1);
 }
 
 // ---- indicator maths (pure) ----------------------------------------------

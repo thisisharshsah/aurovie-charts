@@ -13,8 +13,9 @@ All notable changes to this project are documented here. The format follows
   VPVR, data window, Auto / Log / % and the gear (the compact gear too). `true` and `false` are
   unchanged.
 - **`Theme.minorGrid`**: `false` turns off the in-between gridlines added in 0.16 on both the
-  price and time axes, leaving only the major rules (the pre-0.16 grid). Axis labels are
-  unaffected. Absent or `true` draws exactly what 0.19.0 drew.
+  price and time axes, leaving only the major rules (no in-between lines). Axis labels are
+  unaffected. Absent or `true` draws exactly what 0.19.0 drew. Like the size scale, it is the
+  host's and holds under every named theme preset, not only Auto.
 
 ### Notes
 

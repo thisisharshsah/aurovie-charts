@@ -26,7 +26,7 @@ export interface Theme {
   grid: string;
   /**
    * The in-between (minor) gridlines added in 0.16, on the price and time axes. Default on;
-   * `false` draws only the major rules, the pre-0.16 grid. Labels are unaffected.
+   * `false` draws only the major rules (no in-between lines). Labels are unaffected.
    */
   minorGrid?: boolean;
   border: string;
