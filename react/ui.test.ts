@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { CONTROL, DEPTH, RADIUS, SHEET, SPACE, TYPE, contrast, cx, readable, themeVars } from "./ui";
+import { CONTROL, DEPTH, RADIUS, SHEET, SPACE, TYPE, contrast, cx, legendExtraParts, legendVolume, readable, themeVars } from "./ui";
 import { DARK, LIGHT, THEMES } from "../src/util";
 
 // The failure this exists to prevent: the widget paints every SELECTED control's label in
@@ -157,4 +157,36 @@ test("inline size fallbacks in the components stay on the 0.16 px", () => {
     for (const [, name, px] of src.matchAll(/var\((--ac-(?:r|h|hit)-[\w-]+),\s*(\d+)px\)/g))
       assert.ok(Number(px) === want[name] || offScale.has(`${name} ${px}`), `${f}: ${name} falls back to ${px}px`);
   }
+});
+
+// The legend's V: compact, and an unknown (absent, NaN, or the 0 volume-less feeds send) is a dash.
+test("legend volume is compact and never a confident zero", () => {
+  assert.equal(legendVolume(undefined), "\u2014");
+  assert.equal(legendVolume(null), "\u2014");
+  assert.equal(legendVolume(NaN), "\u2014");
+  assert.equal(legendVolume(0), "\u2014");
+  assert.equal(legendVolume(999), "999");
+  assert.equal(legendVolume(1_000), "1K");
+  assert.equal(legendVolume(870_000), "870K");
+  assert.equal(legendVolume(41_200_000), "41.2M");
+  assert.equal(legendVolume(1.25e9), "1.25B");
+});
+
+// Host figures (Today, YTD) print as given; an unknown is a neutral dash whatever its tone.
+test("legend extras print the host's text, a null as an em dash, tone as theme ink", () => {
+  assert.deepEqual(legendExtraParts(undefined), []);
+  assert.deepEqual(
+    legendExtraParts([
+      { label: "Today", value: "+1.24%", tone: "up" },
+      { label: "YTD", value: null, tone: "down" },
+      { label: "Prev", value: "-0.50%", tone: "down" },
+      { label: "Note", value: "flat" },
+    ]),
+    [
+      { label: "Today", text: "+1.24%", color: "var(--ac-up-ink)" },
+      { label: "YTD", text: "\u2014", color: "var(--ac-text)" },
+      { label: "Prev", text: "-0.50%", color: "var(--ac-down-ink)" },
+      { label: "Note", text: "flat", color: "var(--ac-ink)" },
+    ],
+  );
 });

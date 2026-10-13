@@ -25,7 +25,7 @@
 // so one static sheet serves every theme, every host override, and both light and dark, and a
 // theme change repaints without re-rendering a single rule.
 import type { CSSProperties } from "react";
-import { alpha, mix } from "../src/util";
+import { alpha, fmtVolume, mix } from "../src/util";
 import type { Theme } from "../src/types";
 
 /**
@@ -437,6 +437,37 @@ export const SHEET = `
   [data-aurovie-chart] *, [data-aurovie-ticket] * { transition-duration: 1ms !important; animation-duration: 1ms !important; }
 }
 `;
+
+/* ── The legend line ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * A bar's volume for the legend: compact (41.2M, 870K, 1.25B), or an em dash when the bar carries
+ * none. Zero is a dash too, the rule the bar-detail panel already used: feeds that have no volume
+ * (indices, some FX) send 0, and printing a confident "0" for an unknown is the K5 mistake.
+ * The cost is that a genuinely zero-volume bar also reads "—".
+ */
+export const legendVolume = (v: number | null | undefined): string =>
+  v === null || v === undefined || !Number.isFinite(v) || v === 0 ? "\u2014" : fmtVolume(v);
+
+/** A host figure appended to the legend line (Today, YTD …). The host computes it; the widget only prints it. */
+export interface LegendExtra {
+  label: string;
+  /** Already formatted by the host. `null` = unknown, printed as an em dash. */
+  value: string | null;
+  tone?: "up" | "down" | "neutral";
+}
+
+/**
+ * The extras as printable parts. Tone maps to the theme's existing up/down inks, else the plain
+ * ink; an unknown value is a neutral em dash whatever tone it was given (an unknown has no side).
+ */
+export function legendExtraParts(extras: readonly LegendExtra[] | undefined): { label: string; text: string; color: string }[] {
+  return (extras ?? []).map((e) => {
+    const known = e.value !== null && e.value !== "";
+    const color = !known ? "var(--ac-text)" : e.tone === "up" ? "var(--ac-up-ink)" : e.tone === "down" ? "var(--ac-down-ink)" : "var(--ac-ink)";
+    return { label: e.label, text: known ? e.value! : "\u2014", color };
+  });
+}
 
 /** Join class names, dropping anything falsy — `cx("ac-btn", on && "is-on")`. */
 export const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");

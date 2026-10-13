@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.19.0] - 2026-10-12
+
+### Added
+
+- **V on the OHLC legend.** The `ohlc` readout (and `auto` on an OHLC series) now prints
+  `O H L C V` on one line: the hovered bar's volume, compact (`41.2M`, `870K`, `1.25B`), or an em
+  dash when the bar has none. A volume of 0 also prints a dash, since volume-less feeds send 0;
+  the bar-detail panel uses the same rule (`legendVolume`). The close-based `price` readout
+  stays price-only: that series draws no volume.
+- **`legendExtras` prop** on `TradingChart`: `{ label, value: string | null, tone?: "up" | "down" |
+  "neutral" }[]`, printed on the SAME legend line after the bar readout as ` · label value`.
+  Values are the host's own formatted figures (Today, YTD …); the widget does no arithmetic on
+  them. `null` prints an em dash in plain text colour, whatever the tone. `tone` uses the theme's
+  existing up/down inks as text (not chips; no new colours). Extras do not follow the crosshair.
+  Opt-in: with no extras the legend is unchanged apart from V. `legendVolume`,
+  `legendExtraParts` and the `LegendExtra` type are exported from `./react`.
+
+### Removed
+
+- The widget's private `fmtVol` copy; the legend and the detail panel use the engine's
+  `fmtVolume` through `legendVolume`.
+
 ## [0.18.1] - 2026-10-12
 
 ### Fixed

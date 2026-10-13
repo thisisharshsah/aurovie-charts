@@ -8,7 +8,8 @@ import { Icon, hasIcon } from "./icons";
 import { ScriptEditor, type ScriptError, type ScriptPreset, type ScriptScorecard, type ScriptSweep, type SavedStrategy } from "./ScriptEditor";
 import { parseScriptDraw, type ScriptRender } from "../src/script";
 import { DARK, LIGHT, THEMES, THEME_NAMES, SERIES_PALETTE as IND_PALETTE, SWATCHES, CMP_COLORS, CHIP_INK } from "../src/util";
-import { CONTROL, DEPTH, ELEV, H, R, SHEET, SPACE, TYPE, WEIGHT, Z, cx, themeVars } from "./ui";
+import { CONTROL, DEPTH, ELEV, H, R, SHEET, SPACE, TYPE, WEIGHT, Z, cx, legendExtraParts, legendVolume, themeVars } from "./ui";
+import type { LegendExtra } from "./ui";
 import type { Drawing } from "../src/drawings";
 import type { Bar, DataFeed, DataFeedResult, Resolution, IndicatorInstance, LegendValue, PriceLine, Projection, ScaleMode, SeriesType, SessionSpec, Theme, ChartMarker, TradePlan, Zone } from "../src/types";
 
@@ -184,6 +185,17 @@ export interface TradingChartProps {
    * the instrument, where leaving it would print the same word a third time in one screenful.
    */
   legend?: "auto" | "ohlc" | "price" | "none";
+  /**
+   * Host figures printed on the SAME legend line, after the bar readout, each as ` · label value`
+   * (e.g. Today and YTD). The host computes and formats them; the widget never does arithmetic on
+   * them. `value: null` prints an em dash. `tone` picks the theme's up/down ink (plain ink
+   * otherwise) as text, not a chip. They do not follow the crosshair: they describe the
+   * instrument, not the hovered bar. Hidden with the rest of the legend under `legend="none"`.
+   *
+   * The OHLC readout also prints `V` (the hovered bar's volume, em dash when absent). A close-based
+   * readout does not: the series draws no volume, the same reason it prints no high or low.
+   */
+  legendExtras?: LegendExtra[];
   /**
    * Mirror of the crosshair readout the widget already renders in its own legend, so a host can
    * drive chrome OUTSIDE the chart from the hovered bar (a price header that follows the scrub,
@@ -721,6 +733,7 @@ export function TradingChart({
   indicators,
   chartType: chartTypeProp,
   legend: legendProp,
+  legendExtras,
   compareSymbols,
   sr,
   overlay,
@@ -2306,9 +2319,15 @@ export function TradingChart({
                     {(legendBar.close - legendBar.open).toFixed(2)}
                     {legendBar.open ? ` (${(((legendBar.close - legendBar.open) / legendBar.open) * 100).toFixed(2)}%)` : ""}
                   </span>
-                  {legendBar.volume && legendShows === "ohlc" ? <span>Vol {fmtVol(legendBar.volume)}</span> : null}
+                  {legendShows === "ohlc" && <span>V <b style={{ color: "var(--ac-ink)" }}>{legendVolume(legendBar.volume)}</b></span>}
                 </>
               )}
+              {legendExtraParts(legendExtras).map((x) => (
+                <span key={x.label}>
+                  {"\u00b7 "}
+                  {x.label} <b style={{ color: x.color }}>{x.text}</b>
+                </span>
+              ))}
             </div>
             {/* interactive indicator legend — hover a chip to step its period or remove it */}
             {/* CLEAR ALL — one action for what was N.
@@ -2492,7 +2511,7 @@ export function TradingChart({
                         ["Close", legend.bar.close.toFixed(2), barCol],
                         ["Chg O→C", `${legend.bar.close - legend.bar.open >= 0 ? "+" : ""}${(legend.bar.close - legend.bar.open).toFixed(2)}`, legend.bar.close >= legend.bar.open ? "var(--ac-up-ink)" : "var(--ac-down-ink)"],
                         ["Chg %", `${legend.bar.open ? (((legend.bar.close - legend.bar.open) / legend.bar.open) * 100).toFixed(2) : "0.00"}%`, legend.bar.close >= legend.bar.open ? "var(--ac-up-ink)" : "var(--ac-down-ink)"],
-                        ["Volume", legend.bar.volume ? fmtVol(legend.bar.volume) : "—", "var(--ac-ink)"],
+                        ["Volume", legendVolume(legend.bar.volume), "var(--ac-ink)"],
                       ] as const
                     ).map(([k, v, c]) => (
                       <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "1.5px 0" }}>
@@ -3255,4 +3274,3 @@ export function TradingChart({
   );
 }
 
-const fmtVol = (v: number) => (v >= 1e9 ? (v / 1e9).toFixed(2) + "B" : v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : v >= 1e3 ? (v / 1e3).toFixed(0) + "K" : String(Math.round(v)));
