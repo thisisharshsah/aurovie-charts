@@ -270,7 +270,10 @@ test("0.20 wiring: the bar gates its tools on barParts, presets keep minorGrid, 
   assert.match(tc, /\{!barParts\.tools \? null : compact \?/);
   assert.match(tc, /THEMES\[themeName\][^\n]*minorGrid: themeOverride\?\.minorGrid/);
   const chart = readFileSync(new URL("../src/chart.ts", import.meta.url), "utf8");
-  assert.equal(chart.match(/minorLineAlpha\(t, /g)?.length, 2);
+  assert.equal(chart.match(/minorLineAlpha\(t, /g)?.length, 1);
+  assert.match(chart, /if \(this\.gridOn\) drawTimeGrid\(ctx, t, marks/);
+  assert.match(chart, /t\.candleGrid \? smoothstep\(0, 1, minorGridAlpha\(gap\)\) : minorGridAlpha\(gap\)/);
+  assert.match(tc, /THEMES\[themeName\][^\n]*candleGrid: themeOverride\?\.candleGrid/);
 });
 
 test("only the range strip scrolls in the bottom bar; settings, footer and tools stay fixed", () => {

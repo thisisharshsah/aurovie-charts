@@ -3,8 +3,8 @@
 // definitions: NaN padding, the exact formulas, and the invariants each family must hold.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { permEntropy, phasor, ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange, fitBarCount, visibleIndexRange, offsetAfterAppend, DARK, THEMES, timeGridMarks, minorGridAlpha, minorLineAlpha, sectionKey, SECTION_STEPS } from "./util.ts";
-import type { AxisSlot } from "./util.ts";
+import { permEntropy, phasor, ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange, fitBarCount, visibleIndexRange, offsetAfterAppend, DARK, THEMES, timeGridMarks, minorGridAlpha, minorLineAlpha, sectionKey, SECTION_STEPS, candleGridAlpha, drawTimeGrid, crisp } from "./util.ts";
+import type { AxisSlot, GridCtx, TimeMark } from "./util.ts";
 import type { Bar } from "./types.ts";
 
 // A deterministic synthetic series with a real up-leg then a down-leg, so trend indicators must flip.
@@ -517,4 +517,149 @@ test("minorLineAlpha: minors at 0.55 of their fade by default, none with minorGr
   assert.equal(minorLineAlpha({ minorGrid: true }, 0.5), 0.275);
   assert.equal(minorLineAlpha({ ...DARK, minorGrid: false }, 1), 0);
   assert.equal(DARK.minorGrid, undefined);
+});
+
+// ---- Theme.candleGrid (0.21): a line per candle as you zoom in --------------------------------
+
+// A canvas that logs what it is asked to stroke: one entry per stroke(), with its alpha and xs.
+function fakeCtx() {
+  const strokes: { alpha: number; xs: number[]; width: number }[] = [];
+  let xs: number[] = [];
+  const log: string[] = [];
+  const ctx = {
+    strokeStyle: "" as string,
+    lineWidth: 1,
+    globalAlpha: 1,
+    save: () => log.push("save"),
+    restore: () => log.push("restore"),
+    beginPath: () => { xs = []; log.push("begin"); },
+    moveTo: (x: number, y: number) => { xs.push(x); log.push(`m${x},${y}`); },
+    lineTo: (x: number, y: number) => log.push(`l${x},${y}`),
+    stroke: () => { strokes.push({ alpha: ctx.globalAlpha, xs, width: ctx.lineWidth }); log.push(`s${ctx.globalAlpha}/${ctx.lineWidth}/${ctx.strokeStyle}`); },
+  };
+  return { ctx: ctx as unknown as GridCtx, strokes, log };
+}
+const CG = { grid: "#888", candleGrid: true };
+const noBreaks = (f: number, l: number, bs: number) => timeGridMarks(f, l, bs, () => false, () => 0, SECTION_STEPS.intraday);
+// bar -> drawn alpha. x(i) = 100·i so every line maps back to its bar exactly.
+function drawn(bs: number, f = 0, l = 400, t: Parameters<typeof drawTimeGrid>[1] = CG) {
+  const { ctx, strokes } = fakeCtx();
+  drawTimeGrid(ctx, t, noBreaks(f, l, bs), f, l, bs, (i) => i * 100, 1e9, 100);
+  const out = new Map<number, number>();
+  for (const s of strokes) for (const x of s.xs) out.set(Math.round(x / 100), s.alpha);
+  return { out, strokes };
+}
+
+test("candleGridAlpha: continuous — no step anywhere along the zoom", () => {
+  for (const L of [1, 2, 4, 8])
+    for (let bs = 0.5; bs < 200; bs += 0.01) {
+      const d = Math.abs(candleGridAlpha(L, bs + 0.01) - candleGridAlpha(L, bs));
+      assert.ok(d < 0.002, `stride ${L} jumps ${d} at bar spacing ${bs}`);
+    }
+});
+
+test("candleGridAlpha: never fades out as you zoom in, and coarser strides lead finer ones", () => {
+  for (const L of [1, 2, 4, 8])
+    for (let bs = 0.5; bs < 200; bs += 0.05) {
+      assert.ok(candleGridAlpha(L, bs + 0.05) >= candleGridAlpha(L, bs), `stride ${L} dims at ${bs}`);
+      if (L > 1) assert.ok(candleGridAlpha(L, bs) >= candleGridAlpha(L / 2, bs));
+    }
+});
+
+test("candleGridAlpha: per-candle lines at full minor strength zoomed in, none zoomed out", () => {
+  assert.equal(candleGridAlpha(1, 40), 0.55);
+  assert.equal(candleGridAlpha(1, 120), 0.55);
+  assert.equal(candleGridAlpha(1, 8), 0);
+  assert.equal(candleGridAlpha(8, 4), 0, "the gate holds the whole ladder off below 4px candles");
+  assert.ok(candleGridAlpha(1, 20) > 0 && candleGridAlpha(1, 20) < 0.55);
+  assert.equal(candleGridAlpha(16, 40), 0, "the ladder stops at stride 8; coarser lines are the minors'");
+});
+
+test("drawTimeGrid candleGrid: every bar carries a line when zoomed in, only the default grid zoomed out", () => {
+  const near = drawn(40).out;
+  for (let i = 1; i <= 400; i++) assert.ok(near.has(i), `bar ${i} has no line at 40px`);
+  // zoomed out the ladder is gated off: what is drawn is what the default grid draws
+  const far = fakeCtx(), def = fakeCtx();
+  const marks = noBreaks(0, 4000, 2);
+  drawTimeGrid(far.ctx, CG, marks, 0, 4000, 2, (i) => i * 2, 1e9, 100);
+  drawTimeGrid(def.ctx, { grid: "#888" }, marks, 0, 4000, 2, (i) => i * 2, 1e9, 100);
+  const bars = (s: typeof far.strokes) => s.flatMap((k) => k.xs).map((x) => Math.round(x / 2)).sort((a, b) => a - b);
+  assert.deepEqual(bars(far.strokes), bars(def.strokes));
+});
+
+test("drawTimeGrid candleGrid: nested strides — zooming never moves a line, only adds or fades it", () => {
+  let prev: Set<number> | null = null;
+  for (let bs = 3; bs <= 60; bs++) {
+    const { out } = drawn(bs);
+    for (const [i] of out) assert.ok(Number.isInteger(i));
+    const bars = new Set(out.keys());
+    if (prev) for (const i of prev) assert.ok(bars.has(i), `bar ${i}'s line vanished zooming in to ${bs}px`);
+    prev = bars;
+  }
+  // panning: the same bars carry the same lines wherever the view starts
+  const a = drawn(12, 0, 400).out, b = drawn(12, 37, 437).out;
+  for (let i = 37; i <= 400; i++) assert.equal(a.get(i), b.get(i), `bar ${i} changed under a pan`);
+});
+
+test("drawTimeGrid candleGrid: a bar's drawn alpha moves smoothly with the zoom, never pops", () => {
+  for (const i of [1, 2, 3, 4, 6, 8, 12, 16, 24, 33, 64]) {
+    let last = drawn(1).out.get(i) ?? 0;
+    for (let bs = 1.005; bs < 120; bs *= 1.005) { // a wheel notch scales the zoom, so step by ratio
+      const a = drawn(bs, 0, 70).out.get(i) ?? 0;
+      assert.ok(Math.abs(a - last) <= 0.05, `bar ${i}: ${last} -> ${a} at ${bs}px`);
+      assert.ok(a >= last - 1e-9, `bar ${i} dims zooming in at ${bs}px`);
+      last = a;
+    }
+  }
+});
+
+test("drawTimeGrid candleGrid: bounded strokes, one path per alpha, majors last on top", () => {
+  const isB = (i: number) => i % 78 === 0;
+  for (const bs of [0.3, 2, 5, 9, 14, 25, 40, 80]) {
+    const l = 100000;
+    const marks = timeGridMarks(0, l, bs, isB, (i) => Math.floor(i / 78), SECTION_STEPS.intraday);
+    const { ctx, strokes } = fakeCtx();
+    drawTimeGrid(ctx, CG, marks, 0, l, bs, (i) => i * bs, 1e9, 100);
+    assert.ok(strokes.length <= 33, `${strokes.length} strokes at ${bs}px`);
+    assert.equal(strokes[strokes.length - 1].alpha, 1, "majors go last");
+    assert.equal(new Set(strokes.map((s) => s.alpha)).size, strokes.length, "one stroke per alpha");
+  }
+});
+
+test("drawTimeGrid candleGrid: lines sit on the device pixel grid at any devicePixelRatio", () => {
+  for (const dpr of [1, 1.5, 2, 3]) {
+    const { ctx, strokes } = fakeCtx();
+    drawTimeGrid(ctx, CG, noBreaks(0, 50, 23.37), 0, 50, 23.37, (i) => i * 23.37, 1e9, 100, dpr);
+    const lw = strokes[0].width * dpr;
+    assert.equal(Math.round(lw), lw);
+    for (const s of strokes) for (const x of s.xs) assert.ok(Math.abs(x * dpr - lw / 2 - Math.round(x * dpr - lw / 2)) < 1e-9, `blurry at dpr ${dpr}: ${x}`);
+  }
+});
+
+test("drawTimeGrid without candleGrid strokes exactly what 0.20 did", () => {
+  const ref = (ctx: GridCtx, t: { grid: string; minorGrid?: boolean }, marks: TimeMark[], x: (i: number) => number, pw: number, h: number) => {
+    ctx.save();
+    ctx.strokeStyle = t.grid;
+    ctx.lineWidth = 1;
+    for (const m of marks) {
+      const px = x(m.i);
+      if (px < 0 || px > pw) continue;
+      ctx.globalAlpha = m.major ? 1 : minorLineAlpha(t, m.alpha);
+      ctx.beginPath();
+      ctx.moveTo(crisp(px), 0);
+      ctx.lineTo(crisp(px), h);
+      ctx.stroke();
+    }
+    ctx.restore();
+  };
+  const isB = (i: number) => i % 78 === 0;
+  for (const t of [{ grid: "#888" }, { grid: "#888", minorGrid: false }, { grid: "#888", candleGrid: false }])
+    for (const bs of [0.7, 3, 12, 40, 90]) {
+      const marks = timeGridMarks(100, 900, bs, isB, (i) => Math.floor(i / 78), SECTION_STEPS.intraday);
+      const x = (i: number) => (i - 100) * bs - 13.3;
+      const a = fakeCtx(), b = fakeCtx();
+      drawTimeGrid(a.ctx, t, marks, 100, 900, bs, x, 800, 300, 2);
+      ref(b.ctx, t, marks, x, 800, 300);
+      assert.deepEqual(a.log, b.log);
+    }
 });

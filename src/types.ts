@@ -29,6 +29,13 @@ export interface Theme {
    * `false` draws only the major rules (no in-between lines). Labels are unaffected.
    */
   minorGrid?: boolean;
+  /**
+   * Advanced charts (0.21): as you zoom in, every candle gets its own vertical gridline, through
+   * nested power-of-two strides (8, 4, 2, 1 bars) that fade in smoothly by their on-screen gap and
+   * out again as you zoom out; the half-step price lines use the same smooth fade. Default off,
+   * which draws exactly what 0.20 drew. See `candleGridAlpha`.
+   */
+  candleGrid?: boolean;
   border: string;
   text: string;
   textStrong: string;

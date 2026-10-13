@@ -17,6 +17,8 @@ import {
   isTimeBoundary,
   minorGridAlpha,
   minorLineAlpha,
+  smoothstep,
+  drawTimeGrid,
   sectionKey,
   SECTION_STEPS,
   timeGridMarks,
@@ -2227,7 +2229,8 @@ export class Chart {
     if (this.gridOn && p.kind !== "volume" && ticks.length >= 2) {
       const step = ticks[1] - ticks[0];
       const gap = Math.abs(this.priceToY(p, ticks[1]) - this.priceToY(p, ticks[0]));
-      const fade = minorGridAlpha(gap);
+      // candleGrid: the same fade through a smoothstep, so it eases in and out with no kink
+      const fade = t.candleGrid ? smoothstep(0, 1, minorGridAlpha(gap)) : minorGridAlpha(gap);
       const a = minorLineAlpha(t, fade);
       if (fade > 0.02 && a > 0) {
         ctx.save();
@@ -2302,22 +2305,9 @@ export class Chart {
       (i) => sectionKey(this.bars[i].time, this.intraday, this.utc),
       this.intraday ? SECTION_STEPS.intraday : SECTION_STEPS.daily,
     );
-    // Gridlines: majors at full grid strength, minors lighter and scaled by their fade.
-    if (this.gridOn) {
-      ctx.save();
-      ctx.strokeStyle = t.grid;
-      ctx.lineWidth = 1;
-      for (const m of marks) {
-        const px = this.x(m.i);
-        if (px < 0 || px > pw) continue;
-        ctx.globalAlpha = m.major ? 1 : minorLineAlpha(t, m.alpha);
-        ctx.beginPath();
-        ctx.moveTo(crisp(px), 0);
-        ctx.lineTo(crisp(px), this.plotH());
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
+    // Gridlines: majors at full grid strength, minors lighter and scaled by their fade (and, with
+    // `candleGrid`, a line per candle as you zoom in) — see `drawTimeGrid`.
+    if (this.gridOn) drawTimeGrid(ctx, t, marks, lo, hi, this.barSpacing, (i) => this.x(i), pw, this.plotH(), this.dpr);
     // Labels: majors claim their room first, so a faint in-between time can never crowd out the
     // date that opens a section. A label only appears once its mark is most of the way in.
     const taken: [number, number][] = [];

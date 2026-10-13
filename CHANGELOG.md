@@ -4,6 +4,33 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.21.0] - 2026-10-13
+
+### Added
+
+- **`Theme.candleGrid`** (owner, 2026-10-13, for advanced charts): as you zoom in, every candle
+  gets its own vertical gridline, and the lines fade back out as you zoom out. The lines sit on
+  nested power-of-two strides (8, 4, 2, 1 bars), so zooming never moves a line. It only changes
+  how strong the line is. Each stride's alpha is
+  `0.55 × smoothstep(8, 40, stride × barSpacing px) × smoothstep(4, 14, barSpacing px)`
+  (`candleGridAlpha`, thresholds in `CANDLE_GRID`), capped by the theme's grid alpha. The first
+  term fades a stride in by the gap between its lines. The second keeps the whole ladder off
+  below 4 px candles, so a zoomed-out chart draws exactly the default grid. A line that is also
+  one of 0.16's minors takes the stronger of the two alphas. Majors (section breaks) are
+  unchanged and drawn last, on top. The half-step price lines use the same smoothstep fade.
+  Default off: every existing host draws exactly what 0.20 drew. Like `minorGrid`, it holds under
+  the named theme presets.
+
+### Changed
+
+- **The time grid draws through `drawTimeGrid`**, a pure function of the marks and the zoom that
+  can be tested with a fake canvas. Without `candleGrid` it issues the same canvas calls as the
+  0.20 loop (a test compares the two). With `candleGrid` it allocates nothing per line. It
+  batches lines into one path per alpha (32 buckets, each within 1/64 of the computed alpha) plus
+  one path for the majors, so a frame makes at most 33 strokes however long the series. Strides
+  that would draw at near-zero alpha are skipped. Lines snap to the device-pixel grid, so they
+  stay crisp at 1.5× and 3× as well as 1× and 2×.
+
 ## [0.20.1] - 2026-10-13
 
 0.20.0 was published from the build before its last round. This release carries it:

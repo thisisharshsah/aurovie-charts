@@ -483,6 +483,145 @@ export function minorLineAlpha(t: Pick<Theme, "minorGrid">, fade: number): numbe
   return t.minorGrid === false ? 0 : 0.55 * fade;
 }
 
+/** Hermite smoothstep: 0 at `lo`, 1 at `hi`, zero slope at both ends (so a fade never kinks). */
+export function smoothstep(lo: number, hi: number, v: number): number {
+  const x = clamp((v - lo) / (hi - lo), 0, 1);
+  return x * x * (3 - 2 * x);
+}
+
+/**
+ * `Theme.candleGrid` thresholds, in CSS px. A ladder line of stride `L` bars (L = 1, 2, 4, 8) is
+ * `L × barSpacing` from its neighbours of the same stride: invisible below `from`, full from `to`.
+ * `gateFrom`/`gateTo` gate the whole ladder on the candle gap itself, so a zoomed-out chart is
+ * left exactly as the default grid draws it.
+ */
+export const CANDLE_GRID = { from: 8, to: 40, gateFrom: 4, gateTo: 14, depth: 8 } as const;
+
+/**
+ * Stroke alpha (0–0.55, the minor strength) of a candle-ladder line whose stride `level` is the
+ * largest power of two dividing its bar index (`i & -i`). Smooth and non-decreasing in the zoom;
+ * strides nest, so zooming never moves a line, it only changes this.
+ */
+export function candleGridAlpha(level: number, barSpacing: number): number {
+  const g = CANDLE_GRID;
+  if (!(level >= 1) || level > g.depth) return 0;
+  return 0.55 * smoothstep(g.from, g.to, level * barSpacing) * smoothstep(g.gateFrom, g.gateTo, barSpacing);
+}
+
+/** The canvas surface the time grid strokes through (a fake one in tests). */
+export type GridCtx = Pick<
+  CanvasRenderingContext2D,
+  "save" | "restore" | "beginPath" | "moveTo" | "lineTo" | "stroke" | "strokeStyle" | "lineWidth" | "globalAlpha"
+>;
+
+// Reused across frames: the candle ladder allocates nothing per line.
+const GRID_Q = 32; // alpha buckets: a line's drawn alpha is within 1/64 of its computed one
+let gridIdx = new Int32Array(256);
+let gridQ = new Uint8Array(256);
+const gridCount = new Uint16Array(GRID_Q + 1);
+
+/**
+ * The vertical gridlines for `marks` (from `timeGridMarks` over bars `f..l`); `x(i)` is a bar's
+ * position, `h` the plot height. Without `t.candleGrid` this is exactly the 0.16–0.20 loop.
+ *
+ * With it, any bar may carry a line: alpha = max(its minor mark's, `candleGridAlpha`), batched
+ * into one path per alpha bucket plus one for the majors, drawn last so they read on top. Strokes
+ * per frame are ≤ GRID_Q + 1 however long the series. Lines snap to the device pixel grid, so a
+ * 1.5× or 3× screen keeps them crisp.
+ */
+export function drawTimeGrid(
+  ctx: GridCtx,
+  t: Pick<Theme, "grid" | "minorGrid" | "candleGrid">,
+  marks: readonly TimeMark[],
+  f: number,
+  l: number,
+  barSpacing: number,
+  x: (i: number) => number,
+  pw: number,
+  h: number,
+  dpr = 1,
+): void {
+  ctx.save();
+  ctx.strokeStyle = t.grid;
+  ctx.lineWidth = 1;
+  if (!t.candleGrid) {
+    for (const m of marks) {
+      const px = x(m.i);
+      if (px < 0 || px > pw) continue;
+      ctx.globalAlpha = m.major ? 1 : minorLineAlpha(t, m.alpha);
+      ctx.beginPath();
+      ctx.moveTo(crisp(px), 0);
+      ctx.lineTo(crisp(px), h);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+  const lw = Math.max(1, Math.round(dpr)); // device px
+  ctx.lineWidth = lw / dpr;
+  const snap = (v: number) => (Math.round(v * dpr - lw / 2) + lw / 2) / dpr;
+  const a1 = candleGridAlpha(1, barSpacing);
+  const a2 = candleGridAlpha(2, barSpacing);
+  const a4 = candleGridAlpha(4, barSpacing);
+  const a8 = candleGridAlpha(8, barSpacing);
+  const fine = (i: number) => {
+    const b = i & -i;
+    return b === 1 ? a1 : b === 2 ? a2 : b === 4 ? a4 : b === 8 ? a8 : 0;
+  };
+  // Below the gate there is no ladder, so only the marks are walked (a zoomed-out view can hold
+  // thousands of bars).
+  const ladder = a1 + a2 + a4 + a8 > 0;
+  const cap = ladder ? Math.max(0, l - f + 1) : marks.length;
+  if (gridIdx.length < cap) {
+    gridIdx = new Int32Array(cap * 2);
+    gridQ = new Uint8Array(cap * 2);
+  }
+  gridCount.fill(0);
+  let n = 0;
+  let hasMajor = false;
+  const push = (i: number, a: number) => {
+    const q = Math.round(Math.min(1, a) * GRID_Q);
+    if (q === 0) return; // ~invisible: no stroke
+    gridIdx[n] = i;
+    gridQ[n++] = q;
+    gridCount[q]++;
+  };
+  if (ladder) {
+    let m = 0;
+    for (let i = f; i <= l; i++) {
+      while (m < marks.length && marks[m].i < i) m++;
+      const mk = m < marks.length && marks[m].i === i ? marks[m] : null;
+      if (mk?.major) hasMajor = true;
+      else push(i, Math.max(mk ? minorLineAlpha(t, mk.alpha) : 0, fine(i)));
+    }
+  } else {
+    for (const mk of marks) {
+      if (mk.major) hasMajor = true;
+      else push(mk.i, minorLineAlpha(t, mk.alpha));
+    }
+  }
+  const line = (i: number) => {
+    const px = x(i);
+    if (px < 0 || px > pw) return;
+    ctx.moveTo(snap(px), 0);
+    ctx.lineTo(snap(px), h);
+  };
+  for (let q = 1; q <= GRID_Q; q++) {
+    if (!gridCount[q]) continue;
+    ctx.globalAlpha = q / GRID_Q;
+    ctx.beginPath();
+    for (let k = 0; k < n; k++) if (gridQ[k] === q) line(gridIdx[k]);
+    ctx.stroke();
+  }
+  if (hasMajor) {
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    for (const mk of marks) if (mk.major) line(mk.i);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 // ---- indicator maths (pure) ----------------------------------------------
 // NaN-padded so index i of the output aligns with bar i.
 export function sma(src: number[], p: number): number[] {

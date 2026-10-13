@@ -1055,12 +1055,12 @@ export function TradingChart({
   // "Auto" follows the host app (theme prop + design-token override, so it stays on-brand); a
   // named preset from THEMES takes over the colours. Persisted, so the user's pick sticks.
   const th: Theme = useMemo(
-    // The host's SIZE scale (controlHeights / radii) and grid density (minorGrid) are not a look
+    // The host's SIZE scale (controlHeights / radii) and grid density (minorGrid, candleGrid) are not a look
     // the preset owns, so they hold under every preset, not only Auto.
     () =>
       themeName === "Auto"
         ? { ...(theme === "light" ? LIGHT : DARK), ...(themeOverride ?? {}) }
-        : { ...(THEMES[themeName] ?? DARK), controlHeights: themeOverride?.controlHeights, radii: themeOverride?.radii, minorGrid: themeOverride?.minorGrid },
+        : { ...(THEMES[themeName] ?? DARK), controlHeights: themeOverride?.controlHeights, radii: themeOverride?.radii, minorGrid: themeOverride?.minorGrid, candleGrid: themeOverride?.candleGrid },
     [themeName, theme, themeOverride],
   );
 
