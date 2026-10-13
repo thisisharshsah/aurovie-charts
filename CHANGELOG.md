@@ -13,9 +13,11 @@ All notable changes to this project are documented here. The format follows
   dash when the bar has none. A volume of 0 also prints a dash, since volume-less feeds send 0;
   the bar-detail panel uses the same rule (`legendVolume`).
 - **V on the `auto` close-based legend.** Under `legend="auto"` a line/area/step/baseline series
-  prints the price plus `V` when the hovered bar carries a volume (nothing when it has none, so an
-  index line gets no `V —`). A forced `legend="price"` stays price-only. `legendLine` (exported
-  from `./react`) is the one place that decides what the line prints.
+  prints the price plus `V` when the series carries volume (any loaded bar, or a live tick, with
+  volume > 0). V is then steady: a zero-volume hovered bar reads `V —` rather than V vanishing.
+  A series with no volume anywhere (an index) prints no V. A forced `legend="price"` stays
+  price-only. `legendLine` (exported from `./react`, now one options object) is the one place
+  that decides what the line prints.
 - **`legendExtras` prop** on `TradingChart`: `{ label, value: string | null, tone?: "up" | "down" |
   "neutral" }[]`, printed on the SAME legend line after the bar readout as ` · label value`.
   Values are the host's own formatted figures (Today, YTD …); the widget does no arithmetic on
@@ -30,7 +32,10 @@ All notable changes to this project are documented here. The format follows
   and its %): the host's Today/YTD sit on the same line, and on the OHLC readout O and C already
   carry it. Chosen over a new `legendBarChange` prop as the smaller change; with no extras the
   change prints as before.
-
+- **Simple charts never print the symbol/interval chip.** `mode="simple"` still defaults the
+  legend to `"none"`; a host that passes an explicit readout (e.g. `legend="auto"` to show its
+  Today/YTD extras) now gets the bar readout and extras without the ticker and TF chip, which
+  the host's own header already names.
 - The legend's volume label is `V` (was `Vol`) and its value is bold ink like O/H/L/C. It now
   always shows on the OHLC readout, so a volume-less OHLC feed reads `V —` where it showed nothing.
 - `legendExtras` wrap only as one group: on a narrow chart they move to the next line together,

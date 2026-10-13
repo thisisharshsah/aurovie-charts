@@ -176,13 +176,16 @@ export interface TradingChartProps {
    *
    * `"auto"` (default) keys on the series type: an OHLC series (candles, bars, heikin…) gets the
    * full `O H L C V` readout, while a close-based one (line, area, step, baseline) gets the price
-   * and its change, plus `V` when the bar carries a volume. That is not a cosmetic trim — a line chart DRAWS only the close, so
-   * printing a high and a low beside it reports two numbers the reader cannot see and did not
-   * ask for, and invites them to read a range off a shape that has none.
+   * and its change, plus `V` when the series carries volume. That is not a cosmetic trim — a line
+   * chart DRAWS only the close, so printing a high and a low beside it reports two numbers the
+   * reader cannot see and did not ask for, and invites them to read a range off a shape that has
+   * none.
    *
-   * `"ohlc"` and `"price"` force either regardless of series (a forced `"price"` prints no V); `"none"` removes the on-canvas
-   * legend entirely — ticker and interval included — for hosts whose own header already carries
-   * the instrument, where leaving it would print the same word a third time in one screenful.
+   * `"ohlc"` and `"price"` force either regardless of series (a forced `"price"` prints no V);
+   * `"none"` removes the on-canvas legend entirely — ticker and interval included — for hosts whose
+   * own header already carries the instrument, where leaving it would print the same word a third
+   * time in one screenful. Under `mode="simple"` (default `"none"`) an explicit readout prints
+   * without the ticker and interval chip, for the same reason. See `legendLine`.
    */
   legend?: "auto" | "ohlc" | "price" | "none";
   /**
@@ -850,6 +853,9 @@ export function TradingChart({
   // A chart at rest showing only a ticker symbol makes the reader move the mouse to learn the
   // price it is already displaying.
   const [latest, setLatest] = useState<Bar | null>(null);
+  // Whether the loaded series carries volume at all — the "auto" close-based legend keys V on
+  // this, not on the hovered bar, so one zero bar does not make V blink out.
+  const [seriesVolume, setSeriesVolume] = useState(false);
   const [selection, setSelection] = useState<{ id: number; color?: string; width?: number; style?: "solid" | "dashed" | "dotted"; x: number; y: number } | null>(null);
   const [objects, setObjects] = useState<Drawing[]>([]); // the objects-panel list (mirrors the engine's drawings)
   const [objectsOpen, setObjectsOpen] = useState(false);
@@ -1165,6 +1171,7 @@ export function TradingChart({
         setLoading(false);
         const newest = res.bars[res.bars.length - 1] ?? null;
         setLatest(newest);
+        setSeriesVolume(res.bars.some((b) => (b.volume ?? 0) > 0));
         setBoxEff(chart.getBrickSize()); // auto box depends on the freshly loaded data
         chart.setDrawings(loadDrawings(symbol)); // restore this symbol's saved drawings
         // `setData` fits the series afresh, which would silently discard the range the strip is
@@ -1174,10 +1181,14 @@ export function TradingChart({
       () => {
         setLoading(false);
         setLatest(null);
+        setSeriesVolume(false);
       },
       // A realtime tick moves the newest bar, so the at-rest legend has to follow it — otherwise
       // the resting readout freezes at the price the chart happened to load with.
-      (bar) => setLatest((cur) => (cur && bar.time < cur.time ? cur : bar)),
+      (bar) => {
+        setLatest((cur) => (cur && bar.time < cur.time ? cur : bar));
+        if ((bar.volume ?? 0) > 0) setSeriesVolume(true);
+      },
     );
   }, [datafeed, symbol, resolution]);
 
@@ -1675,7 +1686,14 @@ export function TradingChart({
   const legendBar = legend.bar ?? (overProjection ? null : latest);
   // Resolved against the LIVE series type, not the seeded prop — the user's own toolbar pick
   // is what is on screen, so switching candles→line under "auto" has to follow.
-  const line = legendLine(legendMode, OHLC_SERIES.includes(type), legendBar?.volume, legendExtras?.length ?? 0);
+  const line = legendLine({
+    mode: legendMode,
+    ohlcSeries: OHLC_SERIES.includes(type),
+    seriesVolume,
+    volume: legendBar?.volume,
+    extras: legendExtras?.length ?? 0,
+    simple: mode === "simple",
+  });
   const legendShows = line.shows;
   const up = legendBar ? legendBar.close >= legendBar.open : true;
   const barCol = up ? "var(--ac-up-ink)" : "var(--ac-down-ink)";
@@ -2302,8 +2320,12 @@ export function TradingChart({
                 transition: "background 160ms ease, border-color 160ms ease",
             }}
             >
-              <span style={{ color: "var(--ac-ink)", fontWeight: 700, fontFamily: "var(--ac-font)", fontSize: 12, letterSpacing: "0.01em" }}>{symbol}</span>
-              <span style={{ fontFamily: "var(--ac-font)", fontSize: 10, fontWeight: 600, color: "var(--ac-text)", background: "var(--ac-hover)", borderRadius: R.xs, padding: "1px 5px" }}>{TF_SHORT[resolution] ?? resolution}</span>
+              {line.chip && (
+                <>
+                  <span style={{ color: "var(--ac-ink)", fontWeight: 700, fontFamily: "var(--ac-font)", fontSize: 12, letterSpacing: "0.01em" }}>{symbol}</span>
+                  <span style={{ fontFamily: "var(--ac-font)", fontSize: 10, fontWeight: 600, color: "var(--ac-text)", background: "var(--ac-hover)", borderRadius: R.xs, padding: "1px 5px" }}>{TF_SHORT[resolution] ?? resolution}</span>
+                </>
+              )}
               {legendBar && (
                 <>
                   {legendShows === "ohlc" ? (

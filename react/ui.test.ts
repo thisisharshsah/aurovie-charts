@@ -195,22 +195,39 @@ test("legend extras print the host's text, a null as an em dash, tone as theme i
   );
 });
 
+const ll = (o: Partial<Parameters<typeof legendLine>[0]> = {}) =>
+  legendLine({ mode: "auto", ohlcSeries: true, seriesVolume: true, volume: 1e6, extras: 0, simple: false, ...o });
+
 // Owner decision 2026-10-12: the bar's own change drops out while host extras share the line.
 test("legend line hides the bar's own change only while host extras are shown", () => {
-  assert.equal(legendLine("auto", true, 1e6, 0).barChange, true);
-  assert.equal(legendLine("auto", true, 1e6, 2).barChange, false);
-  assert.equal(legendLine("auto", false, 1e6, 1).barChange, false);
-  assert.equal(legendLine("ohlc", false, 1e6, 0).barChange, true);
+  assert.equal(ll().barChange, true);
+  assert.equal(ll({ extras: 2 }).barChange, false);
+  assert.equal(ll({ ohlcSeries: false, extras: 1 }).barChange, false);
+  assert.equal(ll({ mode: "ohlc", ohlcSeries: false }).barChange, true);
+  // ...and the JSX actually gates the change span on it.
+  const src = readFileSync(new URL("TradingChart.tsx", import.meta.url), "utf8");
+  assert.match(src, /\{line\.barChange && \(\s*<span[^>]*>\s*\{legendBar\.close - legendBar\.open/);
+  assert.match(src, /\{line\.chip && \(/);
 });
 
-// "auto": OHLC series get O H L C V (V dash when absent); close-based get price plus V only when known.
-test("auto legend prints V on close-based series only when the bar has volume", () => {
-  assert.deepEqual(legendLine("auto", true, 41_200_000, 0), { shows: "ohlc", volume: "41.2M", barChange: true });
-  assert.deepEqual(legendLine("auto", true, 0, 0), { shows: "ohlc", volume: "\u2014", barChange: true });
-  assert.deepEqual(legendLine("auto", false, 41_200_000, 0), { shows: "price", volume: "41.2M", barChange: true });
-  assert.deepEqual(legendLine("auto", false, 0, 0), { shows: "price", volume: null, barChange: true });
-  assert.deepEqual(legendLine("auto", false, undefined, 0), { shows: "price", volume: null, barChange: true });
-  assert.equal(legendLine("price", true, 41_200_000, 0).volume, null);
-  assert.equal(legendLine("ohlc", false, undefined, 0).volume, "\u2014");
-  assert.equal(legendLine("none", true, 1e6, 0).shows, "none");
+// "auto": OHLC series get O H L C V (V dash when absent); close-based get price plus V when the SERIES has volume.
+test("auto legend prints V on close-based series when the series has volume", () => {
+  assert.deepEqual(ll({ volume: 41_200_000 }), { shows: "ohlc", volume: "41.2M", barChange: true, chip: true });
+  assert.equal(ll({ volume: 0, seriesVolume: false }).volume, "\u2014");
+  assert.equal(ll({ ohlcSeries: false, volume: 41_200_000 }).volume, "41.2M");
+  // A stock line with a zero (halted / forming) hovered bar keeps V, as a dash, so V does not blink.
+  assert.equal(ll({ ohlcSeries: false, volume: 0 }).volume, "\u2014");
+  assert.equal(ll({ ohlcSeries: false, volume: undefined }).volume, "\u2014");
+  // An index line (no volume anywhere) prints no V at all.
+  assert.equal(ll({ ohlcSeries: false, seriesVolume: false, volume: 0 }).volume, null);
+  assert.equal(ll({ mode: "price", volume: 41_200_000 }).volume, null);
+  assert.equal(ll({ mode: "ohlc", ohlcSeries: false, seriesVolume: false, volume: undefined }).volume, "\u2014");
+  assert.equal(ll({ mode: "none" }).shows, "none");
+});
+
+// Simple charts: an explicit readout (for Today/YTD extras) never brings the symbol/TF chip back.
+test("simple charts print the legend readout without the symbol and interval chip", () => {
+  assert.deepEqual(ll({ simple: true, ohlcSeries: false, extras: 2 }), { shows: "price", volume: "1.0M", barChange: false, chip: false });
+  assert.equal(ll({ simple: false }).chip, true);
+  assert.equal(ll({ mode: "none" }).chip, false);
 });
