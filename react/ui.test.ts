@@ -235,9 +235,26 @@ test("simple charts print the legend readout without the symbol and interval chi
 // `controls="ranges"`: the range strip stays, the zoom cluster and the scale/tool switches go.
 // The boolean values keep their meaning, so no other host's bar changes.
 test("bottomBarParts: ranges keeps the strip and drops the tools; booleans unchanged", () => {
-  assert.deepEqual(bottomBarParts(true), { ranges: true, tools: true });
-  assert.deepEqual(bottomBarParts(false), { ranges: false, tools: false });
-  assert.deepEqual(bottomBarParts("ranges"), { ranges: true, tools: false });
+  assert.deepEqual(bottomBarParts(true), { ranges: true, realtime: true, tools: true });
+  assert.deepEqual(bottomBarParts(false), { ranges: false, realtime: false, tools: false });
+  assert.deepEqual(bottomBarParts("ranges"), { ranges: true, realtime: true, tools: false }, "ranges keeps go-to-realtime");
+});
+
+// upText/downText: the legend ink and the price tag stay solid while bodies take an alpha;
+// absent, both fall back to up/down so no other host changes.
+test("upText/downText reach the legend ink and the price tag; absent, up/down as before", () => {
+  const plain = themeVars(DARK) as Record<string, string>;
+  assert.equal(plain["--ac-up-ink"], readable(DARK.up, DARK.background, 4.5));
+  assert.equal(plain["--ac-down-ink"], readable(DARK.down, DARK.background, 4.5));
+  const v = themeVars({ ...DARK, up: "rgba(0, 200, 5, 0.88)", down: "rgba(255, 90, 14, 0.88)", upText: "#00c805", downText: "#ff5a0e" }) as Record<string, string>;
+  assert.equal(v["--ac-up-ink"], "#00c805");
+  assert.equal(v["--ac-down-ink"], "#ff5a0e");
+  assert.equal(v["--ac-up"], "rgba(0, 200, 5, 0.88)", "the hue for fills keeps the body alpha");
+  const chart = readFileSync(new URL("../src/chart.ts", import.meta.url), "utf8");
+  assert.match(chart, /const col = up \? \(this\.theme\.upText \?\? this\.theme\.up\) : \(this\.theme\.downText \?\? this\.theme\.down\);\n    \/\/ a faint wash/, "the last-price tag");
+  const tc = readFileSync(new URL("TradingChart.tsx", import.meta.url), "utf8");
+  assert.match(tc, /setTheme\(\{ entry: undefined, upText: undefined, downText: undefined, \.\.\.th \}\)/, "a preset switch clears the host's text inks");
+  assert.match(tc, /\{barParts\.realtime && !view\.atRealtime && \(/);
 });
 
 // Wiring, not just the helpers: reverting a call site must fail the suite.

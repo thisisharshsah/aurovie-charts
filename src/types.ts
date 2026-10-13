@@ -38,6 +38,14 @@ export interface Theme {
   up: string;
   down: string;
   /**
+   * Up / down as TEXT and the last-price tag: the legend's figures, its tones and the live price
+   * tag on the axis. Optional; each falls back to `up` / `down`. A host that draws candle bodies
+   * at an alpha (`up: "rgba(…,0.88)"`) sets these to the solid hue so the words and the tag stay
+   * full strength while the bodies sit back.
+   */
+  upText?: string;
+  downText?: string;
+  /**
    * The ENTRY level of a `TradePlan`. Optional; falls back to `textStrong`.
    *
    * Entry is the one level on a plan that is not an outcome, so it must not borrow `up` or

@@ -3097,7 +3097,7 @@ export class Chart {
     const up = useReal
       ? this.rawBars.length < 2 || this.rawBars[this.rawBars.length - 1].close >= this.rawBars[this.rawBars.length - 2].close
       : b.close >= b.open;
-    const col = up ? this.theme.up : this.theme.down;
+    const col = up ? (this.theme.upText ?? this.theme.up) : (this.theme.downText ?? this.theme.down);
     // a faint wash toward the axis so the live level reads even at a glance across a busy plot
     const pw = this.plotW();
     const g = ctx.createLinearGradient(pw - 120, 0, pw, 0);

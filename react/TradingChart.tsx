@@ -151,8 +151,9 @@ export interface TradingChartProps {
    * is to open the instrument, not to change the scale inside a 110px pane. With this off the bar
    * is drawn only if the host put something in `footer` or `footerRight`, and otherwise not at all.
    *
-   * `"ranges"` keeps the range strip (and the host's `settings`, `footer`, `footerRight`) and drops
-   * the tools: the zoom cluster, go-to-realtime, VPVR, data window, Auto / Log / % and the gear.
+   * `"ranges"` keeps the range strip, go-to-realtime (and the host's `settings`, `footer`,
+   * `footerRight`) and drops the other tools: the zoom cluster, VPVR, data window, Auto / Log / %
+   * and the gear.
    */
   controls?: boolean | "ranges";
   /**
@@ -1158,7 +1159,9 @@ export function TradingChart({
   }, [axes]);
 
   useEffect(() => {
-    chartRef.current?.setTheme(th);
+    // setTheme MERGES, so an optional key the new theme leaves out is cleared here — otherwise a
+    // host's solid upText/downText (or entry) would outlive a switch to a preset that has none.
+    chartRef.current?.setTheme({ entry: undefined, upText: undefined, downText: undefined, ...th });
   }, [th]);
 
   // Load (and re-load) bars on symbol / resolution change; subscribe for realtime.
@@ -2914,7 +2917,7 @@ export function TradingChart({
                 <button {...clusterBtn(false, { width: H.xs, padding: 0 })} title="Zoom in (+)" aria-label="Zoom in" onClick={() => chartRef.current?.zoomBy(1)}><Icon name="zoomin" size={13} /></button>
               </span>
             )}
-            {barParts.tools && !view.atRealtime && (
+            {barParts.realtime && !view.atRealtime && (
               <button {...clusterBtn(false, { height: compact ? H.sm : "var(--ac-h-xs, 23px)", flexShrink: 0 })} title="Scroll to the latest bar" aria-label="Go to realtime" onClick={() => chartRef.current?.scrollToRealtime()}><Icon name="realtime" size={13} /></button>
             )}
             {/* The host's own panel controls, with the "how is it drawn" group rather than with

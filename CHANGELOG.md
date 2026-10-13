@@ -8,10 +8,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- **`controls="ranges"`** on `TradingChart`: the bottom bar keeps the range strip (and the host's
-  `settings`, `footer`, `footerRight`) and drops the tools: the zoom cluster, go-to-realtime,
-  VPVR, data window, Auto / Log / % and the gear (the compact gear too). `true` and `false` are
-  unchanged.
+- **`controls="ranges"`** on `TradingChart`: the bottom bar keeps the range strip and
+  go-to-realtime (and the host's `settings`, `footer`, `footerRight`) and drops the other tools:
+  the zoom cluster, VPVR, data window, Auto / Log / % and the gear (the compact gear too). `true`
+  and `false` are unchanged.
+- **`Theme.upText` / `Theme.downText`**: up/down as text and the last-price tag (the legend's
+  figures and tones, the axis price tag and its rule). Absent, each falls back to `up` / `down`,
+  so nothing changes for a host that does not set them. Lets a host draw candle bodies at an
+  alpha while the words and the tag stay solid. A switch to a named preset clears them (and
+  `entry`), as the preset owns the look.
 - **`Theme.minorGrid`**: `false` turns off the in-between gridlines added in 0.16 on both the
   price and time axes, leaving only the major rules (no in-between lines). Axis labels are
   unaffected. Absent or `true` draws exactly what 0.19.0 drew. Like the size scale, it is the
@@ -21,8 +26,8 @@ All notable changes to this project are documented here. The format follows
 
 - Already themable, so nothing new: grid strength (give `grid` an alpha), candle bodies
   (`up`/`down`, e.g. at 0.88 alpha), wicks (`upWick`/`downWick`) and volume
-  (`volumeUp`/`volumeDown`). `up`/`down` also colour the price tag and other up/down marks, so an
-  alpha there reaches them too.
+  (`volumeUp`/`volumeDown`). `up`/`down` also colour other up/down marks, so an alpha there
+  reaches them too; the legend text and price tag follow `upText`/`downText` when set.
 
 ## [0.19.0] - 2026-10-12
 

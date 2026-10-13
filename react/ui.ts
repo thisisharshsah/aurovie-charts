@@ -218,8 +218,8 @@ export function themeVars(th: Theme): CSSProperties {
     // be readable as text on this background. On every dark theme they are the same value.
     "--ac-accent": th.line,
     "--ac-accent-ink": readable(th.line, th.background, 4.5),
-    "--ac-up-ink": readable(th.up, th.background, 4.5),
-    "--ac-down-ink": readable(th.down, th.background, 4.5),
+    "--ac-up-ink": readable(th.upText ?? th.up, th.background, 4.5),
+    "--ac-down-ink": readable(th.downText ?? th.down, th.background, 4.5),
     // Interaction washes.
     "--ac-hover": wash(onLight ? 6 : 8),
     "--ac-press": wash(onLight ? 11 : 14),
@@ -536,9 +536,10 @@ export interface DepthDefaults {
   watermark?: boolean;
 }
 
-/** What the bottom bar draws for a `controls` value: `"ranges"` keeps the range strip, drops the tools. */
-export function bottomBarParts(controls: boolean | "ranges"): { ranges: boolean; tools: boolean } {
-  return { ranges: controls !== false, tools: controls === true };
+/** What the bottom bar draws for a `controls` value: `"ranges"` keeps the range strip and
+ *  go-to-realtime, drops the other tools. */
+export function bottomBarParts(controls: boolean | "ranges"): { ranges: boolean; realtime: boolean; tools: boolean } {
+  return { ranges: controls !== false, realtime: controls !== false, tools: controls === true };
 }
 
 export const DEPTH: Record<"simple" | "advanced", DepthDefaults> = {
