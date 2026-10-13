@@ -22,6 +22,13 @@ All notable changes to this project are documented here. The format follows
   unaffected. Absent or `true` draws exactly what 0.19.0 drew. Like the size scale, it is the
   host's and holds under every named theme preset, not only Auto.
 
+### Fixed
+
+- **Drawings under a non-hex theme colour.** The position zones, VPVR bars and POC, measure and
+  range washes, range guides, AVWAP bands and shape fills built their translucent colour by
+  appending a hex alpha (`up + "22"`), so an `rgba()`/`rgb()` token produced an invalid colour
+  the canvas ignored, painting the previous fill. They now go through `alpha()`.
+
 ### Notes
 
 - Already themable, so nothing new: grid strength (give `grid` an alpha), candle bodies

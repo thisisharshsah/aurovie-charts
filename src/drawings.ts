@@ -4,7 +4,7 @@
 // state machine (draft → place points → select → drag handles / move / delete); this module owns
 // the geometry + rendering so new tools are a self-contained addition here.
 import type { Bar, Theme } from "./types";
-import { vwapAnchored, vwapAnchoredBands, volumeProfile, CHIP_INK } from "./util";
+import { alpha, vwapAnchored, vwapAnchoredBands, volumeProfile, CHIP_INK } from "./util";
 
 export interface Point {
   time: number;
@@ -205,9 +205,9 @@ function drawPosition(dc: DrawCtx, d: Drawing, sel: boolean, side: "LONG" | "SHO
   const green = theme.up;
   const red = theme.down;
   ctx.save();
-  ctx.fillStyle = green + "22";
+  ctx.fillStyle = alpha(green, 0x22 / 255);
   ctx.fillRect(lo, Math.min(yE, yT), w, Math.abs(yT - yE)); // profit zone (entry → target)
-  ctx.fillStyle = red + "22";
+  ctx.fillStyle = alpha(red, 0x22 / 255);
   ctx.fillRect(lo, Math.min(yE, yS), w, Math.abs(yS - yE)); // loss zone (entry → stop)
   ctx.restore();
   line(dc, lo, yT, lo + w, yT, green, 1.4);
@@ -279,7 +279,7 @@ function renderProfile(dc: DrawCtx, seg: Bar[], boxL: number, boxR: number, c: s
   const yTop = Math.min(yHi, yLo);
   const height = Math.abs(yLo - yHi);
   ctx.save();
-  ctx.strokeStyle = theme.line + "55";
+  ctx.strokeStyle = alpha(theme.line, 0x55 / 255);
   ctx.lineWidth = 1;
   ctx.setLineDash([4, 3]);
   ctx.strokeRect(lo, yTop, hi - lo, height);
@@ -300,7 +300,7 @@ function renderProfile(dc: DrawCtx, seg: Bar[], boxL: number, boxR: number, c: s
     const yt = Math.min(yA, yB);
     const bh = Math.max(1, Math.abs(yA - yB) - 1);
     const inVA = i >= prof.vaLo && i <= prof.vaHi;
-    ctx.fillStyle = i === prof.poc ? up + "cc" : inVA ? c + "88" : c + "3a";
+    ctx.fillStyle = i === prof.poc ? alpha(up, 0xcc / 255) : inVA ? alpha(c, 0x88 / 255) : alpha(c, 0x3a / 255);
     ctx.fillRect(lo, yt, len, bh);
   }
   ctx.restore();
@@ -427,7 +427,7 @@ export const DRAW_SPECS: Record<string, DrawSpec> = {
       const c = col(dc, d);
       const { ctx } = dc;
       ctx.save();
-      ctx.fillStyle = c + "18";
+      ctx.fillStyle = alpha(c, 0x18 / 255);
       ctx.strokeStyle = c;
       ctx.lineWidth = 1.4 * dc.widthScale;
       ctx.fillRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
@@ -503,7 +503,7 @@ export const DRAW_SPECS: Record<string, DrawSpec> = {
       const c = up ? dc.theme.up : dc.theme.down;
       const { ctx } = dc;
       ctx.save();
-      ctx.fillStyle = c + "1e";
+      ctx.fillStyle = alpha(c, 0x1e / 255);
       ctx.fillRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
       line(dc, x1, y1, x1, y2, c, 1.2);
       line(dc, x1, y2, x2, y2, c, 1.2);
@@ -613,7 +613,7 @@ export const DRAW_SPECS: Record<string, DrawSpec> = {
       const c = col(dc, d);
       const { ctx } = dc;
       ctx.save();
-      ctx.fillStyle = c + "14";
+      ctx.fillStyle = alpha(c, 0x14 / 255);
       ctx.strokeStyle = c;
       ctx.lineWidth = 1.4 * dc.widthScale;
       ctx.beginPath();
@@ -658,7 +658,7 @@ export const DRAW_SPECS: Record<string, DrawSpec> = {
       const c = col(dc, d);
       const { ctx } = dc;
       ctx.save();
-      ctx.fillStyle = c + "14";
+      ctx.fillStyle = alpha(c, 0x14 / 255);
       ctx.beginPath();
       ctx.moveTo(ax, ay);
       ctx.lineTo(bx, by);
@@ -756,7 +756,7 @@ export const DRAW_SPECS: Record<string, DrawSpec> = {
       const [e2x, e2y] = ext(x2, y2);
       const { ctx } = dc;
       ctx.save();
-      ctx.fillStyle = c + "12";
+      ctx.fillStyle = alpha(c, 0x12 / 255);
       ctx.beginPath();
       ctx.moveTo(x1, y1);
       ctx.lineTo(e1x, e1y);
@@ -891,8 +891,8 @@ export const DRAW_SPECS: Record<string, DrawSpec> = {
       const up = b.price >= a.price;
       const c = up ? dc.theme.up : dc.theme.down;
       const xc = (x1 + x2) / 2;
-      line(dc, Math.min(x1, x2), yA, Math.max(x1, x2), yA, c + "88", 1);
-      line(dc, Math.min(x1, x2), yB, Math.max(x1, x2), yB, c + "88", 1);
+      line(dc, Math.min(x1, x2), yA, Math.max(x1, x2), yA, alpha(c, 0x88 / 255), 1);
+      line(dc, Math.min(x1, x2), yB, Math.max(x1, x2), yB, alpha(c, 0x88 / 255), 1);
       arrowV(dc, xc, yA, yB, c);
       const diff = b.price - a.price;
       const pct = a.price ? (diff / a.price) * 100 : 0;
@@ -919,8 +919,8 @@ export const DRAW_SPECS: Record<string, DrawSpec> = {
       const yB = dc.yOfPrice(b.price);
       const c = dc.theme.line;
       const yc = (yA + yB) / 2;
-      line(dc, x1, Math.min(yA, yB), x1, Math.max(yA, yB) + 6, c + "88", 1);
-      line(dc, x2, Math.min(yA, yB), x2, Math.max(yA, yB) + 6, c + "88", 1);
+      line(dc, x1, Math.min(yA, yB), x1, Math.max(yA, yB) + 6, alpha(c, 0x88 / 255), 1);
+      line(dc, x2, Math.min(yA, yB), x2, Math.max(yA, yB) + 6, alpha(c, 0x88 / 255), 1);
       arrowH(dc, yc, x1, x2, c);
       const bars = dc.barsBetween(a.time, b.time);
       chip(dc, (x1 + x2) / 2, yc, `${bars} bar${bars === 1 ? "" : "s"} · ${fmtDur(b.time - a.time)}`, c);
@@ -948,7 +948,7 @@ export const DRAW_SPECS: Record<string, DrawSpec> = {
       const c = up ? dc.theme.up : dc.theme.down;
       const { ctx } = dc;
       ctx.save();
-      ctx.fillStyle = c + "1e";
+      ctx.fillStyle = alpha(c, 0x1e / 255);
       ctx.strokeStyle = c;
       ctx.lineWidth = 1.3 * (dc.widthScale ?? 1);
       ctx.fillRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
@@ -1106,9 +1106,9 @@ export const DRAW_SPECS: Record<string, DrawSpec> = {
       }
       const { vwap, dev } = vwapAnchoredBands(seg, anchor.time);
       const { ctx } = dc;
-      const band = (mult: number, alpha: string, width: number, dash?: number[]) => {
+      const band = (mult: number, a: number, width: number, dash?: number[]) => {
         ctx.save();
-        ctx.strokeStyle = c + alpha;
+        ctx.strokeStyle = a < 1 ? alpha(c, a) : c;
         ctx.lineWidth = width * (dc.widthScale ?? 1);
         if (dash) ctx.setLineDash(dash);
         else if (dc.dash) ctx.setLineDash(dc.dash);
@@ -1126,11 +1126,11 @@ export const DRAW_SPECS: Record<string, DrawSpec> = {
         ctx.stroke();
         ctx.restore();
       };
-      band(2, "44", 1, [4, 3]);
-      band(-2, "44", 1, [4, 3]);
-      band(1, "88", 1, [3, 2]);
-      band(-1, "88", 1, [3, 2]);
-      band(0, "", 1.6); // the VWAP itself, full colour
+      band(2, 0x44 / 255, 1, [4, 3]);
+      band(-2, 0x44 / 255, 1, [4, 3]);
+      band(1, 0x88 / 255, 1, [3, 2]);
+      band(-1, 0x88 / 255, 1, [3, 2]);
+      band(0, 1, 1.6); // the VWAP itself, full colour
       const yA = dc.yOfPrice(vwap[0]);
       ctx.save();
       ctx.fillStyle = c;
@@ -1191,7 +1191,7 @@ export const DRAW_SPECS: Record<string, DrawSpec> = {
       // fill ±1 SD band
       const { ctx } = dc;
       ctx.save();
-      ctx.fillStyle = c + "14";
+      ctx.fillStyle = alpha(c, 0x14 / 255);
       ctx.beginPath();
       ctx.moveTo(x0, yup0);
       ctx.lineTo(x1, yup1);
