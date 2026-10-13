@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.20.1] - 2026-10-13
+
+0.20.0 was published from the build before its last round. This release carries it:
+
+### Added
+
+- **`Theme.upText` / `Theme.downText`:** solid inks for text drawn in up/down (legend figures
+  and tones, the last-price tag, plan T/S chips, support/resistance labels, trade-marker chips),
+  so a host can draw candle bodies translucent without washing out the numbers. Absent, they
+  fall back to `up` / `down`: no change for other hosts.
+
+### Changed
+
+- **`controls="ranges"` keeps the go-to-realtime button** while still hiding the bar's tools.
+
+### Fixed
+
+- **Drawings with a non-hex up/down colour.** Translucent fills and strokes were built by
+  appending a hex alpha to the colour string, which gave an invalid canvas colour for an
+  `rgba()` / `rgb()` theme. All drawing tools now go through `alpha()`.
+- **A preset switch no longer keeps the host's text inks** or entry colour from the previous theme.
+
 ## [0.20.0] - 2026-10-13
 
 ### Added

@@ -254,6 +254,10 @@ test("upText/downText reach the legend ink and the price tag; absent, up/down as
   assert.match(chart, /const col = up \? \(this\.theme\.upText \?\? this\.theme\.up\) : \(this\.theme\.downText \?\? this\.theme\.down\);\n    \/\/ a faint wash/, "the last-price tag");
   const tc = readFileSync(new URL("TradingChart.tsx", import.meta.url), "utf8");
   assert.match(tc, /setTheme\(\{ entry: undefined, upText: undefined, downText: undefined, \.\.\.th \}\)/, "a preset switch clears the host's text inks");
+  // Text chips (plan T/S, S/R levels, trade markers) take the solid ink too.
+  assert.match(chart, /yT, this\.theme\.upText \?\? this\.theme\.up\]/, "plan T chip");
+  assert.match(chart, /lv\.kind === "r" \? \(this\.theme\.downText \?\? this\.theme\.down\)/, "S/R level chip");
+  assert.match(chart, /const up = this\.theme\.upText \?\? this\.theme\.up;/, "trade marker chip");
   assert.match(tc, /\{barParts\.realtime && !view\.atRealtime && \(/);
 });
 

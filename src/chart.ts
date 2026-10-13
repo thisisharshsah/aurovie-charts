@@ -782,8 +782,9 @@ export class Chart {
        */
       ctx.font = this.theme.monoFont;
       for (const [label, y, col] of [
-        [`T ${fmtPrice(plan.target, this.decimals)}`, yT, this.theme.up],
-        [`S ${fmtPrice(plan.stop, this.decimals)}`, yS, this.theme.down],
+        // Text chips take the solid ink (upText/downText), never a translucent body hue.
+        [`T ${fmtPrice(plan.target, this.decimals)}`, yT, this.theme.upText ?? this.theme.up],
+        [`S ${fmtPrice(plan.stop, this.decimals)}`, yS, this.theme.downText ?? this.theme.down],
       ] as const) {
         if (y < p.top + 2 || y > p.top + p.height - 2) continue;
         const w = Math.ceil(ctx.measureText(label).width) + 12;
@@ -1013,7 +1014,8 @@ export class Chart {
     for (const lv of levels) {
       const y = this.priceToY(p, lv.price);
       if (y < p.top + 2 || y > p.top + p.height - 2) continue;
-      const c = lv.kind === "r" ? this.theme.down : this.theme.up;
+      const c =
+        lv.kind === "r" ? (this.theme.downText ?? this.theme.down) : (this.theme.upText ?? this.theme.up);
       ctx.strokeStyle = c;
       ctx.globalAlpha = 0.85;
       ctx.lineWidth = 1;
@@ -3324,16 +3326,18 @@ export class Chart {
       // target a gain-coloured one, an entry the neutral interactive accent. A
       // colour never means two things.
       const bought = (m.qty ?? 0) >= 0;
+      const up = this.theme.upText ?? this.theme.up;
+      const down = this.theme.downText ?? this.theme.down;
       const col =
         m.kind === "stop"
-          ? this.theme.down
+          ? down
           : m.kind === "target"
-            ? this.theme.up
+            ? up
             : m.kind === "close"
               ? this.theme.grid
               : bought
-                ? this.theme.up
-                : this.theme.down;
+                ? up
+                : down;
 
       ctx.save();
       ctx.globalAlpha = 0.95;
