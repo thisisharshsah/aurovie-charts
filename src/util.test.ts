@@ -3,7 +3,7 @@
 // definitions: NaN padding, the exact formulas, and the invariants each family must hold.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { permEntropy, phasor, ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange, fitBarCount, visibleIndexRange, offsetAfterAppend, THEMES, timeGridMarks, minorGridAlpha, sectionKey, SECTION_STEPS } from "./util.ts";
+import { permEntropy, phasor, ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange, fitBarCount, visibleIndexRange, offsetAfterAppend, DARK, THEMES, timeGridMarks, minorGridAlpha, minorLineAlpha, sectionKey, SECTION_STEPS } from "./util.ts";
 import type { AxisSlot } from "./util.ts";
 import type { Bar } from "./types.ts";
 
@@ -508,4 +508,13 @@ test("a forming-candle tick changes only the last value of entropy and phasor", 
   }
   assert.notEqual(eA[119], eB[119], "the tick reaches the last entropy value");
   assert.notEqual(pA.phase[119], pB.phase[119], "the tick reaches the last phase");
+});
+
+// `Theme.minorGrid: false` is the pre-0.16 grid: no in-between lines on either axis. Absent or
+// true keeps today's 0.55 × fade, so every other host's grid is unchanged.
+test("minorLineAlpha: minors at 0.55 of their fade by default, none with minorGrid false", () => {
+  assert.equal(minorLineAlpha(DARK, 1), 0.55);
+  assert.equal(minorLineAlpha({ minorGrid: true }, 0.5), 0.275);
+  assert.equal(minorLineAlpha({ ...DARK, minorGrid: false }, 1), 0);
+  assert.equal(DARK.minorGrid, undefined);
 });

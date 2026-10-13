@@ -536,6 +536,11 @@ export interface DepthDefaults {
   watermark?: boolean;
 }
 
+/** What the bottom bar draws for a `controls` value: `"ranges"` keeps the range strip, drops the tools. */
+export function bottomBarParts(controls: boolean | "ranges"): { ranges: boolean; tools: boolean } {
+  return { ranges: controls !== false, tools: controls === true };
+}
+
 export const DEPTH: Record<"simple" | "advanced", DepthDefaults> = {
   advanced: {},
   simple: {

@@ -22,7 +22,13 @@ export type Resolution = string;
 export interface Theme {
   background: string;
   paneBackground: string;
+  /** Gridline colour. Its alpha is the grid's strength, e.g. `rgba(…,0.3)` for a faint grid. */
   grid: string;
+  /**
+   * The in-between (minor) gridlines added in 0.16, on the price and time axes. Default on;
+   * `false` draws only the major rules, the pre-0.16 grid. Labels are unaffected.
+   */
+  minorGrid?: boolean;
   border: string;
   text: string;
   textStrong: string;

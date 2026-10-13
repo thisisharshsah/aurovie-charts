@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { CONTROL, DEPTH, RADIUS, SHEET, SPACE, TYPE, contrast, cx, legendExtraParts, legendLine, legendVolume, readable, themeVars } from "./ui";
+import { CONTROL, DEPTH, RADIUS, bottomBarParts, SHEET, SPACE, TYPE, contrast, cx, legendExtraParts, legendLine, legendVolume, readable, themeVars } from "./ui";
 import { DARK, LIGHT, THEMES } from "../src/util";
 
 // The failure this exists to prevent: the widget paints every SELECTED control's label in
@@ -230,4 +230,12 @@ test("simple charts print the legend readout without the symbol and interval chi
   assert.deepEqual(ll({ simple: true, ohlcSeries: false, extras: 2 }), { shows: "price", volume: "1.0M", barChange: false, chip: false });
   assert.equal(ll({ simple: false }).chip, true);
   assert.equal(ll({ mode: "none" }).chip, false);
+});
+
+// `controls="ranges"`: the range strip stays, the zoom cluster and the scale/tool switches go.
+// The boolean values keep their meaning, so no other host's bar changes.
+test("bottomBarParts: ranges keeps the strip and drops the tools; booleans unchanged", () => {
+  assert.deepEqual(bottomBarParts(true), { ranges: true, tools: true });
+  assert.deepEqual(bottomBarParts(false), { ranges: false, tools: false });
+  assert.deepEqual(bottomBarParts("ranges"), { ranges: true, tools: false });
 });

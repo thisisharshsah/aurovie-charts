@@ -16,6 +16,7 @@ import {
   fmtCountdown,
   isTimeBoundary,
   minorGridAlpha,
+  minorLineAlpha,
   sectionKey,
   SECTION_STEPS,
   timeGridMarks,
@@ -2224,10 +2225,11 @@ export class Chart {
     if (this.gridOn && p.kind !== "volume" && ticks.length >= 2) {
       const step = ticks[1] - ticks[0];
       const gap = Math.abs(this.priceToY(p, ticks[1]) - this.priceToY(p, ticks[0]));
-      const a = minorGridAlpha(gap);
-      if (a > 0.02) {
+      const fade = minorGridAlpha(gap);
+      const a = minorLineAlpha(t, fade);
+      if (fade > 0.02 && a > 0) {
         ctx.save();
-        ctx.globalAlpha = 0.55 * a;
+        ctx.globalAlpha = a;
         ctx.strokeStyle = t.grid;
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -2306,7 +2308,7 @@ export class Chart {
       for (const m of marks) {
         const px = this.x(m.i);
         if (px < 0 || px > pw) continue;
-        ctx.globalAlpha = m.major ? 1 : 0.55 * m.alpha;
+        ctx.globalAlpha = m.major ? 1 : minorLineAlpha(t, m.alpha);
         ctx.beginPath();
         ctx.moveTo(crisp(px), 0);
         ctx.lineTo(crisp(px), this.plotH());

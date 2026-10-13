@@ -4,6 +4,25 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.20.0] - 2026-10-13
+
+### Added
+
+- **`controls="ranges"`** on `TradingChart`: the bottom bar keeps the range strip (and the host's
+  `settings`, `footer`, `footerRight`) and drops the tools: the zoom cluster, go-to-realtime,
+  VPVR, data window, Auto / Log / % and the gear (the compact gear too). `true` and `false` are
+  unchanged.
+- **`Theme.minorGrid`**: `false` turns off the in-between gridlines added in 0.16 on both the
+  price and time axes, leaving only the major rules (the pre-0.16 grid). Axis labels are
+  unaffected. Absent or `true` draws exactly what 0.19.0 drew.
+
+### Notes
+
+- Already themable, so nothing new: grid strength (give `grid` an alpha), candle bodies
+  (`up`/`down`, e.g. at 0.88 alpha), wicks (`upWick`/`downWick`) and volume
+  (`volumeUp`/`volumeDown`). `up`/`down` also colour the price tag and other up/down marks, so an
+  alpha there reaches them too.
+
 ## [0.19.0] - 2026-10-12
 
 ### Added

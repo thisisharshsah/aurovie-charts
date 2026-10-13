@@ -8,7 +8,7 @@ import { Icon, hasIcon } from "./icons";
 import { ScriptEditor, type ScriptError, type ScriptPreset, type ScriptScorecard, type ScriptSweep, type SavedStrategy } from "./ScriptEditor";
 import { parseScriptDraw, type ScriptRender } from "../src/script";
 import { DARK, LIGHT, THEMES, THEME_NAMES, SERIES_PALETTE as IND_PALETTE, SWATCHES, CMP_COLORS, CHIP_INK } from "../src/util";
-import { CONTROL, DEPTH, ELEV, H, R, SHEET, SPACE, TYPE, WEIGHT, Z, cx, legendExtraParts, legendLine, legendVolume, themeVars } from "./ui";
+import { CONTROL, DEPTH, bottomBarParts, ELEV, H, R, SHEET, SPACE, TYPE, WEIGHT, Z, cx, legendExtraParts, legendLine, legendVolume, themeVars } from "./ui";
 import type { LegendExtra } from "./ui";
 import type { Drawing } from "../src/drawings";
 import type { Bar, DataFeed, DataFeedResult, Resolution, IndicatorInstance, LegendValue, PriceLine, Projection, ScaleMode, SeriesType, SessionSpec, Theme, ChartMarker, TradePlan, Zone } from "../src/types";
@@ -150,8 +150,11 @@ export interface TradingChartProps {
    * A card-sized chart has no use for them: it states one picture, and the way to interrogate it
    * is to open the instrument, not to change the scale inside a 110px pane. With this off the bar
    * is drawn only if the host put something in `footer` or `footerRight`, and otherwise not at all.
+   *
+   * `"ranges"` keeps the range strip (and the host's `settings`, `footer`, `footerRight`) and drops
+   * the tools: the zoom cluster, go-to-realtime, VPVR, data window, Auto / Log / % and the gear.
    */
-  controls?: boolean;
+  controls?: boolean | "ranges";
   /**
    * Score the current strategy. Host-supplied, like `onRunScript` — the chart never fetches. When
    * a saved strategy is loaded, its id is passed too, so the host can cache the score against it.
@@ -792,6 +795,7 @@ export function TradingChart({
   // turn off, and getting one of them wrong is what made two pages of the same app look like two
   // products.
   const depth = DEPTH[mode];
+  const barParts = bottomBarParts(controls);
   const toolbar = toolbarProp ?? depth.toolbar ?? true;
   const drawingRail = drawingRailProp ?? depth.drawingRail ?? true;
   const chartType = chartTypeProp ?? (depth.chartType as SeriesType | undefined);
@@ -2807,7 +2811,7 @@ export function TradingChart({
             BAR and these pick the width of the WINDOW, and with "1D" and "1W" printed in both
             rows, in the same pill, one lit in each, a reader has no way to tell which governs
             what they are looking at. */}
-        {controls && rangeList.length > 0 && (
+        {barParts.ranges && rangeList.length > 0 && (
             <span role="group" aria-label="Visible range" style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
               {rangeList.map((r) => (
                 <button
@@ -2903,14 +2907,14 @@ export function TradingChart({
                 with a trackpad and no keyboard habit had no way to discover the chart zooms at
                 all. Same shape as every other switch in this bar; the fit button returns to the
                 default view. */}
-            {controls && !compact && (
+            {barParts.tools && !compact && (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 2, flexShrink: 0, marginRight: SPACE[1] }}>
                 <button {...clusterBtn(false, { width: H.xs, padding: 0 })} title="Zoom out (−)" aria-label="Zoom out" onClick={() => chartRef.current?.zoomBy(-1)}><Icon name="zoomout" size={13} /></button>
                 <button {...clusterBtn(false, { width: H.xs, padding: 0 })} title="Fit all bars (F)" aria-label="Fit all bars" onClick={() => chartRef.current?.fit()}><Icon name="fit" size={13} /></button>
                 <button {...clusterBtn(false, { width: H.xs, padding: 0 })} title="Zoom in (+)" aria-label="Zoom in" onClick={() => chartRef.current?.zoomBy(1)}><Icon name="zoomin" size={13} /></button>
               </span>
             )}
-            {controls && !view.atRealtime && (
+            {barParts.tools && !view.atRealtime && (
               <button {...clusterBtn(false, { height: compact ? H.sm : "var(--ac-h-xs, 23px)", flexShrink: 0 })} title="Scroll to the latest bar" aria-label="Go to realtime" onClick={() => chartRef.current?.scrollToRealtime()}><Icon name="realtime" size={13} /></button>
             )}
             {/* The host's own panel controls, with the "how is it drawn" group rather than with
@@ -2919,7 +2923,7 @@ export function TradingChart({
             {/* COMPACT: six switches become one. The scale modes, the profile, the data window
                 and every display toggle live in the sheet, and this is the way in — which also
                 means a host that hides the toolbar still leaves all of them reachable. */}
-            {!controls ? null : compact ? (
+            {!barParts.tools ? null : compact ? (
               <button {...clusterBtn(sheetIs("menu"), { height: H.sm, minWidth: 30, flexShrink: 0 })} title="Chart settings" aria-label="Chart settings" aria-expanded={sheetIs("menu")} onClick={() => setSheet(sheetIs("menu") ? null : "menu")}><Icon name="settings" size={13} /></button>
             ) : (
               <>
