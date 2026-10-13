@@ -21,6 +21,19 @@ All notable changes to this project are documented here. The format follows
   Opt-in: with no extras the legend is unchanged apart from V. `legendVolume`,
   `legendExtraParts` and the `LegendExtra` type are exported from `./react`.
 
+### Changed
+
+- The legend's volume label is `V` (was `Vol`) and its value is bold ink like O/H/L/C. It now
+  always shows on the OHLC readout, so a volume-less OHLC feed reads `V —` where it showed nothing.
+- `legendExtras` wrap only as one group: on a narrow chart they move to the next line together,
+  and a ` · ` separator never starts a line by itself.
+
+### Fixed
+
+- `fmtVolume` rounds before it picks the unit: `999.6` is `1K` (was `1000`), `999_999` is `1.0M`
+  (was `1000K`), `999_960_000` is `1.00B` (was `1000.0M`). A volume under 1 (fractional crypto)
+  keeps two significant digits (`0.042`) instead of printing a false `0`. The axis labels use it too.
+
 ### Removed
 
 - The widget's private `fmtVol` copy; the legend and the detail panel use the engine's

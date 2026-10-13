@@ -2322,12 +2322,17 @@ export function TradingChart({
                   {legendShows === "ohlc" && <span>V <b style={{ color: "var(--ac-ink)" }}>{legendVolume(legendBar.volume)}</b></span>}
                 </>
               )}
-              {legendExtraParts(legendExtras).map((x) => (
-                <span key={x.label}>
-                  {"\u00b7 "}
-                  {x.label} <b style={{ color: x.color }}>{x.text}</b>
+              {/* The extras wrap only together, as one group, so a separator never starts a line alone. */}
+              {legendExtras?.length ? (
+                <span style={{ display: "inline-flex", gap: 8, whiteSpace: "nowrap" }}>
+                  {legendExtraParts(legendExtras).map((x, i) => (
+                    <span key={i}>
+                      {"\u00b7 "}
+                      {x.label} <b style={{ color: x.color }}>{x.text}</b>
+                    </span>
+                  ))}
                 </span>
-              ))}
+              ) : null}
             </div>
             {/* interactive indicator legend — hover a chip to step its period or remove it */}
             {/* CLEAR ALL — one action for what was N.

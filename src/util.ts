@@ -313,12 +313,15 @@ export function priceDecimals(range: number): number {
   return 5;
 }
 export const fmtPrice = (v: number, decimals: number) => v.toFixed(decimals);
+// Each unit's cut-off is where the smaller unit would round up to 1000 (999_999 is 1.0M, not 1000K).
+// Under 1 (fractional crypto volume) keeps two significant digits instead of rounding to a false 0.
 export function fmtVolume(v: number): string {
   const a = Math.abs(v);
-  if (a >= 1e9) return (v / 1e9).toFixed(2) + "B";
-  if (a >= 1e6) return (v / 1e6).toFixed(1) + "M";
-  if (a >= 1e3) return (v / 1e3).toFixed(0) + "K";
-  return String(Math.round(v));
+  if (a >= 999.95e6) return (v / 1e9).toFixed(2) + "B";
+  if (a >= 999.5e3) return (v / 1e6).toFixed(1) + "M";
+  if (a >= 999.5) return (v / 1e3).toFixed(0) + "K";
+  if (a >= 1) return String(Math.round(v));
+  return String(Number(v.toPrecision(2)));
 }
 
 // ---- time formatting ------------------------------------------------------

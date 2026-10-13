@@ -170,6 +170,10 @@ test("legend volume is compact and never a confident zero", () => {
   assert.equal(legendVolume(870_000), "870K");
   assert.equal(legendVolume(41_200_000), "41.2M");
   assert.equal(legendVolume(1.25e9), "1.25B");
+  assert.equal(legendVolume(999.6), "1K");
+  assert.equal(legendVolume(999_999), "1.0M");
+  assert.equal(legendVolume(999_960_000), "1.00B");
+  assert.equal(legendVolume(0.042), "0.042");
 });
 
 // Host figures (Today, YTD) print as given; an unknown is a neutral dash whatever its tone.
