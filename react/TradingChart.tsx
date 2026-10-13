@@ -1772,6 +1772,8 @@ export function TradingChart({
    * area (--ac-hit-touch) grows sideways only and is cut to the row's height. Upgrade: block
    * padding of (touch - H.sm) / 2 with a matching negative margin, checked on a phone.
    */
+  /** The bottom bar's range strip: the one part of that bar that scrolls, at every width. */
+  const bottomRangeRow: CSSProperties = { display: "flex", alignItems: "center", flexWrap: "nowrap", overflowX: "auto", overflowY: "hidden", scrollbarWidth: "none", WebkitOverflowScrolling: "touch", flex: "0 1 auto", minWidth: 0 };
   const scrollRow: CSSProperties = compact
     ? { display: "flex", alignItems: "center", flexWrap: "nowrap", overflowX: "auto", overflowY: "hidden", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }
     : { display: "flex", alignItems: "center", flexWrap: "wrap" };
@@ -2804,11 +2806,16 @@ export function TradingChart({
           belong in chrome. As a real bar they also stop colliding with the axis corner, the
           countdown and anything the host draws in `overlay`. */}
       {(controls || footer || footerRight) && (
-      <div style={{ display: "flex", alignItems: "center", flexWrap: compact ? "nowrap" : "wrap", gap: 4, padding: compact ? "6px 8px" : "5px 8px", borderTop: frame ? "1px solid var(--ac-line)" : "none", background: "var(--ac-pane)" }}>
-        {/* Compact scrolls the range strip and the host's settings and keeps the right-hand
-            cluster pinned; `display: contents` leaves the wide bar exactly as it was, with its
-            children wrapping in the parent. */}
-        <div style={compact ? { ...scrollRow, flex: "1 1 auto", minWidth: 0, gap: 4 } : { display: "contents" }}>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "nowrap", gap: 4, padding: compact ? "6px 8px" : "5px 8px", borderTop: frame ? "1px solid var(--ac-line)" : "none", background: "var(--ac-pane)" }}>
+        {/* ONE ROW, AND ONLY THE RANGE STRIP SCROLLS (owner, 2026-10-13). The host's settings
+            (a timeframe, a basis), its footer and the right-hand cluster stay fixed in place;
+            the range strip takes the room that is left and scrolls sideways inside it, at
+            every width. Wrapping added rows the plot lost, and scrolling the settings with
+            the ranges pushed a choice the reader had made out of sight.
+            ponytail: the fixed parts never shrink, so on a very narrow chart with many host
+            settings the range strip can scroll down to nothing. Upgrade: fold settings into
+            the sheet below a width. */}
+        <div className="ac-scroll" style={{ ...bottomRangeRow, gap: 4 }}>
         {/* RANGE — the visible WINDOW, beside the scale switches that draw it.
             Not in the toolbar, where it sat among the interval tabs: those pick the width of a
             BAR and these pick the width of the WINDOW, and with "1D" and "1W" printed in both
@@ -2829,6 +2836,8 @@ export function TradingChart({
               ))}
             </span>
         )}
+        </div>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
 
         {/* HOST SETTINGS — declared, so the widget draws them. See `ChartSettingGroup`. */}
         {(settings ?? []).map((g) => {
@@ -2845,9 +2854,9 @@ export function TradingChart({
                     aria-label={g.label ?? g.id}
                     aria-expanded={compact ? sheetSetting === g.id : barMenu === g.id}
                     disabled={g.disabled}
-                    // Compact opens the SHEET: this bar scrolls horizontally, and a menu
-                    // absolutely positioned inside a scrolling box is clipped by it — the
-                    // options would render, unreachably, exactly out of sight.
+                    // Compact opens the SHEET, the phone's pattern for a choice; the wide bar
+                    // opens a menu above the button (settings sit outside the range strip's
+                    // scroll box, so the menu is never clipped by it).
                     onClick={() => (compact ? setSheet(sheetSetting === g.id ? null : { setting: g.id }) : setBarMenu((m) => (m === g.id ? null : g.id)))}
                   >
                     {cur?.label ?? g.value} ▾
@@ -2904,7 +2913,7 @@ export function TradingChart({
             `settings` covers the common case (a choice between options) in the widget's own
             vocabulary; this slot stays for everything that is not one. */}
         {footer}
-        </div>
+        </span>
         <span style={{ marginLeft: "auto", flexShrink: 0 }} />
             {/* ZOOM. Wheel, pinch and +/− already zoom, but none of them is visible — a reader
                 with a trackpad and no keyboard habit had no way to discover the chart zooms at

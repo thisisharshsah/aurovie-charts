@@ -272,3 +272,15 @@ test("0.20 wiring: the bar gates its tools on barParts, presets keep minorGrid, 
   const chart = readFileSync(new URL("../src/chart.ts", import.meta.url), "utf8");
   assert.equal(chart.match(/minorLineAlpha\(t, /g)?.length, 2);
 });
+
+test("only the range strip scrolls in the bottom bar; settings, footer and tools stay fixed", () => {
+  const src = readFileSync(new URL("TradingChart.tsx", import.meta.url), "utf8");
+  const bar = src.slice(src.indexOf("ONE ROW, AND ONLY THE RANGE STRIP SCROLLS"), src.indexOf("{footerRight}"));
+  const scroller = bar.indexOf("bottomRangeRow");
+  const close = bar.indexOf("</div>", bar.indexOf('aria-label="Visible range"'));
+  assert.ok(scroller > 0 && close > scroller, "the range strip has its own scroll box");
+  // Settings and the host footer come after that box closes, not inside it.
+  assert.ok(bar.indexOf("HOST SETTINGS") > close, "settings sit outside the scroll box");
+  assert.ok(bar.indexOf("{footer}") > close, "the footer sits outside the scroll box");
+  assert.match(src, /flexWrap: "nowrap", gap: 4, padding: compact \? "6px 8px"/, "the bar is one row at every width");
+});

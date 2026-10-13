@@ -18,6 +18,10 @@ All notable changes to this project are documented here. The format follows
 ### Changed
 
 - **`controls="ranges"` keeps the go-to-realtime button** while still hiding the bar's tools.
+- **Only the range strip scrolls in the bottom bar** (owner, 2026-10-13). The bar is one row at
+  every width: the host's `settings` (a timeframe, a basis), `footer` and the right-hand tools stay
+  fixed, and the range strip takes the room left and scrolls sideways inside it. Before, a wide
+  bar wrapped to a second row, and a compact one scrolled the settings away with the ranges.
 
 ### Fixed
 
