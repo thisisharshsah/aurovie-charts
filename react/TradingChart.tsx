@@ -8,7 +8,7 @@ import { Icon, hasIcon } from "./icons";
 import { ScriptEditor, type ScriptError, type ScriptPreset, type ScriptScorecard, type ScriptSweep, type SavedStrategy } from "./ScriptEditor";
 import { parseScriptDraw, type ScriptRender } from "../src/script";
 import { DARK, LIGHT, THEMES, THEME_NAMES, SERIES_PALETTE as IND_PALETTE, SWATCHES, CMP_COLORS, CHIP_INK } from "../src/util";
-import { CONTROL, DEPTH, ELEV, H, R, SHEET, SPACE, TYPE, WEIGHT, Z, cx, legendExtraParts, legendVolume, themeVars } from "./ui";
+import { CONTROL, DEPTH, ELEV, H, R, SHEET, SPACE, TYPE, WEIGHT, Z, cx, legendExtraParts, legendLine, legendVolume, themeVars } from "./ui";
 import type { LegendExtra } from "./ui";
 import type { Drawing } from "../src/drawings";
 import type { Bar, DataFeed, DataFeedResult, Resolution, IndicatorInstance, LegendValue, PriceLine, Projection, ScaleMode, SeriesType, SessionSpec, Theme, ChartMarker, TradePlan, Zone } from "../src/types";
@@ -175,12 +175,12 @@ export interface TradingChartProps {
    * How much the on-chart legend reports.
    *
    * `"auto"` (default) keys on the series type: an OHLC series (candles, bars, heikin…) gets the
-   * full `O H L C` readout, while a close-based one (line, area, step, baseline) gets just the
-   * price and its change. That is not a cosmetic trim — a line chart DRAWS only the close, so
+   * full `O H L C V` readout, while a close-based one (line, area, step, baseline) gets the price
+   * and its change, plus `V` when the bar carries a volume. That is not a cosmetic trim — a line chart DRAWS only the close, so
    * printing a high and a low beside it reports two numbers the reader cannot see and did not
    * ask for, and invites them to read a range off a shape that has none.
    *
-   * `"ohlc"` and `"price"` force either regardless of series; `"none"` removes the on-canvas
+   * `"ohlc"` and `"price"` force either regardless of series (a forced `"price"` prints no V); `"none"` removes the on-canvas
    * legend entirely — ticker and interval included — for hosts whose own header already carries
    * the instrument, where leaving it would print the same word a third time in one screenful.
    */
@@ -192,8 +192,9 @@ export interface TradingChartProps {
    * otherwise) as text, not a chip. They do not follow the crosshair: they describe the
    * instrument, not the hovered bar. Hidden with the rest of the legend under `legend="none"`.
    *
-   * The OHLC readout also prints `V` (the hovered bar's volume, em dash when absent). A close-based
-   * readout does not: the series draws no volume, the same reason it prints no high or low.
+   * While extras are shown the legend drops the hovered bar's own change (close − open): the
+   * host's figures sit on the same line, and on OHLC the O and C already carry it. With no extras
+   * that change prints as before. See `legendLine`.
    */
   legendExtras?: LegendExtra[];
   /**
@@ -1674,7 +1675,8 @@ export function TradingChart({
   const legendBar = legend.bar ?? (overProjection ? null : latest);
   // Resolved against the LIVE series type, not the seeded prop — the user's own toolbar pick
   // is what is on screen, so switching candles→line under "auto" has to follow.
-  const legendShows = legendMode === "auto" ? (OHLC_SERIES.includes(type) ? "ohlc" : "price") : legendMode;
+  const line = legendLine(legendMode, OHLC_SERIES.includes(type), legendBar?.volume, legendExtras?.length ?? 0);
+  const legendShows = line.shows;
   const up = legendBar ? legendBar.close >= legendBar.open : true;
   const barCol = up ? "var(--ac-up-ink)" : "var(--ac-down-ink)";
 
@@ -2314,12 +2316,14 @@ export function TradingChart({
                   ) : (
                     <b style={{ color: barCol, fontSize: 12 }}>{legendBar.close.toFixed(2)}</b>
                   )}
-                  <span style={{ color: barCol, fontWeight: 700 }}>
-                    {legendBar.close - legendBar.open >= 0 ? "+" : ""}
-                    {(legendBar.close - legendBar.open).toFixed(2)}
-                    {legendBar.open ? ` (${(((legendBar.close - legendBar.open) / legendBar.open) * 100).toFixed(2)}%)` : ""}
-                  </span>
-                  {legendShows === "ohlc" && <span>V <b style={{ color: "var(--ac-ink)" }}>{legendVolume(legendBar.volume)}</b></span>}
+                  {line.barChange && (
+                    <span style={{ color: barCol, fontWeight: 700 }}>
+                      {legendBar.close - legendBar.open >= 0 ? "+" : ""}
+                      {(legendBar.close - legendBar.open).toFixed(2)}
+                      {legendBar.open ? ` (${(((legendBar.close - legendBar.open) / legendBar.open) * 100).toFixed(2)}%)` : ""}
+                    </span>
+                  )}
+                  {line.volume !== null && <span>V <b style={{ color: "var(--ac-ink)" }}>{line.volume}</b></span>}
                 </>
               )}
               {/* The extras wrap only together, as one group, so a separator never starts a line alone. */}

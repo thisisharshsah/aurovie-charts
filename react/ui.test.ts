@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { CONTROL, DEPTH, RADIUS, SHEET, SPACE, TYPE, contrast, cx, legendExtraParts, legendVolume, readable, themeVars } from "./ui";
+import { CONTROL, DEPTH, RADIUS, SHEET, SPACE, TYPE, contrast, cx, legendExtraParts, legendLine, legendVolume, readable, themeVars } from "./ui";
 import { DARK, LIGHT, THEMES } from "../src/util";
 
 // The failure this exists to prevent: the widget paints every SELECTED control's label in
@@ -193,4 +193,24 @@ test("legend extras print the host's text, a null as an em dash, tone as theme i
       { label: "Note", text: "flat", color: "var(--ac-ink)" },
     ],
   );
+});
+
+// Owner decision 2026-10-12: the bar's own change drops out while host extras share the line.
+test("legend line hides the bar's own change only while host extras are shown", () => {
+  assert.equal(legendLine("auto", true, 1e6, 0).barChange, true);
+  assert.equal(legendLine("auto", true, 1e6, 2).barChange, false);
+  assert.equal(legendLine("auto", false, 1e6, 1).barChange, false);
+  assert.equal(legendLine("ohlc", false, 1e6, 0).barChange, true);
+});
+
+// "auto": OHLC series get O H L C V (V dash when absent); close-based get price plus V only when known.
+test("auto legend prints V on close-based series only when the bar has volume", () => {
+  assert.deepEqual(legendLine("auto", true, 41_200_000, 0), { shows: "ohlc", volume: "41.2M", barChange: true });
+  assert.deepEqual(legendLine("auto", true, 0, 0), { shows: "ohlc", volume: "\u2014", barChange: true });
+  assert.deepEqual(legendLine("auto", false, 41_200_000, 0), { shows: "price", volume: "41.2M", barChange: true });
+  assert.deepEqual(legendLine("auto", false, 0, 0), { shows: "price", volume: null, barChange: true });
+  assert.deepEqual(legendLine("auto", false, undefined, 0), { shows: "price", volume: null, barChange: true });
+  assert.equal(legendLine("price", true, 41_200_000, 0).volume, null);
+  assert.equal(legendLine("ohlc", false, undefined, 0).volume, "\u2014");
+  assert.equal(legendLine("none", true, 1e6, 0).shows, "none");
 });

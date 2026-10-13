@@ -449,6 +449,29 @@ export const SHEET = `
 export const legendVolume = (v: number | null | undefined): string =>
   v === null || v === undefined || !Number.isFinite(v) || v === 0 ? "\u2014" : fmtVolume(v);
 
+/**
+ * What the legend line prints for one bar. `mode` is the `legend` prop; `ohlcSeries` says whether
+ * the series on screen is OHLC-drawn (candles, bars …).
+ *
+ * - `shows`: `"auto"` resolves to `"ohlc"` on an OHLC series, `"price"` on a close-based one.
+ * - `volume`: the OHLC readout always prints V (an em dash when the bar has none). The `"auto"`
+ *   close-based readout prints V only when the bar carries a volume, so a volume-less line chart
+ *   (an index) gets no `V —`. A forced `"price"` stays price-only.
+ * - `barChange`: the hovered bar's own change (close − open) is dropped while host extras are
+ *   shown: the host's Today/YTD sit on the same line, and on OHLC the O and C already carry it.
+ */
+export function legendLine(
+  mode: "auto" | "ohlc" | "price" | "none",
+  ohlcSeries: boolean,
+  volume: number | null | undefined,
+  extras: number,
+): { shows: "ohlc" | "price" | "none"; volume: string | null; barChange: boolean } {
+  const shows = mode === "auto" ? (ohlcSeries ? "ohlc" : "price") : mode;
+  const v = legendVolume(volume);
+  const known = v !== "\u2014";
+  return { shows, volume: shows === "ohlc" || (mode === "auto" && known) ? v : null, barChange: extras === 0 };
+}
+
 /** A host figure appended to the legend line (Today, YTD …). The host computes it; the widget only prints it. */
 export interface LegendExtra {
   label: string;

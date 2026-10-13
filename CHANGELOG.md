@@ -11,8 +11,11 @@ All notable changes to this project are documented here. The format follows
 - **V on the OHLC legend.** The `ohlc` readout (and `auto` on an OHLC series) now prints
   `O H L C V` on one line: the hovered bar's volume, compact (`41.2M`, `870K`, `1.25B`), or an em
   dash when the bar has none. A volume of 0 also prints a dash, since volume-less feeds send 0;
-  the bar-detail panel uses the same rule (`legendVolume`). The close-based `price` readout
-  stays price-only: that series draws no volume.
+  the bar-detail panel uses the same rule (`legendVolume`).
+- **V on the `auto` close-based legend.** Under `legend="auto"` a line/area/step/baseline series
+  prints the price plus `V` when the hovered bar carries a volume (nothing when it has none, so an
+  index line gets no `V —`). A forced `legend="price"` stays price-only. `legendLine` (exported
+  from `./react`) is the one place that decides what the line prints.
 - **`legendExtras` prop** on `TradingChart`: `{ label, value: string | null, tone?: "up" | "down" |
   "neutral" }[]`, printed on the SAME legend line after the bar readout as ` · label value`.
   Values are the host's own formatted figures (Today, YTD …); the widget does no arithmetic on
@@ -22,6 +25,11 @@ All notable changes to this project are documented here. The format follows
   `legendExtraParts` and the `LegendExtra` type are exported from `./react`.
 
 ### Changed
+
+- **While `legendExtras` are shown the legend omits the hovered bar's own change** (close − open
+  and its %): the host's Today/YTD sit on the same line, and on the OHLC readout O and C already
+  carry it. Chosen over a new `legendBarChange` prop as the smaller change; with no extras the
+  change prints as before.
 
 - The legend's volume label is `V` (was `Vol`) and its value is bold ink like O/H/L/C. It now
   always shows on the OHLC readout, so a volume-less OHLC feed reads `V —` where it showed nothing.
