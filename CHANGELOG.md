@@ -26,10 +26,14 @@ All notable changes to this project are documented here. The format follows
 - **The time grid draws through `drawTimeGrid`**, a pure function of the marks and the zoom that
   can be tested with a fake canvas. Without `candleGrid` it issues the same canvas calls as the
   0.20 loop (a test compares the two). With `candleGrid` it allocates nothing per line. It
-  batches lines into one path per alpha (32 buckets, each within 1/64 of the computed alpha) plus
-  one path for the majors, so a frame makes at most 33 strokes however long the series. Strides
-  that would draw at near-zero alpha are skipped. Lines snap to the device-pixel grid, so they
-  stay crisp at 1.5× and 3× as well as 1× and 2×.
+  batches lines into one path per alpha plus one path for the majors, so a frame makes at most 33
+  strokes however long the series. The drawn alpha is quantised to 1/32 steps (each within 1/64
+  of the computed alpha), and a line under 1/64 is not drawn. Lines snap to the device-pixel grid
+  through `snapLine`, which is `crisp()` at 1×, 2× and 3×, so a candle's gridline sits under its
+  wick and pans with it; at 1.5× it is the device column nearest the wick. Bars on strides
+  coarser than 8 hold stride 8's alpha, so the line beside a section break is never fainter than
+  its neighbours. The per-candle lines draw even with `minorGrid: false`, which still removes
+  the 0.16 minors and the half-step price lines.
 
 ## [0.20.1] - 2026-10-13
 

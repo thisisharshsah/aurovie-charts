@@ -33,7 +33,8 @@ export interface Theme {
    * Advanced charts (0.21): as you zoom in, every candle gets its own vertical gridline, through
    * nested power-of-two strides (8, 4, 2, 1 bars) that fade in smoothly by their on-screen gap and
    * out again as you zoom out; the half-step price lines use the same smooth fade. Default off,
-   * which draws exactly what 0.20 drew. See `candleGridAlpha`.
+   * which draws exactly what 0.20 drew. See `candleGridAlpha`. The per-candle time lines draw even
+   * with `minorGrid: false`, which still removes 0.16's minors and the half-step price lines.
    */
   candleGrid?: boolean;
   border: string;

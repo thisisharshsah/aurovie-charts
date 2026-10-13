@@ -500,12 +500,24 @@ export const CANDLE_GRID = { from: 8, to: 40, gateFrom: 4, gateTo: 14, depth: 8 
 /**
  * Stroke alpha (0–0.55, the minor strength) of a candle-ladder line whose stride `level` is the
  * largest power of two dividing its bar index (`i & -i`). Smooth and non-decreasing in the zoom;
- * strides nest, so zooming never moves a line, it only changes this.
+ * strides nest, so zooming never moves a line, it only changes this. Strides above `depth` count
+ * as `depth`, so a coarser line is never fainter than a finer one.
  */
 export function candleGridAlpha(level: number, barSpacing: number): number {
   const g = CANDLE_GRID;
-  if (!(level >= 1) || level > g.depth) return 0;
-  return 0.55 * smoothstep(g.from, g.to, level * barSpacing) * smoothstep(g.gateFrom, g.gateTo, barSpacing);
+  if (!(level >= 1)) return 0;
+  const L = Math.min(level, g.depth);
+  return 0.55 * smoothstep(g.from, g.to, L * barSpacing) * smoothstep(g.gateFrom, g.gateTo, barSpacing);
+}
+
+/**
+ * Where a vertical gridline of `max(1, round(dpr))` device px is drawn for x = `v` (CSS px): the
+ * device column(s) nearest `crisp(v)`, the column the candle wicks use. Equal to `crisp(v)` at
+ * 1×, 2× and 3×, so a candle's gridline sits under its wick and moves with it while panning.
+ */
+export function snapLine(v: number, dpr: number): number {
+  const lw = Math.max(1, Math.round(dpr));
+  return (Math.round(crisp(v) * dpr - lw / 2) + lw / 2) / dpr;
 }
 
 /** The canvas surface the time grid strokes through (a fake one in tests). */
@@ -559,15 +571,12 @@ export function drawTimeGrid(
   }
   const lw = Math.max(1, Math.round(dpr)); // device px
   ctx.lineWidth = lw / dpr;
-  const snap = (v: number) => (Math.round(v * dpr - lw / 2) + lw / 2) / dpr;
   const a1 = candleGridAlpha(1, barSpacing);
   const a2 = candleGridAlpha(2, barSpacing);
   const a4 = candleGridAlpha(4, barSpacing);
   const a8 = candleGridAlpha(8, barSpacing);
-  const fine = (i: number) => {
-    const b = i & -i;
-    return b === 1 ? a1 : b === 2 ? a2 : b === 4 ? a4 : b === 8 ? a8 : 0;
-  };
+  // Bars on a stride of 8 or more (and bar 0) all take a8: coarser is never fainter than finer.
+  const fine = (i: number) => ((i & 7) === 0 ? a8 : (i & 3) === 0 ? a4 : (i & 1) === 0 ? a2 : a1);
   // Below the gate there is no ladder, so only the marks are walked (a zoomed-out view can hold
   // thousands of bars).
   const ladder = a1 + a2 + a4 + a8 > 0;
@@ -603,9 +612,11 @@ export function drawTimeGrid(
   const line = (i: number) => {
     const px = x(i);
     if (px < 0 || px > pw) return;
-    ctx.moveTo(snap(px), 0);
-    ctx.lineTo(snap(px), h);
+    ctx.moveTo(snapLine(px, dpr), 0);
+    ctx.lineTo(snapLine(px, dpr), h);
   };
+  // ponytail: rescans all n lines per non-empty bucket, O(GRID_Q·n); n ≤ pw/4 with the ladder on
+  // (it is gated off below 4px candles). Upgrade path: a counting sort over gridCount.
   for (let q = 1; q <= GRID_Q; q++) {
     if (!gridCount[q]) continue;
     ctx.globalAlpha = q / GRID_Q;

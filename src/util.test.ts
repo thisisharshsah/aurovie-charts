@@ -3,7 +3,7 @@
 // definitions: NaN padding, the exact formulas, and the invariants each family must hold.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { permEntropy, phasor, ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange, fitBarCount, visibleIndexRange, offsetAfterAppend, DARK, THEMES, timeGridMarks, minorGridAlpha, minorLineAlpha, sectionKey, SECTION_STEPS, candleGridAlpha, drawTimeGrid, crisp } from "./util.ts";
+import { permEntropy, phasor, ichimoku, supertrend, psar, keltner, adx, atr, ema, alpha, mix, fmtCountdown, placeAxisTag, fmtAxisTime, fmtCrosshairTime, isTimeBoundary, rightMarginBars, panFloorBars, projVisibleRange, fitBarCount, visibleIndexRange, offsetAfterAppend, DARK, THEMES, timeGridMarks, minorGridAlpha, minorLineAlpha, sectionKey, SECTION_STEPS, candleGridAlpha, drawTimeGrid, crisp, snapLine } from "./util.ts";
 import type { AxisSlot, GridCtx, TimeMark } from "./util.ts";
 import type { Bar } from "./types.ts";
 
@@ -572,7 +572,7 @@ test("candleGridAlpha: per-candle lines at full minor strength zoomed in, none z
   assert.equal(candleGridAlpha(1, 8), 0);
   assert.equal(candleGridAlpha(8, 4), 0, "the gate holds the whole ladder off below 4px candles");
   assert.ok(candleGridAlpha(1, 20) > 0 && candleGridAlpha(1, 20) < 0.55);
-  assert.equal(candleGridAlpha(16, 40), 0, "the ladder stops at stride 8; coarser lines are the minors'");
+  assert.equal(candleGridAlpha(16, 40), candleGridAlpha(8, 40), "strides past 8 hold stride 8's alpha");
 });
 
 test("drawTimeGrid candleGrid: every bar carries a line when zoomed in, only the default grid zoomed out", () => {
@@ -633,6 +633,30 @@ test("drawTimeGrid candleGrid: lines sit on the device pixel grid at any deviceP
     const lw = strokes[0].width * dpr;
     assert.equal(Math.round(lw), lw);
     for (const s of strokes) for (const x of s.xs) assert.ok(Math.abs(x * dpr - lw / 2 - Math.round(x * dpr - lw / 2)) < 1e-9, `blurry at dpr ${dpr}: ${x}`);
+  }
+});
+
+test("snapLine: the wick's column — equal to crisp() at 1×, 2× and 3×", () => {
+  for (let v = -20; v < 200; v += 0.037)
+    for (const dpr of [1, 2, 3]) assert.ok(Math.abs(snapLine(v, dpr) - crisp(v)) < 1e-9, `${v} at ${dpr}×: ${snapLine(v, dpr)} vs ${crisp(v)}`);
+  for (let v = 0; v < 50; v += 0.037) assert.ok(Math.abs(snapLine(v, 1.5) - crisp(v)) <= 0.5 / 1.5 + 1e-9);
+});
+
+test("drawTimeGrid candleGrid: no gap beside a section break — bar 16 is never fainter than bar 17", () => {
+  const isB = (i: number) => i === 15 || i === 47;
+  const key = (i: number) => (i < 15 ? 0 : i < 47 ? 1 : 2);
+  const at = (bs: number) => {
+    const { ctx, strokes } = fakeCtx();
+    drawTimeGrid(ctx, CG, timeGridMarks(0, 80, bs, isB, key, SECTION_STEPS.intraday), 0, 80, bs, (i) => i * 100, 1e9, 100);
+    const out = new Map<number, number>();
+    for (const s of strokes) for (const x of s.xs) out.set(Math.round(x / 100), s.alpha);
+    return out;
+  };
+  const near = at(40);
+  for (let i = 1; i <= 80; i++) if (!isB(i)) assert.ok((near.get(i) ?? 0) >= candleGridAlpha(1, 40) - 1 / 64, `bar ${i} at ${near.get(i)}`);
+  for (let bs = 3; bs <= 60; bs += 0.5) {
+    const out = at(bs);
+    for (const [c, f] of [[16, 17], [48, 49], [32, 33]]) assert.ok((out.get(c) ?? 0) >= (out.get(f) ?? 0), `bar ${c} fainter than ${f} at ${bs}px`);
   }
 });
 
