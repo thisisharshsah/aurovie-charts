@@ -898,6 +898,61 @@ export function TradingChart({
   const [dataWindow, setDataWindow] = useState(p0.dataWindow); // floating "every value at the cursor" panel
   const [shortcuts, setShortcuts] = useState(false); // keyboard help overlay
   const [scriptOpen, setScriptOpen] = useState(false);
+  // THE FULL-SCREEN SCRIPT WORKSPACE (TradingView's Pine editor layout): the widget covers the
+  // window, and on a wide screen the editor is a resizable column beside the plot instead of a
+  // dock under it. On a phone two columns are both too narrow to read, so it stays docked.
+  const [workspace, setWorkspace] = useState(false);
+  const [sideWidth, setSideWidth] = useState(460);
+  // The workspace fills the window, so the window's width decides: two readable columns need about
+  // 900px (a 460px editor and a chart wider than a phone).
+  const [windowWidth, setWindowWidth] = useState(0);
+  const sideBySide = workspace && scriptOpen && windowWidth >= 900;
+  const sideW = Math.min(sideWidth, Math.round(windowWidth * 0.7));
+  // Entering also asks the browser for real full screen where it allows one; leaving it by the
+  // browser's own Esc leaves the workspace, so the two never disagree.
+  const toggleWorkspace = () => {
+    const el = rootRef.current;
+    if (!workspace) {
+      setWorkspace(true);
+      el?.requestFullscreen?.().catch(() => {}); // refused (an iframe, iOS): the window is enough
+    } else {
+      setWorkspace(false);
+      if (typeof document !== "undefined" && document.fullscreenElement === el) document.exitFullscreen?.().catch(() => {});
+    }
+  };
+  useEffect(() => {
+    if (!workspace) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented) setWorkspace(false);
+    };
+    const onFs = () => {
+      if (!document.fullscreenElement) setWorkspace(false);
+    };
+    const onResize = () => setWindowWidth(window.innerWidth);
+    onResize();
+    window.addEventListener("resize", onResize);
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("fullscreenchange", onFs);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("fullscreenchange", onFs);
+    };
+  }, [workspace]);
+  // Drag the column's edge: the editor between 320px and 70% of the widget.
+  const dragSide = (e: React.PointerEvent<HTMLDivElement>) => {
+    const root = rootRef.current;
+    if (!root) return;
+    e.preventDefault();
+    const box = root.getBoundingClientRect();
+    const move = (ev: PointerEvent) => setSideWidth(Math.round(Math.min(Math.max(box.right - ev.clientX, 320), box.width * 0.7)));
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
   const [scriptSrc, setScriptSrc] = useState("");
   const [loadedSaved, setLoadedSaved] = useState<SavedStrategy | null>(null); // which saved strategy the editor is editing, if any
   const [scriptErr, setScriptErr] = useState<ScriptError | null>(null);
@@ -1792,15 +1847,18 @@ export function TradingChart({
         // else resolves from here through the stylesheet, so a theme change is one attribute
         // rather than several hundred re-rendered style objects.
         ...themeVars(th),
-        position: "relative",
+        position: workspace ? "fixed" : "relative",
+        ...(workspace ? { inset: 0, zIndex: 1000 } : null),
         display: "flex",
         flexDirection: "column",
-        height,
+        height: workspace ? "100dvh" : height,
+        // the editor column takes the right padding; the plot and its bars lay out in the rest
+        paddingRight: sideBySide ? sideW : 0,
         background: "var(--ac-bg)",
-        border: frame ? "1px solid var(--ac-line)" : "none",
-        borderRadius: frame ? R.xl : 0,
+        border: frame && !workspace ? "1px solid var(--ac-line)" : "none",
+        borderRadius: frame && !workspace ? R.xl : 0,
         overflow: "hidden",
-        boxShadow: frame ? "0 1px 2px rgba(0,0,0,0.16), 0 8px 28px rgba(0,0,0,0.12)" : "none",
+        boxShadow: frame && !workspace ? "0 1px 2px rgba(0,0,0,0.16), 0 8px 28px rgba(0,0,0,0.12)" : "none",
         transition: "background 220ms ease, border-color 220ms ease",
       }}
     >
@@ -3008,7 +3066,26 @@ export function TradingChart({
           slit. Docked below it takes real height out of the layout: the plot shrinks, both
           are fully visible, and the editor is big enough to work in. */}
           {scriptOpen && onRunScript && (
+            <div
+              style={
+                sideBySide
+                  ? { position: "absolute", top: 0, right: 0, bottom: 0, width: sideW, display: "flex", flexDirection: "column", zIndex: 6 }
+                  : { display: "contents" }
+              }
+            >
+            {sideBySide && (
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize the script editor"
+                onPointerDown={dragSide}
+                style={{ position: "absolute", left: -3, top: 0, bottom: 0, width: 6, cursor: "col-resize", zIndex: 1, touchAction: "none" }}
+              />
+            )}
             <ScriptEditor
+              side={sideBySide}
+              fullScreen={workspace}
+              onFullScreen={toggleWorkspace}
               theme={th}
               value={scriptSrc}
               onChange={(src) => {
@@ -3019,7 +3096,10 @@ export function TradingChart({
                 setSweep(null);
               }}
               onRun={runScript}
-              onClose={() => setScriptOpen(false)}
+              onClose={() => {
+                setScriptOpen(false);
+                if (workspace) toggleWorkspace();
+              }}
               running={scriptRunning}
               error={scriptErr}
               status={scriptStatus}
@@ -3093,6 +3173,7 @@ export function TradingChart({
               }
               dirty={loadedSaved ? scriptSrc !== loadedSaved.source : undefined}
             />
+            </div>
           )}
 
       {/* ——— THE COMPACT SHEET ———

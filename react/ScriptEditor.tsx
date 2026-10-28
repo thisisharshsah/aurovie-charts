@@ -168,6 +168,15 @@ export interface ScriptEditorProps {
   onDeleteSaved?: (id: string | number) => void;
   /** True when the editor has unsaved edits vs the loaded strategy — marks the Save button. */
   dirty?: boolean;
+  /**
+   * Laid out as a column beside the plot (the full-screen workspace) instead of a dock under it.
+   * The host gives it the full height; the code-beside-results split stays off, since one column
+   * cannot carry two.
+   */
+  side?: boolean;
+  /** The full-screen workspace toggle. Omitted, the button is not drawn. */
+  onFullScreen?: () => void;
+  fullScreen?: boolean;
 }
 
 const EXAMPLE = `indicator("Squeeze", overlay = false)
@@ -207,6 +216,9 @@ export function ScriptEditor({
   onSelectSaved,
   onDeleteSaved,
   dirty,
+  side = false,
+  onFullScreen,
+  fullScreen = false,
 }: ScriptEditorProps) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const gutterRef = useRef<HTMLDivElement>(null);
@@ -242,7 +254,7 @@ export function ScriptEditor({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const split = expanded && wide;
+  const split = expanded && wide && !side;
 
   // Keep the gutter aligned with the textarea's own scrolling.
   useEffect(() => {
@@ -286,11 +298,12 @@ export function ScriptEditor({
         // instead of stealing it from the plot.
         display: "flex",
         flexDirection: "column",
-        flex: expanded ? "1 1 auto" : "0 0 clamp(240px, 42%, 420px)",
+        flex: expanded || side ? "1 1 auto" : "0 0 clamp(240px, 42%, 420px)",
         minHeight: 0,
         overflow: "hidden",
         background: "var(--ac-pane)",
-        borderTop: "1px solid var(--ac-line)",
+        borderTop: side ? "none" : "1px solid var(--ac-line)",
+        borderLeft: side ? "1px solid var(--ac-line)" : "none",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderBottom: "1px solid var(--ac-line)" }}>
@@ -355,7 +368,18 @@ export function ScriptEditor({
         <button {...btn(true)} onClick={onRun} disabled={running} title="Run (Ctrl/Cmd + Enter)">
           {running ? "Running…" : "▶ Run"}
         </button>
-        <button
+        {onFullScreen && (
+          <button
+            {...btn(fullScreen)}
+            onClick={onFullScreen}
+            aria-pressed={fullScreen}
+            title={fullScreen ? "Leave full screen (Esc)" : "Full screen: the chart and the script side by side"}
+            aria-label={fullScreen ? "Leave full screen" : "Full screen"}
+          >
+            <Icon name="layout" size={14} />
+          </button>
+        )}
+        {!side && <button
           {...btn(expanded)}
           onClick={() => setExpanded((v) => !v)}
           aria-pressed={expanded}
@@ -363,7 +387,7 @@ export function ScriptEditor({
           aria-label={expanded ? "Collapse editor" : "Expand editor"}
         >
           <Icon name={expanded ? "collapse" : "expand"} size={14} />
-        </button>
+        </button>}
         <button {...btn()} onClick={onClose} aria-label="Close editor"><Icon name="close" size={13} /></button>
       </div>
 
@@ -474,6 +498,10 @@ export function ScriptEditor({
               e.stopPropagation();
             }}
             spellCheck={false}
+            // No soft wrap: a wrapped line takes two rows beside one gutter number, so every
+            // number below it — and the error highlight — points at the wrong line. Long lines
+            // scroll sideways instead, as in a code editor.
+            wrap="off"
             autoComplete="off"
             style={{
               flex: 1,

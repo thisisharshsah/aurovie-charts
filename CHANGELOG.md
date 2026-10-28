@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.22.0] - 2026-10-28
+
+### Added
+
+- **The full-screen script workspace** (owner, 2026-10-28: TradingView's Pine editor layout). The
+  script editor's new full-screen button makes the widget cover the window, and asks the browser
+  for real full screen where it allows one. From 900 px wide, the editor becomes a column to the
+  right of the plot, 460 px to start, which you can resize by dragging its left edge between
+  320 px and 70% of the window. The chart keeps everything else, with its toolbar and bottom bar.
+  Below 900 px the editor stays docked under the plot, because two columns would both be too
+  narrow to read. Esc, the button again, the browser leaving full screen, or closing the editor
+  returns the widget to its place. New `ScriptEditor` props: `side`, `fullScreen` and
+  `onFullScreen`.
+
+### Fixed
+
+- **The editor no longer soft-wraps.** A wrapped line took two rows beside one line number, so
+  every number below it, and the error highlight, pointed at the wrong line. Long lines now
+  scroll sideways, as in a code editor.
+
 ## [0.21.0] - 2026-10-13
 
 ### Added
